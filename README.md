@@ -77,3 +77,12 @@ func main() {
 
 	fmt.Printf("\nResults: %d zeros, %d ones\n", zeros, ones)
 }
+
+## Expansion
+
+To extend this further, you could:
+- Add more gates (X, Y, Z, CNOT, etc.)
+- Implement entanglement operations
+- Add error checking for invalid qubit indices
+- **Error Handling**: Check normalization (\( |\alpha|^2 + |\beta|^2 = 1 \)) after operations.
+- Add methods to access individual qubit states
