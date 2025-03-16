@@ -38,7 +38,12 @@ func (q *Qubit) ApplyHadamard() {
 }
 
 // Apply Hadamard gate to the specified qubit (0-based index)
-func (qs *QuantumState) ApplyHadamard(qubit int) {
+func (qs *QuantumState) ApplyHadamard(qubit int) error {
+	// Input validation
+	if qubit < 0 || qubit >= qs.NQubits {
+		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+	}
+
 	h := [2][2]complex128{
 		{complex(1.0/math.Sqrt(2), 0), complex(1.0/math.Sqrt(2), 0)},
 		{complex(1.0/math.Sqrt(2), 0), complex(-1.0/math.Sqrt(2), 0)},
@@ -63,6 +68,7 @@ func (qs *QuantumState) ApplyHadamard(qubit int) {
 		}
 	}
 	qs.Amplitudes = newAmplitudes
+	return nil
 }
 
 func (q *Qubit) Measure() int {
@@ -132,6 +138,90 @@ func (qs *QuantumState) PrintState() {
 	}
 }
 
+// Apply CNOT gate to QuantumState, returns error instead of panicking
+func (qs *QuantumState) ApplyCNOT(control, target int) error {
+	// Input validation
+	if control < 0 || control >= qs.NQubits {
+		return fmt.Errorf("control qubit index %d out of range [0,%d)", control, qs.NQubits)
+	}
+	if target < 0 || target >= qs.NQubits {
+		return fmt.Errorf("target qubit index %d out of range [0,%d)", target, qs.NQubits)
+	}
+	if control == target {
+		return fmt.Errorf("control and target qubits must be different, got %d for both", control)
+	}
+
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+	copy(newAmplitudes, qs.Amplitudes)
+
+	// For each basis state
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Check if control qubit is 1
+		controlBit := (state >> control) & 1
+		if controlBit == 1 {
+			// Flip the target bit
+			newState := state ^ (1 << target)
+			newAmplitudes[newState] = qs.Amplitudes[state]
+			newAmplitudes[state] = 0
+		}
+	}
+	qs.Amplitudes = newAmplitudes
+	return nil
+}
+
+// Add a test function for CNOT with error handling
+func CNOTTrials() {
+	fmt.Println("\nCNOT gate trials:")
+
+	// Trial 1: |00> -> |00> (control=0, no flip)
+	qs1 := NewQuantumState(2)
+	fmt.Println("Initial state |00>:")
+	qs1.PrintState()
+	err := qs1.ApplyCNOT(0, 1)
+	if err != nil {
+		fmt.Printf("Error applying CNOT: %v\n", err)
+		return
+	}
+	fmt.Println("After CNOT (control=0, target=1):")
+	qs1.PrintState()
+
+	// Trial 2: |10> -> |11> (control=1, flip target)
+	qs2 := NewQuantumState(2)
+	qs2.Amplitudes[0] = 0
+	qs2.Amplitudes[2] = 1.0 + 0i // |10>
+	fmt.Println("\nInitial state |10>:")
+	qs2.PrintState()
+	err = qs2.ApplyCNOT(0, 1)
+	if err != nil {
+		fmt.Printf("Error applying CNOT: %v\n", err)
+		return
+	}
+	fmt.Println("After CNOT (control=0, target=1):")
+	qs2.PrintState()
+
+	// Trial 3: Bell state creation
+	qs3 := NewQuantumState(2)
+	err = qs3.ApplyHadamard(0)
+	if err != nil {
+		fmt.Printf("Error applying Hadamard: %v\n", err)
+		return
+	}
+	err = qs3.ApplyCNOT(0, 1)
+	if err != nil {
+		fmt.Printf("Error applying CNOT: %v\n", err)
+		return
+	}
+	fmt.Println("\nAfter H(0) then CNOT(0,1) - Bell state:")
+	qs3.PrintState()
+
+	// Demo of error handling
+	fmt.Println("\nTrying invalid CNOT operation (control=target):")
+	err = qs3.ApplyCNOT(1, 1)
+	if err != nil {
+		fmt.Printf("Expected error: %v\n", err)
+	}
+}
+
 func HadamardTrials() {
 	trials := 1000
 	zeros := 0
@@ -186,4 +276,7 @@ func main() {
 	fmt.Println("------------------------")
 	fmt.Println("\nMultiple qubits trials:")
 	MultipleQubitsTrials()
+	fmt.Println("------------------------")
+	fmt.Println("\nCNOT gate trials:")
+	CNOTTrials()
 }

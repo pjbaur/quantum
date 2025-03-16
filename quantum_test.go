@@ -95,3 +95,33 @@ func TestMeasure(t *testing.T) {
 		t.Errorf("Measurement ratio = %f, want ~0.5 (zeros=%d, ones=%d)", ratio, zeros, ones)
 	}
 }
+
+func TestCNOTGate(t *testing.T) {
+	// Test 1: |00> should stay |00>
+	qs1 := NewQuantumState(2)
+	qs1.ApplyCNOT(0, 1)
+	if cmplx.Abs(qs1.Amplitudes[0]-1.0) > 1e-10 || cmplx.Abs(qs1.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs1.Amplitudes[3]) > 1e-10 {
+		t.Errorf("CNOT failed on |00>: expected |00>, got %v", qs1.Amplitudes)
+	}
+
+	// Test 2: |10> should become |11>
+	qs2 := NewQuantumState(2)
+	qs2.Amplitudes[0] = 0
+	qs2.Amplitudes[2] = 1.0 + 0i
+	qs2.ApplyCNOT(0, 1)
+	if cmplx.Abs(qs2.Amplitudes[0]) > 1e-10 || cmplx.Abs(qs2.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs2.Amplitudes[3]-1.0) > 1e-10 {
+		t.Errorf("CNOT failed on |10>: expected |11>, got %v", qs2.Amplitudes)
+	}
+
+	// Test 3: Bell state creation
+	qs3 := NewQuantumState(2)
+	qs3.ApplyHadamard(0)
+	qs3.ApplyCNOT(0, 1)
+	expected := 1.0 / cmplx.Sqrt(2)
+	if cmplx.Abs(qs3.Amplitudes[0]-expected) > 1e-10 || cmplx.Abs(qs3.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs3.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs3.Amplitudes[3]-expected) > 1e-10 {
+		t.Errorf("CNOT failed to create Bell state: expected 1/sqrt(2)(|00> + |11>), got %v", qs3.Amplitudes)
+	}
+}
