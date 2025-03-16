@@ -1,4 +1,4 @@
-# Quantum Computing Simulation in Go
+# Schrödinger's Gopher
 
 This project provides a basic simulation of quantum computing concepts using the Go programming language. It focuses on the fundamental building block of quantum computing: the qubit, and implements core operations like the Hadamard gate and measurement.
 
@@ -86,3 +86,8 @@ To extend this further, you could:
 - Add error checking for invalid qubit indices
 - **Error Handling**: Check normalization (\( |\alpha|^2 + |\beta|^2 = 1 \)) after operations.
 - Add methods to access individual qubit states
+- Quantum Circuit abstraction: Add a circuit model to compose operations more easily.
+- Gate decomposition: Support for decomposing complex operations into your basic gates.
+- Density matrix representation: For mixed states and noisy simulations.
+- Performance optimizations: Consider sparse representations for states with many zeros.
+- Visualization tools: Add methods to visualize quantum states (Bloch sphere for single qubits).
