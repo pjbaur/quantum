@@ -17,6 +17,12 @@ type QuantumState struct {
 	NQubits    int          // Number of qubits
 }
 
+// Hadamard matrix constant
+var H = [2][2]complex128{
+	{complex(1.0/math.Sqrt(2), 0), complex(1.0/math.Sqrt(2), 0)},
+	{complex(1.0/math.Sqrt(2), 0), complex(-1.0/math.Sqrt(2), 0)},
+}
+
 func NewQubit() *Qubit {
 	return &Qubit{
 		Alpha: 1.0 + 0i,
@@ -24,29 +30,20 @@ func NewQubit() *Qubit {
 	}
 }
 
+// Apply Hadamard gate to a single qubit
 func (q *Qubit) ApplyHadamard() {
-	h00 := complex(1.0/math.Sqrt(2), 0)
-	h01 := complex(1.0/math.Sqrt(2), 0)
-	h10 := complex(1.0/math.Sqrt(2), 0)
-	h11 := complex(-1.0/math.Sqrt(2), 0)
-
-	newAlpha := h00*q.Alpha + h01*q.Beta
-	newBeta := h10*q.Alpha + h11*q.Beta
+	newAlpha := H[0][0]*q.Alpha + H[0][1]*q.Beta
+	newBeta := H[1][0]*q.Alpha + H[1][1]*q.Beta
 
 	q.Alpha = newAlpha
 	q.Beta = newBeta
 }
 
-// Apply Hadamard gate to the specified qubit (0-based index)
+// Apply Hadamard gate to the specified qubit (0-based index) in a quantum state
 func (qs *QuantumState) ApplyHadamard(qubit int) error {
 	// Input validation
 	if qubit < 0 || qubit >= qs.NQubits {
 		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
-	}
-
-	h := [2][2]complex128{
-		{complex(1.0/math.Sqrt(2), 0), complex(1.0/math.Sqrt(2), 0)},
-		{complex(1.0/math.Sqrt(2), 0), complex(-1.0/math.Sqrt(2), 0)},
 	}
 
 	newAmplitudes := make([]complex128, len(qs.Amplitudes))
@@ -55,18 +52,21 @@ func (qs *QuantumState) ApplyHadamard(qubit int) error {
 	for state := 0; state < len(qs.Amplitudes); state++ {
 		// Check the bit at target qubit position
 		bit := (state >> qubit) & 1
-		// Calculate the state with flipped bit
+		// Calculate the state with flipped bit at the target position
 		flipped := state ^ (1 << qubit)
 
-		// Apply Hadamard transformation
-		for i := 0; i < 2; i++ {
-			src := state
-			if i == 0 {
-				src = flipped
-			}
-			newAmplitudes[state] += h[bit][i] * qs.Amplitudes[src]
+		// Apply Hadamard transformation using the global Hadamard matrix
+		if bit == 0 {
+			// If qubit is |0⟩: newAmplitudes += H[0][0] * currentAmplitude (no flip) + H[0][1] * currentAmplitude (with flip)
+			newAmplitudes[state] += H[0][0] * qs.Amplitudes[state]
+			newAmplitudes[flipped] += H[0][1] * qs.Amplitudes[state]
+		} else {
+			// If qubit is |1⟩: newAmplitudes += H[1][0] * currentAmplitude (with flip) + H[1][1] * currentAmplitude (no flip)
+			newAmplitudes[flipped] += H[1][0] * qs.Amplitudes[state]
+			newAmplitudes[state] += H[1][1] * qs.Amplitudes[state]
 		}
 	}
+
 	qs.Amplitudes = newAmplitudes
 	return nil
 }
