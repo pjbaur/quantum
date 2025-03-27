@@ -3,12 +3,63 @@ package qubit
 import (
 	"math/cmplx"
 	"math/rand"
+
+	"github.com/pjbaur/quantum/gates"
 )
 
 // Qubit represents a single quantum bit with complex amplitudes
 type Qubit struct {
 	Alpha complex128 // Amplitude for |0⟩ state
 	Beta  complex128 // Amplitude for |1⟩ state
+}
+
+// ApplyMatrix applies a 2x2 unitary matrix to the qubit's state
+func (q *Qubit) ApplyMatrix(matrix [2][2]complex128) {
+	newAlpha := matrix[0][0]*q.Alpha + matrix[0][1]*q.Beta
+	newBeta := matrix[1][0]*q.Alpha + matrix[1][1]*q.Beta
+
+	q.Alpha = newAlpha
+	q.Beta = newBeta
+}
+
+// ApplyHadamard applies the Hadamard gate to the qubit
+func (q *Qubit) ApplyHadamard() {
+	q.ApplyMatrix(gates.H)
+}
+
+// ApplyX applies the Pauli-X gate to the qubit
+func (q *Qubit) ApplyX() {
+	q.ApplyMatrix(gates.X)
+}
+
+// ApplyZ applies the Pauli-Z gate to the qubit
+func (q *Qubit) ApplyZ() {
+	q.ApplyMatrix(gates.Z)
+}
+
+// ApplyT applies the T gate to the qubit
+func (q *Qubit) ApplyT() {
+	q.ApplyMatrix(gates.T)
+}
+
+// ApplyS applies the S gate to the qubit
+func (q *Qubit) ApplyS() {
+	q.ApplyMatrix(gates.S)
+}
+
+// ApplyY applies the Pauli-Y gate to the qubit
+func (q *Qubit) ApplyY() {
+	q.ApplyMatrix(gates.Y)
+}
+
+// ApplyCNot applies the CNOT gate to the qubit
+func (q *Qubit) ApplyCNot(control int) {
+	q.ApplyMatrix(gates.CNot(control))
+}
+
+// ApplyCZ applies the CZ gate to the qubit
+func (q *Qubit) ApplyCZ(control int) {
+	q.ApplyMatrix(gates.CZ(control))
 }
 
 // NewQubit creates a new qubit initialized to |0⟩ state
@@ -63,13 +114,4 @@ func (q *Qubit) Clone() *Qubit {
 		Alpha: q.Alpha,
 		Beta:  q.Beta,
 	}
-}
-
-// ApplyMatrix applies a 2x2 unitary matrix to the qubit
-func (q *Qubit) ApplyMatrix(matrix [2][2]complex128) {
-	newAlpha := matrix[0][0]*q.Alpha + matrix[0][1]*q.Beta
-	newBeta := matrix[1][0]*q.Alpha + matrix[1][1]*q.Beta
-
-	q.Alpha = newAlpha
-	q.Beta = newBeta
 }

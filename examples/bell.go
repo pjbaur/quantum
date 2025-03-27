@@ -1,20 +1,20 @@
 /*
-This `examples/bell.go` file contains several demonstration functions focused on Bell states and their applications in quantum information:
+This `examples/bell.go` file contains several demonstration functions focused on Bell states and
+their applications in quantum information:
 
-1. `CreateBellState()` - A utility function that creates the standard Bell state (Φ+): (|00⟩ + |11⟩)/√2.
-
-2. `BellStateDemo()` - Demonstrates the step-by-step creation of a Bell state using Hadamard and CNOT gates.
-
-3. `BellStateMeasurementCorrelation()` - Shows the perfect correlation between measurements of qubits in a Bell state through multiple trials.
-
-4. `CreateFourBellStates()` - Creates and displays all four Bell states (Φ+, Φ-, Ψ+, Ψ-) using combinations of quantum gates.
-
-5. `BellStateEntanglementDemo()` - Demonstrates quantum entanglement by measuring one qubit of a Bell pair and observing the effect on the other qubit.
-
-6. `QuantumTeleportationDemo()` - Simulates quantum teleportation using Bell states, one of the most important quantum information protocols.
-
+1. `CreateBellState()` - A utility function that creates the standard Bell state
+    (Φ+): (|00⟩ + |11⟩)/√2.
+2. `BellStateDemo()` - Demonstrates the step-by-step creation of a Bell state using Hadamard and
+    CNOT gates.
+3. `BellStateMeasurementCorrelation()` - Shows the perfect correlation between measurements of
+    qubits in a Bell state through multiple trials.
+4. `CreateFourBellStates()` - Creates and displays all four Bell states (Φ+, Φ-, Ψ+, Ψ-) using
+    combinations of quantum gates.
+5. `BellStateEntanglementDemo()` - Demonstrates quantum entanglement by measuring one qubit of a
+    Bell pair and observing the effect on the other qubit.
+6. `QuantumTeleportationDemo()` - Simulates quantum teleportation using Bell states, one of the
+    most important quantum information protocols.
 7. `AreQubitStatesEqual()` - A helper function to compare qubit states within a numerical tolerance.
-
 8. `RunAllBellDemos()` - A convenience function that runs all the demonstrations in sequence.
 
 The code assumes your new package structure with imports from packages like `quantum/state`. It includes detailed explanations of Bell states and their properties, focusing on entanglement and non-classical correlations that make Bell states fundamental to quantum information science.
@@ -29,6 +29,8 @@ import (
 	"math/cmplx"
 	"math/rand"
 
+	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/measurement"
 	"github.com/pjbaur/quantum/qubit"
 	"github.com/pjbaur/quantum/state"
 )
@@ -112,20 +114,20 @@ func CreateFourBellStates() {
 	// Φ- = (|00⟩ - |11⟩)/√2
 	fmt.Println("\nBell state |Φ-⟩ = (|00⟩ - |11⟩)/√2:")
 	bellPhiMinus := CreateBellState()
-	bellPhiMinus.ApplyZ(1) // Apply Z gate to second qubit
+	bellPhiMinus.ApplyMatrix(1, gates.Z) // Apply Z gate to second qubit
 	bellPhiMinus.PrintState()
 
 	// Ψ+ = (|01⟩ + |10⟩)/√2
 	fmt.Println("\nBell state |Ψ+⟩ = (|01⟩ + |10⟩)/√2:")
 	bellPsiPlus := CreateBellState()
-	bellPsiPlus.ApplyX(1) // Apply X gate to second qubit
+	bellPsiPlus.ApplyMatrix(1, gates.X) // Apply X gate to second qubit
 	bellPsiPlus.PrintState()
 
 	// Ψ- = (|01⟩ - |10⟩)/√2
 	fmt.Println("\nBell state |Ψ-⟩ = (|01⟩ - |10⟩)/√2:")
 	bellPsiMinus := CreateBellState()
-	bellPsiMinus.ApplyX(1) // Apply X gate to second qubit
-	bellPsiMinus.ApplyZ(1) // Apply Z gate to second qubit
+	bellPsiMinus.ApplyMatrix(1, gates.X) // Apply X gate to second qubit
+	bellPsiMinus.ApplyMatrix(1, gates.Z) // Apply Z gate to second qubit
 	bellPsiMinus.PrintState()
 }
 
@@ -141,7 +143,7 @@ func BellStateEntanglementDemo() {
 
 	for i := 0; i < trials; i++ {
 		// Create a new 2-qubit quantum state
-		qs := state.New(2)
+		qs := state.NewQuantumState(2)
 
 		// Create Bell state
 		qs.ApplyHadamard(0)
@@ -149,10 +151,10 @@ func BellStateEntanglementDemo() {
 
 		// Measure only the first qubit using custom measurement
 		// Implementation depends on your state package's capabilities
-		firstQubitResult := qs.MeasureQubit(0)
+		firstQubitResult, _ := measurement.MeasureSingleQubit(qs, 0)
 
 		// Now measure the second qubit
-		secondQubitResult := qs.MeasureQubit(1)
+		secondQubitResult, _ := measurement.MeasureSingleQubit(qs, 1)
 
 		// In a Bell state, the qubits should have the same value
 		if firstQubitResult == secondQubitResult {
@@ -181,7 +183,7 @@ func QuantumTeleportationDemo() {
 
 	for i := 0; i < trials; i++ {
 		// Create a 3-qubit system: message qubit + Bell pair
-		qs := state.New(3)
+		qs := state.NewQuantumState(3)
 
 		// Prepare a random state for the message qubit (qubit 0)
 		if rand.Float64() < 0.5 {
@@ -189,15 +191,15 @@ func QuantumTeleportationDemo() {
 			qs.ApplyHadamard(0)
 			// Apply a random phase with T gate for more variety
 			if rand.Float64() < 0.5 {
-				qs.ApplyT(0)
+				qs.ApplyMatrix(0, gates.T)
 			}
 		} else {
 			// Or just flip to |1⟩ state for simple demonstration
-			qs.ApplyX(0)
+			qs.ApplyMatrix(0, gates.X)
 		}
 
 		// Record the initial state of the message qubit
-		initialState := qs.GetQubitState(0)
+		initialState, _ := measurement.MeasureSingleQubit(qs, 0)
 
 		// Create Bell state between qubits 1 and 2
 		qs.ApplyHadamard(1)
@@ -211,22 +213,22 @@ func QuantumTeleportationDemo() {
 
 		// 2. Measure the first two qubits (message and first of Bell pair)
 		// This would collapse the state
-		firstQubitResult := qs.MeasureQubit(0)
-		secondQubitResult := qs.MeasureQubit(1)
+		firstQubitResult, _ := measurement.MeasureSingleQubit(qs, 0)
+		secondQubitResult, _ := measurement.MeasureSingleQubit(qs, 1)
 
 		// 3. Apply corrections to the third qubit based on measurement results
 		if secondQubitResult == 1 {
-			qs.ApplyX(2)
+			qs.ApplyMatrix(2, gates.X)
 		}
 		if firstQubitResult == 1 {
-			qs.ApplyZ(2)
+			qs.ApplyMatrix(2, gates.Z)
 		}
 
 		// 4. Verify teleportation success by checking final state of qubit 2
-		finalState := qs.GetQubitState(2)
+		finalState, _ := measurement.MeasureSingleQubit(qs, 2)
 
 		// Compare the initial and final states (within tolerance)
-		if AreQubitStatesEqual(initialState, finalState) {
+		if initialState == finalState {
 			successfulTeleportations++
 		}
 	}

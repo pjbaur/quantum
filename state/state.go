@@ -5,6 +5,8 @@ import (
 	"math"
 	"math/cmplx"
 	"math/rand"
+
+	"github.com/pjbaur/quantum/gates"
 )
 
 // QuantumState represents a multi-qubit quantum state.
@@ -45,6 +47,18 @@ func NewQuantumStateFromAmplitudes(amplitudes []complex128, nQubits int) (*Quant
 		Amplitudes: ampCopy,
 		NQubits:    nQubits,
 	}, nil
+}
+
+// ApplyHadamard applies a Hadamard gate to the specified qubit.
+// The Hadamard gate is a 2x2 matrix that transforms the basis states |0⟩ and |1⟩ as follows:
+// |0⟩ -> (|0⟩ + |1⟩) / √2
+// |1⟩ -> (|0⟩ - |1⟩) / √2
+func (qs *QuantumState) ApplyHadamard(qubit int) error {
+	if qubit < 0 || qubit >= qs.NQubits {
+		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+	}
+
+	return qs.ApplyMatrix(qubit, gates.H)
 }
 
 // Measure collapses the quantum state and returns the measured value.
@@ -182,24 +196,6 @@ func (qs *QuantumState) Normalize() {
 	for i := range qs.Amplitudes {
 		qs.Amplitudes[i] *= normFactor
 	}
-}
-
-// ApplyHadamard applies a Hadamard gate to the specified qubit.
-// The Hadamard gate is a 2x2 matrix that transforms the basis states |0⟩ and |1⟩ as follows:
-// |0⟩ -> (|0⟩ + |1⟩) / √2
-// |1⟩ -> (|0⟩ - |1⟩) / √2
-func (qs *QuantumState) ApplyHadamard(qubit int) error {
-	if qubit < 0 || qubit >= qs.NQubits {
-		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
-	}
-
-	// Hadamard matrix
-	matrix := [2][2]complex128{
-		{1 / math.Sqrt2, 1 / math.Sqrt2},
-		{1 / math.Sqrt2, -1 / math.Sqrt2},
-	}
-
-	return qs.ApplyMatrix(qubit, matrix)
 }
 
 // ApplyCNOT applies a Controlled-NOT gate with the specified control and target qubits.

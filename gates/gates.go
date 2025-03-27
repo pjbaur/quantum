@@ -52,7 +52,59 @@ var (
 		{complex(1, 0), complex(0, 0)},
 		{complex(0, 0), complex(0, 1)},
 	}
+
+	// CNOT gate
+	CNot = func(control int) Matrix2x2 {
+		// CNOT = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ X
+		var result Matrix2x2
+		switch control {
+		case 0:
+			result = Matrix2x2{
+				{complex(1, 0), complex(0, 0)},
+				{complex(0, 0), complex(0, 0)},
+			}
+		case 1:
+			result = Matrix2x2{
+				{complex(0, 0), complex(0, 0)},
+				{complex(0, 0), complex(1, 0)},
+			}
+		}
+		return result.Multiply(X)
+	}
+
+	// CZ gate
+	CZ = func(control int) Matrix2x2 {
+		// CZ = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ Z
+		var result Matrix2x2
+		switch control {
+		case 0:
+			result = Matrix2x2{
+				{complex(1, 0), complex(0, 0)},
+				{complex(0, 0), complex(0, 0)},
+			}
+		case 1:
+			result = Matrix2x2{
+				{complex(0, 0), complex(0, 0)},
+				{complex(0, 0), complex(-1, 0)},
+			}
+		}
+		return result.Multiply(Z)
+	}
+
+	// T-Dagger gate (inverse of T)
+	TDagger = T.Conjugate()
 )
+
+// Conjugate returns the conjugate of a 2x2 matrix
+func (m Matrix2x2) Conjugate() Matrix2x2 {
+	var result Matrix2x2
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 2; j++ {
+			result[i][j] = cmplx.Conj(m[i][j])
+		}
+	}
+	return result
+}
 
 // Multiply multiplies two 2x2 matrices and returns the result
 func (m Matrix2x2) Multiply(other Matrix2x2) Matrix2x2 {

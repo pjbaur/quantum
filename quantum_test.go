@@ -4,13 +4,16 @@ import (
 	"math"
 	"math/cmplx"
 	"testing"
+
+	"github.com/pjbaur/quantum/qubit"
+	"github.com/pjbaur/quantum/state"
 )
 
 const tolerance = 1e-10 // Small tolerance for floating-point comparisons
 
 // TestNewQubit checks if a new qubit starts in |0> state
 func TestNewQubit(t *testing.T) {
-	q := NewQubit()
+	q := qubit.NewQubit()
 	if real(q.Alpha) != 1.0 || imag(q.Alpha) != 0.0 {
 		t.Errorf("NewQubit Alpha = %v, want 1 + 0i", q.Alpha)
 	}
@@ -21,7 +24,7 @@ func TestNewQubit(t *testing.T) {
 
 // TestApplyHadamardFromZero tests Hadamard on |0>
 func TestApplyHadamardFromZero(t *testing.T) {
-	q := NewQubit()
+	q := qubit.NewQubit()
 	q.ApplyHadamard()
 
 	expected := 1.0 / math.Sqrt(2)
@@ -41,7 +44,7 @@ func TestApplyHadamardFromZero(t *testing.T) {
 
 // TestApplyHadamardFromOne tests Hadamard on |1>
 func TestApplyHadamardFromOne(t *testing.T) {
-	q := &Qubit{Alpha: 0.0 + 0i, Beta: 1.0 + 0i} // Start in |1>
+	q := &qubit.Qubit{Alpha: 0.0 + 0i, Beta: 1.0 + 0i} // Start in |1>
 	q.ApplyHadamard()
 
 	expectedAlpha := 1.0 / math.Sqrt(2)
@@ -63,7 +66,7 @@ func TestApplyHadamardFromOne(t *testing.T) {
 // TestMeasure tests that measurement collapses and gives valid outcomes
 func TestMeasure(t *testing.T) {
 	// Test 1: Measure |0> should always give 0
-	q1 := NewQubit()
+	q1 := qubit.NewQubit()
 	result1 := q1.Measure()
 	if result1 != 0 {
 		t.Errorf("Measure |0> = %d, want 0", result1)
@@ -77,7 +80,7 @@ func TestMeasure(t *testing.T) {
 	zeros := 0
 	ones := 0
 	for i := 0; i < trials; i++ {
-		q := NewQubit()
+		q := qubit.NewQubit()
 		q.ApplyHadamard()
 		result := q.Measure()
 		if result == 0 {
@@ -98,7 +101,7 @@ func TestMeasure(t *testing.T) {
 
 func TestCNOTGate(t *testing.T) {
 	// Test 1: |00> should stay |00>
-	qs1 := NewQuantumState(2)
+	qs1 := state.NewQuantumState(2)
 	qs1.ApplyCNOT(0, 1)
 	if cmplx.Abs(qs1.Amplitudes[0]-1.0) > 1e-10 || cmplx.Abs(qs1.Amplitudes[1]) > 1e-10 ||
 		cmplx.Abs(qs1.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs1.Amplitudes[3]) > 1e-10 {
@@ -106,7 +109,7 @@ func TestCNOTGate(t *testing.T) {
 	}
 
 	// Test 2: |10> should become |11>
-	qs2 := NewQuantumState(2)
+	qs2 := state.NewQuantumState(2)
 	qs2.Amplitudes[0] = 0
 	qs2.Amplitudes[2] = 1.0 + 0i
 	qs2.ApplyCNOT(0, 1)
@@ -116,7 +119,7 @@ func TestCNOTGate(t *testing.T) {
 	}
 
 	// Test 3: Bell state creation
-	qs3 := NewQuantumState(2)
+	qs3 := state.NewQuantumState(2)
 	qs3.ApplyHadamard(0)
 	qs3.ApplyCNOT(0, 1)
 	expected := 1.0 / cmplx.Sqrt(2)

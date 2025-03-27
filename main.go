@@ -38,7 +38,7 @@ func runDemos(demoType string) {
 		fmt.Println("\n========================================================")
 		fmt.Println("             QUANTUM COMPUTING IN GO")
 		fmt.Println("              ALL DEMONSTRATIONS")
-		fmt.Println("========================================================\n")
+		fmt.Println("========================================================")
 
 		examples.RunAllHadamardDemos()
 		fmt.Println("\nPress Enter to continue to T-gate demonstrations...")
@@ -67,7 +67,7 @@ func main() {
 	fmt.Println("\n********************************************************")
 	fmt.Println("*              QUANTUM COMPUTING IN GO                 *")
 	fmt.Println("*            Quantum Circuit Simulator                 *")
-	fmt.Println("********************************************************\n")
+	fmt.Println("********************************************************")
 
 	// Process command line arguments
 	args := os.Args

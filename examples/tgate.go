@@ -6,6 +6,7 @@ import (
 	"math/cmplx"
 	"math/rand"
 
+	"github.com/pjbaur/quantum/gates"
 	"github.com/pjbaur/quantum/qubit"
 	"github.com/pjbaur/quantum/state"
 )
@@ -17,7 +18,7 @@ func TGateSingleQubitDemo() {
 	fmt.Println("--------------------------------")
 
 	// Create a new qubit in state |0⟩
-	q := qubit.New()
+	q := qubit.NewQubit()
 	fmt.Printf("Initial state |0⟩: α=%.3f+%.3fi, β=%.3f+%.3fi\n",
 		real(q.Alpha), imag(q.Alpha), real(q.Beta), imag(q.Beta))
 
@@ -44,7 +45,7 @@ func TGateMultipleDemo() {
 	fmt.Println("---------------------------------------")
 
 	// Create a new qubit in state |0⟩
-	q := qubit.New()
+	q := qubit.NewQubit()
 
 	// Apply Hadamard to get superposition
 	q.ApplyHadamard()
@@ -78,7 +79,7 @@ func TGateAndHadamardInterferenceDemo() {
 	fmt.Printf("Running %d trials\n", trials)
 
 	for i := 0; i < trials; i++ {
-		q := qubit.New()
+		q := qubit.NewQubit()
 
 		// Apply Hadamard to create superposition
 		q.ApplyHadamard()
@@ -113,7 +114,7 @@ func TGateInQuantumStateDemo() {
 	fmt.Println("----------------------------------------")
 
 	// Create a 2-qubit quantum state
-	qs := state.New(2)
+	qs := state.NewQuantumState(2)
 	fmt.Println("Initial state:")
 	qs.PrintState()
 
@@ -124,12 +125,12 @@ func TGateInQuantumStateDemo() {
 	qs.PrintState()
 
 	// Apply T-gate to the first qubit
-	qs.ApplyT(0)
+	qs.ApplyMatrix(0, gates.T)
 	fmt.Println("\nAfter T-gate on qubit 0:")
 	qs.PrintState()
 
 	// Apply T-gate to the second qubit
-	qs.ApplyT(1)
+	qs.ApplyMatrix(1, gates.T)
 	fmt.Println("\nAfter T-gate on qubit 1:")
 	qs.PrintState()
 
@@ -144,7 +145,7 @@ func TDaggerDemo() {
 	fmt.Println("--------------------------")
 
 	// Create a qubit in state |0⟩
-	q := qubit.New()
+	q := qubit.NewQubit()
 
 	// Apply Hadamard to get into superposition
 	q.ApplyHadamard()
@@ -157,7 +158,7 @@ func TDaggerDemo() {
 		real(q.Alpha), imag(q.Alpha), real(q.Beta), imag(q.Beta))
 
 	// Apply T-dagger
-	q.ApplyTDagger()
+	q.ApplyMatrix(gates.TDagger)
 	fmt.Printf("After T-dagger: α=%.3f+%.3fi, β=%.3f+%.3fi\n",
 		real(q.Alpha), imag(q.Alpha), real(q.Beta), imag(q.Beta))
 

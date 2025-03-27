@@ -48,7 +48,7 @@ func HadamardMultipleQubitsDemo() {
 
 	for i := 0; i < trials; i++ {
 		// Create a new quantum state with n qubits
-		qs := state.New(nQubits)
+		qs := state.NewQuantumState(nQubits)
 
 		fmt.Printf("\nTrial %d:\n", i+1)
 		fmt.Println("Initial state:")
@@ -85,7 +85,7 @@ func HadamardProbabilityDistribution() {
 	fmt.Printf("Running %d trials with %d qubits\n", trials, nQubits)
 
 	for i := 0; i < trials; i++ {
-		qs := state.New(nQubits)
+		qs := state.NewQuantumState(nQubits)
 
 		// Apply Hadamard to all qubits
 		for q := 0; q < nQubits; q++ {
@@ -103,7 +103,8 @@ func HadamardProbabilityDistribution() {
 	fmt.Println("-----\t-----\t-----------")
 
 	// Calculate the expected probability
-	expectedProb := 1.0 / float64(1<<nQubits)
+	base := 1 << uint(nQubits)          // Perform shift with integers
+	expectedProb := 1.0 / float64(base) // Then convert to float64
 
 	for i := 0; i < (1 << nQubits); i++ {
 		count := outcomes[i]
@@ -122,7 +123,7 @@ func GenerateRandomNumber(maxNumber int) int {
 	}
 
 	// Create quantum state
-	qs := state.New(nQubits)
+	qs := state.NewQuantumState(nQubits)
 
 	// Apply Hadamard to all qubits to create superposition
 	for i := 0; i < nQubits; i++ {
