@@ -1,0 +1,1102 @@
+%% gates/gates.go %%
+// Package gates contains the definition of quantum gates used in the simulator.
+package gates
+
+import (
+	"math"
+	"math/cmplx"
+)
+
+// Matrix2x2 represents a 2x2 complex matrix used for single-qubit gates.
+type Matrix2x2 [2][2]complex128
+
+// Common quantum gates as constants
+var (
+	// Identity gate
+	I = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(1, 0)},
+	}
+
+	// Pauli-X gate (NOT gate)
+	X = Matrix2x2{
+		{complex(0, 0), complex(1, 0)},
+		{complex(1, 0), complex(0, 0)},
+	}
+
+	// Pauli-Y gate
+	Y = Matrix2x2{
+		{complex(0, 0), complex(0, -1)},
+		{complex(0, 1), complex(0, 0)},
+	}
+
+	// Pauli-Z gate
+	Z = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(-1, 0)},
+	}
+
+	// Hadamard gate
+	H = Matrix2x2{
+		{complex(1.0/math.Sqrt(2), 0), complex(1.0/math.Sqrt(2), 0)},
+		{complex(1.0/math.Sqrt(2), 0), complex(-1.0/math.Sqrt(2), 0)},
+	}
+
+	// T gate (π/4 phase shift)
+	T = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(math.Cos(math.Pi/4), math.Sin(math.Pi/4))},
+	}
+
+	// S gate (π/2 phase shift, equivalent to T²)
+	S = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(0, 1)},
+	}
+
+	// CNOT gate
+	CNot = func(control int) Matrix2x2 {
+		// CNOT = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ X
+		var result Matrix2x2
+		switch control {
+		case 0:
+			result = Matrix2x2{
+				{complex(1, 0), complex(0, 0)},
+				{complex(0, 0), complex(0, 0)},
+			}
+		case 1:
+			result = Matrix2x2{
+				{complex(0, 0), complex(0, 0)},
+				{complex(0, 0), complex(1, 0)},
+			}
+		}
+		return result.Multiply(X)
+	}
+
+	// CZ gate
+	CZ = func(control int) Matrix2x2 {
+		// CZ = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ Z
+		var result Matrix2x2
+		switch control {
+		case 0:
+			result = Matrix2x2{
+				{complex(1, 0), complex(0, 0)},
+				{complex(0, 0), complex(0, 0)},
+			}
+		case 1:
+			result = Matrix2x2{
+				{complex(0, 0), complex(0, 0)},
+				{complex(0, 0), complex(-1, 0)},
+			}
+		}
+		return result.Multiply(Z)
+	}
+
+	// T-Dagger gate (inverse of T)
+	TDagger = T.Conjugate()
+)
+
+// Conjugate returns the conjugate of a 2x2 matrix
+func (m Matrix2x2) Conjugate() Matrix2x2 {
+	var result Matrix2x2
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 2; j++ {
+			result[i][j] = cmplx.Conj(m[i][j])
+		}
+	}
+	return result
+}
+
+// Multiply multiplies two 2x2 matrices and returns the result
+func (m Matrix2x2) Multiply(other Matrix2x2) Matrix2x2 {
+	var result Matrix2x2
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 2; j++ {
+			sum := complex(0, 0)
+			for k := 0; k < 2; k++ {
+				sum += m[i][k] * other[k][j]
+			}
+			result[i][j] = sum
+		}
+	}
+	return result
+}
+
+// Apply applies the gate matrix to a state vector [α, β]
+func (m Matrix2x2) Apply(alpha, beta complex128) (complex128, complex128) {
+	newAlpha := m[0][0]*alpha + m[0][1]*beta
+	newBeta := m[1][0]*alpha + m[1][1]*beta
+	return newAlpha, newBeta
+}
+
+// CreateRotationGate creates a rotation gate around the specified axis
+// axis: "x", "y", or "z"
+// theta: rotation angle in radians
+func CreateRotationGate(axis string, theta float64) Matrix2x2 {
+	cosTheta2 := complex(math.Cos(theta/2), 0)
+	sinTheta2 := complex(math.Sin(theta/2), 0)
+
+	var result Matrix2x2
+
+	switch axis {
+	case "x":
+		// Rx(θ) = cos(θ/2)I - i·sin(θ/2)X
+		result[0][0] = cosTheta2
+		result[0][1] = complex(0, -1) * sinTheta2
+		result[1][0] = complex(0, -1) * sinTheta2
+		result[1][1] = cosTheta2
+	case "y":
+		// Ry(θ) = cos(θ/2)I - i·sin(θ/2)Y
+		result[0][0] = cosTheta2
+		result[0][1] = -sinTheta2
+		result[1][0] = sinTheta2
+		result[1][1] = cosTheta2
+	case "z":
+		// Rz(θ) = cos(θ/2)I - i·sin(θ/2)Z
+		result[0][0] = cmplx.Exp(complex(0, -theta/2))
+		result[0][1] = complex(0, 0)
+		result[1][0] = complex(0, 0)
+		result[1][1] = cmplx.Exp(complex(0, theta/2))
+	default:
+		// Default to identity if invalid axis
+		return I
+	}
+
+	return result
+}
+
+// CreatePhaseGate creates a phase gate with the specified phase
+// phase: rotation angle in radians
+func CreatePhaseGate(phase float64) Matrix2x2 {
+	return Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), cmplx.Exp(complex(0, phase))},
+	}
+}
+
+%% end %%
+
+%% measurement/measurement.go %%
+package measurement
+
+import (
+	"fmt"
+	"math/cmplx"
+	"math/rand"
+
+	"github.com/pjbaur/quantum/qubit"
+	"github.com/pjbaur/quantum/state"
+)
+
+// MeasureQubit measures a single qubit and collapses its state
+// Returns the result (0 or 1) based on probability distribution
+func MeasureQubit(q *qubit.Qubit) int {
+	// Calculate probability of measuring |0⟩
+	prob0 := cmplx.Abs(q.Alpha) * cmplx.Abs(q.Alpha)
+
+	// Generate random number to determine outcome
+	if rand.Float64() < prob0 {
+		// Collapse to |0⟩
+		q.Alpha = 1.0 + 0i
+		q.Beta = 0.0 + 0i
+		return 0
+	}
+
+	// Collapse to |1⟩
+	q.Alpha = 0.0 + 0i
+	q.Beta = 1.0 + 0i
+	return 1
+}
+
+// MeasureSingleQubit measures a specific qubit in a multi-qubit system
+// This is a more complex operation as it doesn't fully collapse the state vector
+// Returns the measured result (0 or 1) for the specific qubit
+func MeasureSingleQubit(qs *state.QuantumState, qubitIndex int) (int, error) {
+	// Input validation
+	if qubitIndex < 0 || qubitIndex >= qs.NQubits {
+		return 0, fmt.Errorf("qubit index %d out of range [0,%d)", qubitIndex, qs.NQubits)
+	}
+
+	// Calculate probability of the qubit being in state |0⟩
+	var prob0 float64
+	for i, amp := range qs.Amplitudes {
+		// Check if the bit at qubitIndex is 0
+		if (i>>qubitIndex)&1 == 0 {
+			prob0 += cmplx.Abs(amp) * cmplx.Abs(amp)
+		}
+	}
+
+	// Determine the measurement outcome
+	result := 0
+	if rand.Float64() > prob0 {
+		result = 1
+	}
+
+	// Collapse the state vector according to the measurement
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+	var normalizationFactor float64
+
+	for i, amp := range qs.Amplitudes {
+		// Check if this basis state has the measured value at qubitIndex
+		if ((i >> qubitIndex) & 1) == result {
+			newAmplitudes[i] = amp
+			normalizationFactor += cmplx.Abs(amp) * cmplx.Abs(amp)
+		}
+	}
+
+	// Normalize the new state vector
+	normalizationFactor = 1.0 / cmplx.Abs(complex(normalizationFactor, 0))
+	for i := range newAmplitudes {
+		newAmplitudes[i] *= complex(normalizationFactor, 0)
+	}
+
+	// Update the quantum state
+	qs.Amplitudes = newAmplitudes
+	return result, nil
+}
+
+// GetProbabilities returns the probability distribution of all possible states
+// without collapsing the state
+func GetProbabilities(qs *state.QuantumState) map[int]float64 {
+	probs := make(map[int]float64)
+
+	for i, amp := range qs.Amplitudes {
+		prob := cmplx.Abs(amp) * cmplx.Abs(amp)
+		if prob > 0.0001 { // Only include non-negligible probabilities
+			probs[i] = prob
+		}
+	}
+
+	return probs
+}
+
+// SimulateMeasurements runs multiple measurements on the same quantum state
+// and returns frequency statistics without modifying the original state
+func SimulateMeasurements(qs *state.QuantumState, trials int) map[int]int {
+	results := make(map[int]int)
+	probabilities := make([]float64, len(qs.Amplitudes))
+
+	// Calculate probabilities
+	for i, amp := range qs.Amplitudes {
+		probabilities[i] = cmplx.Abs(amp) * cmplx.Abs(amp)
+	}
+
+	// Run trials
+	for i := 0; i < trials; i++ {
+		r := rand.Float64()
+		var cumulative float64
+
+		for j := 0; j < len(probabilities); j++ {
+			cumulative += probabilities[j]
+			if r < cumulative {
+				results[j]++
+				break
+			}
+		}
+	}
+
+	return results
+}
+
+// FormatMeasurementResults formats measurement results as a string
+// showing binary representations of states and their frequencies
+func FormatMeasurementResults(results map[int]int, nQubits int, trials int) string {
+	var output string
+
+	output += fmt.Sprintf("Measurement results (%d trials):\n", trials)
+	for state, count := range results {
+		percentage := float64(count) / float64(trials) * 100
+		output += fmt.Sprintf("|%0*b⟩: %d times (%.2f%%)\n",
+			nQubits, state, count, percentage)
+	}
+
+	return output
+}
+
+%% end %%
+
+%% qubit/qubit.go %%
+package qubit
+
+import (
+	"math/cmplx"
+	"math/rand"
+
+	"github.com/pjbaur/quantum/gates"
+)
+
+// Qubit represents a single quantum bit with complex amplitudes
+type Qubit struct {
+	Alpha complex128 // Amplitude for |0⟩ state
+	Beta  complex128 // Amplitude for |1⟩ state
+}
+
+// ApplyMatrix applies a 2x2 unitary matrix to the qubit's state
+func (q *Qubit) ApplyMatrix(matrix [2][2]complex128) {
+	newAlpha := matrix[0][0]*q.Alpha + matrix[0][1]*q.Beta
+	newBeta := matrix[1][0]*q.Alpha + matrix[1][1]*q.Beta
+
+	q.Alpha = newAlpha
+	q.Beta = newBeta
+}
+
+// ApplyHadamard applies the Hadamard gate to the qubit
+func (q *Qubit) ApplyHadamard() {
+	q.ApplyMatrix(gates.H)
+}
+
+// ApplyX applies the Pauli-X gate to the qubit
+func (q *Qubit) ApplyX() {
+	q.ApplyMatrix(gates.X)
+}
+
+// ApplyZ applies the Pauli-Z gate to the qubit
+func (q *Qubit) ApplyZ() {
+	q.ApplyMatrix(gates.Z)
+}
+
+// ApplyT applies the T gate to the qubit
+func (q *Qubit) ApplyT() {
+	q.ApplyMatrix(gates.T)
+}
+
+// ApplyS applies the S gate to the qubit
+func (q *Qubit) ApplyS() {
+	q.ApplyMatrix(gates.S)
+}
+
+// ApplyY applies the Pauli-Y gate to the qubit
+func (q *Qubit) ApplyY() {
+	q.ApplyMatrix(gates.Y)
+}
+
+// ApplyCNot applies the CNOT gate to the qubit
+func (q *Qubit) ApplyCNot(control int) {
+	q.ApplyMatrix(gates.CNot(control))
+}
+
+// ApplyCZ applies the CZ gate to the qubit
+func (q *Qubit) ApplyCZ(control int) {
+	q.ApplyMatrix(gates.CZ(control))
+}
+
+// NewQubit creates a new qubit initialized to |0⟩ state
+func NewQubit() *Qubit {
+	return &Qubit{
+		Alpha: 1.0 + 0i,
+		Beta:  0.0 + 0i,
+	}
+}
+
+// NewQubitFromValues creates a new qubit with specified amplitude values
+func NewQubitFromValues(alpha, beta complex128) *Qubit {
+	return &Qubit{
+		Alpha: alpha,
+		Beta:  beta,
+	}
+}
+
+// Measure collapses the qubit to either |0⟩ or |1⟩ based on probability
+// Returns the result (0 or 1) and updates the qubit's state
+func (q *Qubit) Measure() int {
+	prob0 := cmplx.Abs(q.Alpha) * cmplx.Abs(q.Alpha)
+	if rand.Float64() < prob0 {
+		q.Alpha = 1.0 + 0i
+		q.Beta = 0.0 + 0i
+		return 0
+	}
+	q.Alpha = 0.0 + 0i
+	q.Beta = 1.0 + 0i
+	return 1
+}
+
+// Probability0 returns the probability of measuring |0⟩
+func (q *Qubit) Probability0() float64 {
+	return cmplx.Abs(q.Alpha) * cmplx.Abs(q.Alpha)
+}
+
+// Probability1 returns the probability of measuring |1⟩
+func (q *Qubit) Probability1() float64 {
+	return cmplx.Abs(q.Beta) * cmplx.Abs(q.Beta)
+}
+
+// IsNormalized checks if the qubit state is properly normalized
+func (q *Qubit) IsNormalized() bool {
+	sum := q.Probability0() + q.Probability1()
+	return cmplx.Abs(complex(sum, 0)-complex(1.0, 0)) < 1e-10
+}
+
+// Clone creates a copy of the qubit
+func (q *Qubit) Clone() *Qubit {
+	return &Qubit{
+		Alpha: q.Alpha,
+		Beta:  q.Beta,
+	}
+}
+
+%% end %%
+
+%% state/state.go %%
+package state
+
+import (
+	"fmt"
+	"math"
+	"math/cmplx"
+	"math/rand"
+
+	"github.com/pjbaur/quantum/gates"
+)
+
+// QuantumState represents a multi-qubit quantum state.
+// The state is represented as a vector of complex amplitudes for each basis state.
+// The number of qubits is also stored to allow for operations on the state.
+type QuantumState struct {
+	Amplitudes []complex128 // State vector for all possible basis states
+	NQubits    int          // Number of qubits
+}
+
+// NewQuantumState creates a new quantum state with n qubits initialized to |00...0>.
+// The state is represented as a vector of complex amplitudes for each basis state.
+// The initial state is |00...0> with amplitude 1.
+func NewQuantumState(n int) *QuantumState {
+	size := 1 << n // 2^n states
+	amplitudes := make([]complex128, size)
+	amplitudes[0] = 1.0 + 0i // Initial state |00...0>
+	return &QuantumState{
+		Amplitudes: amplitudes,
+		NQubits:    n,
+	}
+}
+
+// NewQuantumStateFromAmplitudes creates a quantum state with specified amplitudes.
+// The number of qubits is inferred from the length of the amplitudes slice.
+func NewQuantumStateFromAmplitudes(amplitudes []complex128, nQubits int) (*QuantumState, error) {
+	expectedSize := 1 << nQubits
+	if len(amplitudes) != expectedSize {
+		return nil, fmt.Errorf("invalid amplitudes length: got %d, want %d (2^%d)",
+			len(amplitudes), expectedSize, nQubits)
+	}
+
+	// Create a copy of the amplitudes
+	ampCopy := make([]complex128, len(amplitudes))
+	copy(ampCopy, amplitudes)
+
+	return &QuantumState{
+		Amplitudes: ampCopy,
+		NQubits:    nQubits,
+	}, nil
+}
+
+// ApplyHadamard applies a Hadamard gate to the specified qubit.
+// The Hadamard gate is a 2x2 matrix that transforms the basis states |0⟩ and |1⟩ as follows:
+// |0⟩ -> (|0⟩ + |1⟩) / √2
+// |1⟩ -> (|0⟩ - |1⟩) / √2
+func (qs *QuantumState) ApplyHadamard(qubit int) error {
+	if qubit < 0 || qubit >= qs.NQubits {
+		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+	}
+
+	return qs.ApplyMatrix(qubit, gates.H)
+}
+
+// Measure collapses the quantum state and returns the measured value.
+// The state is collapsed to a single basis state based on the probabilities of each state.
+// The probability of measuring a basis state is the squared magnitude of the amplitude.
+// The state is then collapsed to the measured basis state.
+func (qs *QuantumState) Measure() int {
+	// Calculate probabilities
+	var probs []float64
+	var sum float64
+	for _, amp := range qs.Amplitudes {
+		prob := cmplx.Abs(amp) * cmplx.Abs(amp)
+		probs = append(probs, prob)
+		sum += prob
+	}
+
+	// Normalize probabilities
+	for i := range probs {
+		probs[i] /= sum
+	}
+
+	// Choose outcome based on probabilities
+	r := rand.Float64()
+	var cumulative float64
+	for i := 0; i < len(probs); i++ {
+		cumulative += probs[i]
+		if r < cumulative {
+			// Collapse to this state
+			newAmplitudes := make([]complex128, len(qs.Amplitudes))
+			newAmplitudes[i] = 1.0 + 0i
+			qs.Amplitudes = newAmplitudes
+			return i
+		}
+	}
+
+	// Fallback (shouldn't normally happen with proper probabilities)
+	return len(probs) - 1
+}
+
+// MeasureQubit measures a specific qubit and collapses the state accordingly.
+func (qs *QuantumState) MeasureQubit(qubit int) (int, error) {
+	if qubit < 0 || qubit >= qs.NQubits {
+		return 0, fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+	}
+
+	// Calculate probability of measuring |0⟩
+	zeroProb := 0.0
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Check if the target qubit is 0
+		if ((state >> qubit) & 1) == 0 {
+			zeroProb += cmplx.Abs(qs.Amplitudes[state]) * cmplx.Abs(qs.Amplitudes[state])
+		}
+	}
+
+	// Measure the qubit
+	result := 0
+	if rand.Float64() > zeroProb {
+		result = 1
+	}
+
+	// Collapse the state based on measurement
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+	newSum := 0.0
+
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Check if this basis state matches our measurement result
+		if ((state >> qubit) & 1) == result {
+			newAmplitudes[state] = qs.Amplitudes[state]
+			newSum += cmplx.Abs(newAmplitudes[state]) * cmplx.Abs(newAmplitudes[state])
+		}
+	}
+
+	// Normalize the state
+	normFactor := 1.0 / complex(math.Sqrt(newSum), 0)
+	for i := range newAmplitudes {
+		newAmplitudes[i] *= normFactor
+	}
+
+	qs.Amplitudes = newAmplitudes
+	return result, nil
+}
+
+// GetProbability returns the probability of measuring a specific basis state.
+// The probability is the squared magnitude of the amplitude.
+// If the basis state is out of range, an error is returned.
+func (qs *QuantumState) GetProbability(basisState int) (float64, error) {
+	if basisState < 0 || basisState >= len(qs.Amplitudes) {
+		return 0, fmt.Errorf("basis state %d out of range [0,%d)", basisState, len(qs.Amplitudes))
+	}
+
+	return cmplx.Abs(qs.Amplitudes[basisState]) * cmplx.Abs(qs.Amplitudes[basisState]), nil
+}
+
+// Clone creates a deep copy of the quantum state.
+// This is useful for preserving the original state when applying operations.
+func (qs *QuantumState) Clone() *QuantumState {
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+	copy(newAmplitudes, qs.Amplitudes)
+
+	return &QuantumState{
+		Amplitudes: newAmplitudes,
+		NQubits:    qs.NQubits,
+	}
+}
+
+// PrintState prints the state in binary notation with amplitudes
+func (qs *QuantumState) PrintState() {
+	for i, amp := range qs.Amplitudes {
+		if cmplx.Abs(amp) > 0.001 { // Only print non-negligible amplitudes
+			fmt.Printf("|%0*b> : %.3f + %.3fi\n",
+				qs.NQubits, i,
+				real(amp), imag(amp))
+		}
+	}
+}
+
+// IsNormalized checks if the quantum state is properly normalized
+func (qs *QuantumState) IsNormalized() bool {
+	sum := 0.0
+	for _, amp := range qs.Amplitudes {
+		sum += cmplx.Abs(amp) * cmplx.Abs(amp)
+	}
+	return cmplx.Abs(complex(sum, 0)-complex(1.0, 0)) < 1e-10
+}
+
+// Normalize ensures the quantum state has unit norm.
+// This is done by dividing each amplitude by the square root of the sum of squared amplitudes.
+func (qs *QuantumState) Normalize() {
+	sum := 0.0
+	for _, amp := range qs.Amplitudes {
+		sum += cmplx.Abs(amp) * cmplx.Abs(amp)
+	}
+
+	normFactor := 1.0 / complex(math.Sqrt(sum), 0)
+	for i := range qs.Amplitudes {
+		qs.Amplitudes[i] *= normFactor
+	}
+}
+
+// ApplyCNOT applies a Controlled-NOT gate with the specified control and target qubits.
+// The control qubit is the first argument and the target qubit is the second argument.
+// The CNOT gate leaves the target qubit unchanged if the control qubit is |0⟩, and flips the
+// target qubit if the control qubit is |1⟩. This is represented by the 4×4 matrix where the
+// bottom-right 2×2 submatrix is swapped compared to the identity matrix.
+func (qs *QuantumState) ApplyCNOT(controlQubit, targetQubit int) error {
+	if controlQubit < 0 || controlQubit >= qs.NQubits {
+		return fmt.Errorf("control qubit index %d out of range [0,%d)", controlQubit, qs.NQubits)
+	}
+	if targetQubit < 0 || targetQubit >= qs.NQubits {
+		return fmt.Errorf("target qubit index %d out of range [0,%d)", targetQubit, qs.NQubits)
+	}
+	if controlQubit == targetQubit {
+		return fmt.Errorf("control and target qubits must be different, got %d for both", controlQubit)
+	}
+
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Check if control qubit is |1⟩
+		if (state>>controlQubit)&1 == 1 {
+			// Flip the target qubit
+			newState := state ^ (1 << targetQubit)
+			newAmplitudes[newState] = qs.Amplitudes[state]
+		} else {
+			// If control qubit is |0⟩, amplitude remains the same
+			newAmplitudes[state] = qs.Amplitudes[state]
+		}
+	}
+
+	qs.Amplitudes = newAmplitudes
+	return nil
+}
+
+// ApplyMatrix applies an operation to the specified qubit using a 2x2 unitary matrix.
+// The matrix is applied to the qubit in the computational basis |0⟩ and |1⟩.
+func (qs *QuantumState) ApplyMatrix(qubit int, matrix [2][2]complex128) error {
+	if qubit < 0 || qubit >= qs.NQubits {
+		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+	}
+
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+
+	// For each basis state
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Check the bit at target qubit position
+		bit := (state >> qubit) & 1
+		// Calculate the state with flipped bit at the target position
+		flipped := state ^ (1 << qubit)
+
+		if bit == 0 {
+			// If qubit is |0⟩: Apply first row of the matrix
+			newAmplitudes[state] += matrix[0][0] * qs.Amplitudes[state]
+			newAmplitudes[flipped] += matrix[0][1] * qs.Amplitudes[state]
+		} else {
+			// If qubit is |1⟩: Apply second row of the matrix
+			newAmplitudes[flipped] += matrix[1][0] * qs.Amplitudes[state]
+			newAmplitudes[state] += matrix[1][1] * qs.Amplitudes[state]
+		}
+	}
+
+	qs.Amplitudes = newAmplitudes
+	return nil
+}
+
+// Apply2QubitMatrix applies a 4x4 matrix operation to two qubits.
+// The matrix is applied to the qubits in the computational basis |00⟩, |01⟩, |10⟩, |11⟩.
+// The matrix is specified as a 4x4 complex matrix.
+func (qs *QuantumState) Apply2QubitMatrix(qubit1, qubit2 int, matrix [4][4]complex128) error {
+	if qubit1 < 0 || qubit1 >= qs.NQubits {
+		return fmt.Errorf("first qubit index %d out of range [0,%d)", qubit1, qs.NQubits)
+	}
+	if qubit2 < 0 || qubit2 >= qs.NQubits {
+		return fmt.Errorf("second qubit index %d out of range [0,%d)", qubit2, qs.NQubits)
+	}
+	if qubit1 == qubit2 {
+		return fmt.Errorf("qubit indices must be different, got %d for both", qubit1)
+	}
+
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+
+	// For each basis state
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Extract the bits at the target positions
+		bit1 := (state >> qubit1) & 1
+		bit2 := (state >> qubit2) & 1
+		inputIdx := (bit1 << 1) | bit2
+
+		// For each possible output
+		for outputIdx := 0; outputIdx < 4; outputIdx++ {
+			outBit1 := (outputIdx >> 1) & 1
+			outBit2 := outputIdx & 1
+
+			// Calculate new state by setting the target bits
+			newState := state
+			if bit1 != outBit1 {
+				newState ^= (1 << qubit1)
+			}
+			if bit2 != outBit2 {
+				newState ^= (1 << qubit2)
+			}
+
+			// Apply matrix element
+			newAmplitudes[newState] += matrix[inputIdx][outputIdx] * qs.Amplitudes[state]
+		}
+	}
+
+	qs.Amplitudes = newAmplitudes
+	return nil
+}
+
+%% end %%
+
+%% quantum_test.go %%
+package main
+
+import (
+	"math"
+	"math/cmplx"
+	"testing"
+
+	"github.com/pjbaur/quantum/qubit"
+	"github.com/pjbaur/quantum/state"
+)
+
+const tolerance = 1e-10 // Small tolerance for floating-point comparisons
+
+// TestNewQubit checks if a new qubit starts in |0> state
+func TestNewQubit(t *testing.T) {
+	q := qubit.NewQubit()
+	if real(q.Alpha) != 1.0 || imag(q.Alpha) != 0.0 {
+		t.Errorf("NewQubit Alpha = %v, want 1 + 0i", q.Alpha)
+	}
+	if real(q.Beta) != 0.0 || imag(q.Beta) != 0.0 {
+		t.Errorf("NewQubit Beta = %v, want 0 + 0i", q.Beta)
+	}
+}
+
+// TestApplyHadamardFromZero tests Hadamard on |0>
+func TestApplyHadamardFromZero(t *testing.T) {
+	q := qubit.NewQubit()
+	q.ApplyHadamard()
+
+	expected := 1.0 / math.Sqrt(2)
+	if math.Abs(real(q.Alpha)-expected) > tolerance || imag(q.Alpha) != 0.0 {
+		t.Errorf("After Hadamard Alpha = %v, want %f + 0i", q.Alpha, expected)
+	}
+	if math.Abs(real(q.Beta)-expected) > tolerance || imag(q.Beta) != 0.0 {
+		t.Errorf("After Hadamard Beta = %v, want %f + 0i", q.Beta, expected)
+	}
+
+	// Check normalization: |alpha|^2 + |beta|^2 = 1
+	norm := cmplx.Abs(q.Alpha)*cmplx.Abs(q.Alpha) + cmplx.Abs(q.Beta)*cmplx.Abs(q.Beta)
+	if math.Abs(norm-1.0) > tolerance {
+		t.Errorf("Normalization failed: %f, want 1.0", norm)
+	}
+}
+
+// TestApplyHadamardFromOne tests Hadamard on |1>
+func TestApplyHadamardFromOne(t *testing.T) {
+	q := &qubit.Qubit{Alpha: 0.0 + 0i, Beta: 1.0 + 0i} // Start in |1>
+	q.ApplyHadamard()
+
+	expectedAlpha := 1.0 / math.Sqrt(2)
+	expectedBeta := -1.0 / math.Sqrt(2)
+	if math.Abs(real(q.Alpha)-expectedAlpha) > tolerance || imag(q.Alpha) != 0.0 {
+		t.Errorf("After Hadamard Alpha = %v, want %f + 0i", q.Alpha, expectedAlpha)
+	}
+	if math.Abs(real(q.Beta)-expectedBeta) > tolerance || imag(q.Beta) != 0.0 {
+		t.Errorf("After Hadamard Beta = %v, want %f + 0i", q.Beta, expectedBeta)
+	}
+
+	// Check normalization
+	norm := cmplx.Abs(q.Alpha)*cmplx.Abs(q.Alpha) + cmplx.Abs(q.Beta)*cmplx.Abs(q.Beta)
+	if math.Abs(norm-1.0) > tolerance {
+		t.Errorf("Normalization failed: %f, want 1.0", norm)
+	}
+}
+
+// TestMeasure tests that measurement collapses and gives valid outcomes
+func TestMeasure(t *testing.T) {
+	// Test 1: Measure |0> should always give 0
+	q1 := qubit.NewQubit()
+	result1 := q1.Measure()
+	if result1 != 0 {
+		t.Errorf("Measure |0> = %d, want 0", result1)
+	}
+	if real(q1.Alpha) != 1.0 || real(q1.Beta) != 0.0 {
+		t.Errorf("After measuring |0>: Alpha = %v, Beta = %v; want 1, 0", q1.Alpha, q1.Beta)
+	}
+
+	// Test 2: Measure after Hadamard gives 0 or 1, statistically ~50/50
+	trials := 1000
+	zeros := 0
+	ones := 0
+	for i := 0; i < trials; i++ {
+		q := qubit.NewQubit()
+		q.ApplyHadamard()
+		result := q.Measure()
+		if result == 0 {
+			zeros++
+		} else if result == 1 {
+			ones++
+		} else {
+			t.Errorf("Measure gave invalid result: %d", result)
+		}
+	}
+
+	// Check rough 50/50 distribution (within statistical noise)
+	ratio := float64(zeros) / float64(trials)
+	if math.Abs(ratio-0.5) > 0.1 { // Allow 10% deviation
+		t.Errorf("Measurement ratio = %f, want ~0.5 (zeros=%d, ones=%d)", ratio, zeros, ones)
+	}
+}
+
+func TestCNOTGate(t *testing.T) {
+	// Test 1: |00> should stay |00>
+	qs1 := state.NewQuantumState(2)
+	err := qs1.ApplyCNOT(0, 1)
+	if err != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err)
+	}
+	if cmplx.Abs(qs1.Amplitudes[0]-1.0) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[2]) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[3]) > 1e-10 {
+		t.Errorf("CNOT failed on |00>: expected |00>, got %v", qs1.Amplitudes)
+	}
+
+	// Test 2: |10> should become |11>
+	qs2 := state.NewQuantumState(2)
+	qs2.Amplitudes[0] = 0
+	qs2.Amplitudes[2] = 1.0 + 0i // Little-endian |10>
+
+	// Print initial state for debugging
+	t.Logf("Initial state: %v", qs2.Amplitudes)
+
+	err2 := qs2.ApplyCNOT(0, 1)
+	if err2 != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err2)
+	}
+
+	// Print state after CNOT for debugging
+	t.Logf("State after CNOT: %v", qs2.Amplitudes)
+
+	if cmplx.Abs(qs2.Amplitudes[0]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[2]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[3]-1.0) > 1e-10 {
+		t.Errorf("CNOT failed on |10>: expected |11>, got %v", qs2.Amplitudes)
+	}
+
+	// Test 3: Bell state creation with more precise verification
+	qs3 := state.NewQuantumState(2)
+	err = qs3.ApplyHadamard(0) // Apply Hadamard to first (least significant) qubit
+	if err != nil {
+		t.Fatalf("Failed to apply Hadamard: %v", err)
+	}
+	err = qs3.ApplyCNOT(0, 1)
+	if err != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err)
+	}
+
+	// Expected Bell state: 1/√2(|00⟩ + |11⟩)
+	expected := 1.0 / math.Sqrt(2)
+
+	// Verify specific indices for |00⟩ and |11⟩ in little-endian
+	if math.Abs(real(qs3.Amplitudes[0])-expected) > 1e-10 ||
+		imag(qs3.Amplitudes[0]) != 0 ||
+		math.Abs(real(qs3.Amplitudes[3])-expected) > 1e-10 ||
+		imag(qs3.Amplitudes[3]) != 0 {
+		t.Errorf("CNOT failed to create Bell state: got %v, want amplitude of %f for |00⟩ and |11⟩",
+			qs3.Amplitudes, expected)
+	}
+
+	// Verify other amplitudes are zero
+	for i, amp := range qs3.Amplitudes {
+		if i != 0 && i != 3 && cmplx.Abs(amp) > 1e-10 {
+			t.Errorf("Unexpected non-zero amplitude at index %d: %v", i, amp)
+		}
+	}
+}
+
+%% end %%
+
+%% gates/gates.go %%
+// Package gates contains the definition of quantum gates used in the simulator.
+package gates
+
+import (
+	"math"
+	"math/cmplx"
+)
+
+// Matrix2x2 represents a 2x2 complex matrix used for single-qubit gates.
+type Matrix2x2 [2][2]complex128
+
+// Common quantum gates as constants
+var (
+	// Identity gate
+	I = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(1, 0)},
+	}
+
+	// Pauli-X gate (NOT gate)
+	X = Matrix2x2{
+		{complex(0, 0), complex(1, 0)},
+		{complex(1, 0), complex(0, 0)},
+	}
+
+	// Pauli-Y gate
+	Y = Matrix2x2{
+		{complex(0, 0), complex(0, -1)},
+		{complex(0, 1), complex(0, 0)},
+	}
+
+	// Pauli-Z gate
+	Z = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(-1, 0)},
+	}
+
+	// Hadamard gate
+	H = Matrix2x2{
+		{complex(1.0/math.Sqrt(2), 0), complex(1.0/math.Sqrt(2), 0)},
+		{complex(1.0/math.Sqrt(2), 0), complex(-1.0/math.Sqrt(2), 0)},
+	}
+
+	// T gate (π/4 phase shift)
+	T = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(math.Cos(math.Pi/4), math.Sin(math.Pi/4))},
+	}
+
+	// S gate (π/2 phase shift, equivalent to T²)
+	S = Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), complex(0, 1)},
+	}
+
+	// CNOT gate
+	CNot = func(control int) Matrix2x2 {
+		// CNOT = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ X
+		var result Matrix2x2
+		switch control {
+		case 0:
+			result = Matrix2x2{
+				{complex(1, 0), complex(0, 0)},
+				{complex(0, 0), complex(0, 0)},
+			}
+		case 1:
+			result = Matrix2x2{
+				{complex(0, 0), complex(0, 0)},
+				{complex(0, 0), complex(1, 0)},
+			}
+		}
+		return result.Multiply(X)
+	}
+
+	// CZ gate
+	CZ = func(control int) Matrix2x2 {
+		// CZ = |0⟩⟨0| ⊗ I + |1⟩⟨1| ⊗ Z
+		var result Matrix2x2
+		switch control {
+		case 0:
+			result = Matrix2x2{
+				{complex(1, 0), complex(0, 0)},
+				{complex(0, 0), complex(0, 0)},
+			}
+		case 1:
+			result = Matrix2x2{
+				{complex(0, 0), complex(0, 0)},
+				{complex(0, 0), complex(-1, 0)},
+			}
+		}
+		return result.Multiply(Z)
+	}
+
+	// T-Dagger gate (inverse of T)
+	TDagger = T.Conjugate()
+)
+
+// Conjugate returns the conjugate of a 2x2 matrix
+func (m Matrix2x2) Conjugate() Matrix2x2 {
+	var result Matrix2x2
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 2; j++ {
+			result[i][j] = cmplx.Conj(m[i][j])
+		}
+	}
+	return result
+}
+
+// Multiply multiplies two 2x2 matrices and returns the result
+func (m Matrix2x2) Multiply(other Matrix2x2) Matrix2x2 {
+	var result Matrix2x2
+	for i := 0; i < 2; i++ {
+		for j := 0; j < 2; j++ {
+			sum := complex(0, 0)
+			for k := 0; k < 2; k++ {
+				sum += m[i][k] * other[k][j]
+			}
+			result[i][j] = sum
+		}
+	}
+	return result
+}
+
+// Apply applies the gate matrix to a state vector [α, β]
+func (m Matrix2x2) Apply(alpha, beta complex128) (complex128, complex128) {
+	newAlpha := m[0][0]*alpha + m[0][1]*beta
+	newBeta := m[1][0]*alpha + m[1][1]*beta
+	return newAlpha, newBeta
+}
+
+// CreateRotationGate creates a rotation gate around the specified axis
+// axis: "x", "y", or "z"
+// theta: rotation angle in radians
+func CreateRotationGate(axis string, theta float64) Matrix2x2 {
+	cosTheta2 := complex(math.Cos(theta/2), 0)
+	sinTheta2 := complex(math.Sin(theta/2), 0)
+
+	var result Matrix2x2
+
+	switch axis {
+	case "x":
+		// Rx(θ) = cos(θ/2)I - i·sin(θ/2)X
+		result[0][0] = cosTheta2
+		result[0][1] = complex(0, -1) * sinTheta2
+		result[1][0] = complex(0, -1) * sinTheta2
+		result[1][1] = cosTheta2
+	case "y":
+		// Ry(θ) = cos(θ/2)I - i·sin(θ/2)Y
+		result[0][0] = cosTheta2
+		result[0][1] = -sinTheta2
+		result[1][0] = sinTheta2
+		result[1][1] = cosTheta2
+	case "z":
+		// Rz(θ) = cos(θ/2)I - i·sin(θ/2)Z
+		result[0][0] = cmplx.Exp(complex(0, -theta/2))
+		result[0][1] = complex(0, 0)
+		result[1][0] = complex(0, 0)
+		result[1][1] = cmplx.Exp(complex(0, theta/2))
+	default:
+		// Default to identity if invalid axis
+		return I
+	}
+
+	return result
+}
+
+// CreatePhaseGate creates a phase gate with the specified phase
+// phase: rotation angle in radians
+func CreatePhaseGate(phase float64) Matrix2x2 {
+	return Matrix2x2{
+		{complex(1, 0), complex(0, 0)},
+		{complex(0, 0), cmplx.Exp(complex(0, phase))},
+	}
+}
+
+%% end %%
+
