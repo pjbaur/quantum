@@ -117,10 +117,18 @@ func TestCNOTGate(t *testing.T) {
 	qs2 := state.NewQuantumState(2)
 	qs2.Amplitudes[0] = 0
 	qs2.Amplitudes[2] = 1.0 + 0i // Little-endian |10>
-	err = qs2.ApplyCNOT(0, 1)
-	if err != nil {
-		t.Fatalf("Failed to apply CNOT: %v", err)
+
+	// Print initial state for debugging
+	t.Logf("Initial state: %v", qs2.Amplitudes)
+
+	err2 := qs2.ApplyCNOT(0, 1)
+	if err2 != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err2)
 	}
+
+	// Print state after CNOT for debugging
+	t.Logf("State after CNOT: %v", qs2.Amplitudes)
+
 	if cmplx.Abs(qs2.Amplitudes[0]) > 1e-10 ||
 		cmplx.Abs(qs2.Amplitudes[1]) > 1e-10 ||
 		cmplx.Abs(qs2.Amplitudes[2]) > 1e-10 ||

@@ -215,15 +215,16 @@ func (qs *QuantumState) ApplyCNOT(controlQubit, targetQubit int) error {
 	}
 
 	newAmplitudes := make([]complex128, len(qs.Amplitudes))
-	copy(newAmplitudes, qs.Amplitudes)
 
-	for state := range qs.Amplitudes {
+	for state := 0; state < len(qs.Amplitudes); state++ {
+		// Check if control qubit is |1⟩
 		if (state>>controlQubit)&1 == 1 {
-			// Flip target qubit using XOR
+			// Flip the target qubit
 			newState := state ^ (1 << targetQubit)
-			// Swap amplitudes between original state and newState
-			newAmplitudes[newState], newAmplitudes[state] =
-				qs.Amplitudes[state], qs.Amplitudes[newState]
+			newAmplitudes[newState] = qs.Amplitudes[state]
+		} else {
+			// If control qubit is |0⟩, amplitude remains the same
+			newAmplitudes[state] = qs.Amplitudes[state]
 		}
 	}
 
