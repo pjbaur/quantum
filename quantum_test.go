@@ -102,29 +102,59 @@ func TestMeasure(t *testing.T) {
 func TestCNOTGate(t *testing.T) {
 	// Test 1: |00> should stay |00>
 	qs1 := state.NewQuantumState(2)
-	qs1.ApplyCNOT(0, 1)
-	if cmplx.Abs(qs1.Amplitudes[0]-1.0) > 1e-10 || cmplx.Abs(qs1.Amplitudes[1]) > 1e-10 ||
-		cmplx.Abs(qs1.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs1.Amplitudes[3]) > 1e-10 {
+	err := qs1.ApplyCNOT(0, 1)
+	if err != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err)
+	}
+	if cmplx.Abs(qs1.Amplitudes[0]-1.0) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[2]) > 1e-10 ||
+		cmplx.Abs(qs1.Amplitudes[3]) > 1e-10 {
 		t.Errorf("CNOT failed on |00>: expected |00>, got %v", qs1.Amplitudes)
 	}
 
 	// Test 2: |10> should become |11>
 	qs2 := state.NewQuantumState(2)
 	qs2.Amplitudes[0] = 0
-	qs2.Amplitudes[2] = 1.0 + 0i
-	qs2.ApplyCNOT(0, 1)
-	if cmplx.Abs(qs2.Amplitudes[0]) > 1e-10 || cmplx.Abs(qs2.Amplitudes[1]) > 1e-10 ||
-		cmplx.Abs(qs2.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs2.Amplitudes[3]-1.0) > 1e-10 {
+	qs2.Amplitudes[2] = 1.0 + 0i // Little-endian |10>
+	err = qs2.ApplyCNOT(0, 1)
+	if err != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err)
+	}
+	if cmplx.Abs(qs2.Amplitudes[0]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[1]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[2]) > 1e-10 ||
+		cmplx.Abs(qs2.Amplitudes[3]-1.0) > 1e-10 {
 		t.Errorf("CNOT failed on |10>: expected |11>, got %v", qs2.Amplitudes)
 	}
 
-	// Test 3: Bell state creation
+	// Test 3: Bell state creation with more precise verification
 	qs3 := state.NewQuantumState(2)
-	qs3.ApplyHadamard(0)
-	qs3.ApplyCNOT(0, 1)
-	expected := 1.0 / cmplx.Sqrt(2)
-	if cmplx.Abs(qs3.Amplitudes[0]-expected) > 1e-10 || cmplx.Abs(qs3.Amplitudes[1]) > 1e-10 ||
-		cmplx.Abs(qs3.Amplitudes[2]) > 1e-10 || cmplx.Abs(qs3.Amplitudes[3]-expected) > 1e-10 {
-		t.Errorf("CNOT failed to create Bell state: expected 1/sqrt(2)(|00> + |11>), got %v", qs3.Amplitudes)
+	err = qs3.ApplyHadamard(0) // Apply Hadamard to first (least significant) qubit
+	if err != nil {
+		t.Fatalf("Failed to apply Hadamard: %v", err)
+	}
+	err = qs3.ApplyCNOT(0, 1)
+	if err != nil {
+		t.Fatalf("Failed to apply CNOT: %v", err)
+	}
+
+	// Expected Bell state: 1/√2(|00⟩ + |11⟩)
+	expected := 1.0 / math.Sqrt(2)
+
+	// Verify specific indices for |00⟩ and |11⟩ in little-endian
+	if math.Abs(real(qs3.Amplitudes[0])-expected) > 1e-10 ||
+		imag(qs3.Amplitudes[0]) != 0 ||
+		math.Abs(real(qs3.Amplitudes[3])-expected) > 1e-10 ||
+		imag(qs3.Amplitudes[3]) != 0 {
+		t.Errorf("CNOT failed to create Bell state: got %v, want amplitude of %f for |00⟩ and |11⟩",
+			qs3.Amplitudes, expected)
+	}
+
+	// Verify other amplitudes are zero
+	for i, amp := range qs3.Amplitudes {
+		if i != 0 && i != 3 && cmplx.Abs(amp) > 1e-10 {
+			t.Errorf("Unexpected non-zero amplitude at index %d: %v", i, amp)
+		}
 	}
 }

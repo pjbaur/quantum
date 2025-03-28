@@ -29,43 +29,6 @@ func MeasureQubit(q *qubit.Qubit) int {
 	return 1
 }
 
-// MeasureState measures all qubits in a quantum state and collapses the state
-// Returns the measured integer value representing the state
-func MeasureState(qs *state.QuantumState) int {
-	// Calculate probabilities for each basis state
-	var probs []float64
-	var sum float64
-
-	for _, amp := range qs.Amplitudes {
-		prob := cmplx.Abs(amp) * cmplx.Abs(amp)
-		probs = append(probs, prob)
-		sum += prob
-	}
-
-	// Normalize probabilities (in case of floating point errors)
-	for i := range probs {
-		probs[i] /= sum
-	}
-
-	// Choose outcome based on probabilities
-	r := rand.Float64()
-	var cumulative float64
-
-	for i := 0; i < len(probs); i++ {
-		cumulative += probs[i]
-		if r < cumulative {
-			// Collapse to this state
-			newAmplitudes := make([]complex128, len(qs.Amplitudes))
-			newAmplitudes[i] = 1.0 + 0i
-			qs.Amplitudes = newAmplitudes
-			return i
-		}
-	}
-
-	// Fallback to the last state (should rarely happen due to floating point issues)
-	return len(probs) - 1
-}
-
 // MeasureSingleQubit measures a specific qubit in a multi-qubit system
 // This is a more complex operation as it doesn't fully collapse the state vector
 // Returns the measured result (0 or 1) for the specific qubit

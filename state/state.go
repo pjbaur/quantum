@@ -214,19 +214,21 @@ func (qs *QuantumState) ApplyCNOT(controlQubit, targetQubit int) error {
 		return fmt.Errorf("control and target qubits must be different, got %d for both", controlQubit)
 	}
 
-	// CNOT matrix in the computational basis |00⟩, |01⟩, |10⟩, |11⟩
-	// 1 0 0 0
-	// 0 1 0 0
-	// 0 0 0 1
-	// 0 0 1 0
-	matrix := [4][4]complex128{
-		{1, 0, 0, 0},
-		{0, 1, 0, 0},
-		{0, 0, 0, 1},
-		{0, 0, 1, 0},
+	newAmplitudes := make([]complex128, len(qs.Amplitudes))
+	copy(newAmplitudes, qs.Amplitudes)
+
+	for state := range qs.Amplitudes {
+		if (state>>controlQubit)&1 == 1 {
+			// Flip target qubit using XOR
+			newState := state ^ (1 << targetQubit)
+			// Swap amplitudes between original state and newState
+			newAmplitudes[newState], newAmplitudes[state] =
+				qs.Amplitudes[state], qs.Amplitudes[newState]
+		}
 	}
 
-	return qs.Apply2QubitMatrix(controlQubit, targetQubit, matrix)
+	qs.Amplitudes = newAmplitudes
+	return nil
 }
 
 // ApplyMatrix applies an operation to the specified qubit using a 2x2 unitary matrix.
@@ -272,11 +274,6 @@ func (qs *QuantumState) Apply2QubitMatrix(qubit1, qubit2 int, matrix [4][4]compl
 	}
 	if qubit1 == qubit2 {
 		return fmt.Errorf("qubit indices must be different, got %d for both", qubit1)
-	}
-
-	// Ensure qubit1 < qubit2 for consistent ordering
-	if qubit1 > qubit2 {
-		qubit1, qubit2 = qubit2, qubit1
 	}
 
 	newAmplitudes := make([]complex128, len(qs.Amplitudes))

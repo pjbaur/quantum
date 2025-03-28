@@ -199,7 +199,7 @@ func QuantumTeleportationDemo() {
 		}
 
 		// Record the initial state of the message qubit
-		initialState, _ := measurement.MeasureSingleQubit(qs, 0)
+		initialState, _ := qs.MeasureQubit(0)
 
 		// Create Bell state between qubits 1 and 2
 		qs.ApplyHadamard(1)
