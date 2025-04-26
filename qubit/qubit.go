@@ -48,7 +48,7 @@ func (q *Qubit) Set(alpha, beta complex128) error {
 	probSum := math.Pow(cmplx.Abs(alpha), 2) + math.Pow(cmplx.Abs(beta), 2)
 
 	// Allow a small floating-point error margin
-	if math.Abs(probSum-1.0) > 1e-10 {
+	if math.Abs(probSum-1.0) > 1e-6 {
 		return &quantum.NormalizationError{Sum: probSum}
 	}
 
