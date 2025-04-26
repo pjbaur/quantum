@@ -9,6 +9,7 @@ This project provides a basic simulation of quantum computing concepts using the
 - Measurement and probability calculations
 - Demonstrations of superposition, entanglement, and quantum teleportation
 - Modular, testable Go code
+- Uses the [little-endian](https://www.gutenberg.org/ebooks/829) convention
 
 ## Getting Started
 
