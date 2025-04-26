@@ -88,7 +88,7 @@ func TGatePhaseRotationDemo() {
 }
 
 // Helper function to print phase information
-func printPhaseInfo(q qubit.Qubit) {
+func printPhaseInfo(q *qubit.Qubit) {
 	alpha := q.Alpha()
 	beta := q.Beta()
 
@@ -222,10 +222,4 @@ func RunAllTGateDemos() {
 	TGateVsHadamardDemo()
 
 	fmt.Println("=============================================")
-}
-
-// Helper function to print state information
-func printState(s state.State) {
-	fmt.Println("State vector:")
-	s.Print()
 }

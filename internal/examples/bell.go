@@ -135,7 +135,7 @@ func QuantumTeleportationDemo() {
 
 	// Step 1: Create the qubit state to teleport
 	// We'll create a random state to make it interesting
-	angle := rand.Float64() * 2 * 3.14159
+	// angle := rand.Float64() * 2 * 3.14159
 	sourceQubit, err := qubit.NewWithValues(
 		complex(float64(rand.Float64()), 0),
 		complex(float64(rand.Float64()), 0),

@@ -5,7 +5,7 @@ import (
 	"math/cmplx"
 	"math/rand"
 
-	"github.com/pjbaur/quantum"
+	"github.com/pjbaur/quantum/quantum"
 )
 
 // Qubit implements the quantum.Qubit interface

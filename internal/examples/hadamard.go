@@ -84,21 +84,6 @@ func HadamardMultipleQubitsDemo() {
 	}
 }
 
-// Helper function to print quantum state in a readable format
-func printState(s *state.State) {
-	numQubits := s.NumQubits()
-	numStates := 1 << numQubits
-
-	for i := 0; i < numStates; i++ {
-		amplitude := s.Amplitude(i)
-		probability := s.Probability(i)
-		if probability > 0.001 { // Only show non-zero probabilities
-			fmt.Printf("|%0*b>: %.4f (%.1f%%)\n",
-				numQubits, i, amplitude, probability*100)
-		}
-	}
-}
-
 // HadamardProbabilityDistribution demonstrates the probability distribution
 // created by applying Hadamard gates to qubits
 func HadamardProbabilityDistribution() {
@@ -145,7 +130,8 @@ func HadamardProbabilityDistribution() {
 	fmt.Println("-----\t-----\t-----------")
 
 	// Calculate the expected probability (should be uniform)
-	expectedProb := 1.0 / float64(1<<nQubits)
+	possibleOutcomes := 1 << uint(nQubits) // Explicit integer shift
+	expectedProb := 1.0 / float64(possibleOutcomes)
 
 	for i := 0; i < (1 << nQubits); i++ {
 		count := outcomes[i]
