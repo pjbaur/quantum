@@ -1,307 +1,214 @@
 package state
 
 import (
-	"fmt"
 	"math"
 	"math/cmplx"
 	"math/rand"
 
-	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/quantum"
 )
 
-// QuantumState represents a multi-qubit quantum state.
-// The state is represented as a vector of complex amplitudes for each basis state.
-// The number of qubits is also stored to allow for operations on the state.
-type QuantumState struct {
-	Amplitudes []complex128 // State vector for all possible basis states
-	NQubits    int          // Number of qubits
+// State implements the quantum.QuantumState interface
+type State struct {
+	numQubits  int
+	amplitudes []complex128
 }
 
-// NewQuantumState creates a new quantum state with n qubits initialized to |00...0>.
-// The state is represented as a vector of complex amplitudes for each basis state.
-// The initial state is |00...0> with amplitude 1.
-func NewQuantumState(n int) *QuantumState {
-	size := 1 << n // 2^n states
+// New creates a new quantum state with the specified number of qubits
+// All qubits are initialized to |0⟩
+func New(numQubits int) *State {
+	if numQubits <= 0 {
+		numQubits = 1
+	}
+
+	// Allocate 2^n amplitudes
+	size := 1 << numQubits
 	amplitudes := make([]complex128, size)
-	amplitudes[0] = 1.0 + 0i // Initial state |00...0>
-	return &QuantumState{
-		Amplitudes: amplitudes,
-		NQubits:    n,
+
+	// Initialize to |00...0⟩
+	amplitudes[0] = 1.0
+
+	return &State{
+		numQubits:  numQubits,
+		amplitudes: amplitudes,
 	}
 }
 
-// NewQuantumStateFromAmplitudes creates a quantum state with specified amplitudes.
-// The number of qubits is inferred from the length of the amplitudes slice.
-func NewQuantumStateFromAmplitudes(amplitudes []complex128, nQubits int) (*QuantumState, error) {
-	expectedSize := 1 << nQubits
-	if len(amplitudes) != expectedSize {
-		return nil, fmt.Errorf("invalid amplitudes length: got %d, want %d (2^%d)",
-			len(amplitudes), expectedSize, nQubits)
-	}
-
-	// Create a copy of the amplitudes
-	ampCopy := make([]complex128, len(amplitudes))
-	copy(ampCopy, amplitudes)
-
-	return &QuantumState{
-		Amplitudes: ampCopy,
-		NQubits:    nQubits,
-	}, nil
+// NumQubits returns the number of qubits in the state
+func (s *State) NumQubits() int {
+	return s.numQubits
 }
 
-// ApplyHadamard applies a Hadamard gate to the specified qubit.
-// The Hadamard gate is a 2x2 matrix that transforms the basis states |0⟩ and |1⟩ as follows:
-// |0⟩ -> (|0⟩ + |1⟩) / √2
-// |1⟩ -> (|0⟩ - |1⟩) / √2
-func (qs *QuantumState) ApplyHadamard(qubit int) error {
-	if qubit < 0 || qubit >= qs.NQubits {
-		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+// Amplitude returns the amplitude of a specific basis state
+func (s *State) Amplitude(basisState int) complex128 {
+	if basisState < 0 || basisState >= len(s.amplitudes) {
+		return 0
 	}
-
-	return qs.ApplyMatrix(qubit, gates.H)
+	return s.amplitudes[basisState]
 }
 
-// Measure collapses the quantum state and returns the measured value.
-// The state is collapsed to a single basis state based on the probabilities of each state.
-// The probability of measuring a basis state is the squared magnitude of the amplitude.
-// The state is then collapsed to the measured basis state.
-func (qs *QuantumState) Measure() int {
-	// Calculate probabilities
-	var probs []float64
-	var sum float64
-	for _, amp := range qs.Amplitudes {
-		prob := cmplx.Abs(amp) * cmplx.Abs(amp)
-		probs = append(probs, prob)
-		sum += prob
-	}
-
-	// Normalize probabilities
-	for i := range probs {
-		probs[i] /= sum
-	}
-
-	// Choose outcome based on probabilities
-	r := rand.Float64()
-	var cumulative float64
-	for i := 0; i < len(probs); i++ {
-		cumulative += probs[i]
-		if r < cumulative {
-			// Collapse to this state
-			newAmplitudes := make([]complex128, len(qs.Amplitudes))
-			newAmplitudes[i] = 1.0 + 0i
-			qs.Amplitudes = newAmplitudes
-			return i
+// SetAmplitude sets the amplitude for a specific basis state
+func (s *State) SetAmplitude(basisState int, value complex128) error {
+	if basisState < 0 || basisState >= len(s.amplitudes) {
+		return &quantum.QubitsOutOfRangeError{
+			Index:    basisState,
+			MaxIndex: len(s.amplitudes) - 1,
 		}
 	}
 
-	// Fallback (shouldn't normally happen with proper probabilities)
-	return len(probs) - 1
+	// Make the change and check normalization
+	oldValue := s.amplitudes[basisState]
+	s.amplitudes[basisState] = value
+
+	if !s.isNormalized() {
+		// Restore the previous value
+		s.amplitudes[basisState] = oldValue
+		return &quantum.NormalizationError{Sum: s.probabilitySum()}
+	}
+
+	return nil
 }
 
-// MeasureQubit measures a specific qubit and collapses the state accordingly.
-func (qs *QuantumState) MeasureQubit(qubit int) (int, error) {
-	if qubit < 0 || qubit >= qs.NQubits {
-		return 0, fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
+// ApplyGate applies a gate to the specified qubit(s)
+func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
+	// Validate target qubits
+	for _, target := range targets {
+		if target < 0 || target >= s.numQubits {
+			return &quantum.QubitsOutOfRangeError{
+				Index:    target,
+				MaxIndex: s.numQubits - 1,
+			}
+		}
+	}
+
+	// Implement gate application logic based on gate type
+	// (simple version shown here, would need to be expanded)
+	if len(targets) == 1 && len(gate.Matrix()) == 2 {
+		// Single-qubit gate
+		return s.applySingleQubitGate(gate, targets[0])
+	}
+
+	return &quantum.InvalidGateApplicationError{
+		Gate:        gate.Name(),
+		RequiredLen: len(gate.Matrix()),
+		ActualLen:   len(targets),
+	}
+}
+
+// applySingleQubitGate applies a single-qubit gate to the specified qubit
+func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
+	matrix := gate.Matrix()
+	if len(matrix) != 2 || len(matrix[0]) != 2 {
+		return &quantum.InvalidGateApplicationError{
+			Gate:        gate.Name(),
+			RequiredLen: 2,
+			ActualLen:   len(matrix),
+		}
+	}
+
+	// Create a copy of amplitudes to work with
+	newAmplitudes := make([]complex128, len(s.amplitudes))
+
+	// Iterate through all basis states
+	for i := range s.amplitudes {
+		// Determine the basis states that will be affected
+		i0 := i &^ (1 << target)                // Clear the target bit
+		i1 := i | (1 << target)                 // Set the target bit
+		isTargetSet := (i & (1 << target)) != 0 // Check if target bit is set
+
+		// Get the affected amplitudes
+		a0 := s.amplitudes[i0] // Amplitude where target qubit is 0
+		a1 := s.amplitudes[i1] // Amplitude where target qubit is 1
+
+		// Apply the gate matrix
+		if isTargetSet {
+			newAmplitudes[i] = matrix[1][0]*a0 + matrix[1][1]*a1
+		} else {
+			newAmplitudes[i] = matrix[0][0]*a0 + matrix[0][1]*a1
+		}
+	}
+
+	// Update amplitudes
+	s.amplitudes = newAmplitudes
+
+	return nil
+}
+
+// Measure measures the specified qubit and collapses the state
+func (s *State) Measure(qubitIndex int) (int, error) {
+	if qubitIndex < 0 || qubitIndex >= s.numQubits {
+		return 0, &quantum.QubitsOutOfRangeError{
+			Index:    qubitIndex,
+			MaxIndex: s.numQubits - 1,
+		}
 	}
 
 	// Calculate probability of measuring |0⟩
-	zeroProb := 0.0
-	for state := 0; state < len(qs.Amplitudes); state++ {
-		// Check if the target qubit is 0
-		if ((state >> qubit) & 1) == 0 {
-			zeroProb += cmplx.Abs(qs.Amplitudes[state]) * cmplx.Abs(qs.Amplitudes[state])
+	prob0 := 0.0
+	for i, amplitude := range s.amplitudes {
+		if (i & (1 << qubitIndex)) == 0 {
+			prob0 += math.Pow(cmplx.Abs(amplitude), 2)
 		}
 	}
 
-	// Measure the qubit
+	// Randomly determine the measurement outcome
 	result := 0
-	if rand.Float64() > zeroProb {
+	if rand.Float64() >= prob0 {
 		result = 1
 	}
 
-	// Collapse the state based on measurement
-	newAmplitudes := make([]complex128, len(qs.Amplitudes))
-	newSum := 0.0
+	// Collapse the state based on the measurement
+	newAmplitudes := make([]complex128, len(s.amplitudes))
+	normalizationFactor := 0.0
 
-	for state := 0; state < len(qs.Amplitudes); state++ {
-		// Check if this basis state matches our measurement result
-		if ((state >> qubit) & 1) == result {
-			newAmplitudes[state] = qs.Amplitudes[state]
-			newSum += cmplx.Abs(newAmplitudes[state]) * cmplx.Abs(newAmplitudes[state])
+	for i, amplitude := range s.amplitudes {
+		isBitSet := (i & (1 << qubitIndex)) != 0
+		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
+			newAmplitudes[i] = amplitude
+			normalizationFactor += math.Pow(cmplx.Abs(amplitude), 2)
 		}
 	}
 
-	// Normalize the state
-	normFactor := 1.0 / complex(math.Sqrt(newSum), 0)
+	// Normalize the resulting state
+	normalizationFactor = math.Sqrt(normalizationFactor)
 	for i := range newAmplitudes {
-		newAmplitudes[i] *= normFactor
+		newAmplitudes[i] /= complex(normalizationFactor, 0)
 	}
 
-	qs.Amplitudes = newAmplitudes
+	s.amplitudes = newAmplitudes
 	return result, nil
 }
 
-// GetProbability returns the probability of measuring a specific basis state.
-// The probability is the squared magnitude of the amplitude.
-// If the basis state is out of range, an error is returned.
-func (qs *QuantumState) GetProbability(basisState int) (float64, error) {
-	if basisState < 0 || basisState >= len(qs.Amplitudes) {
-		return 0, fmt.Errorf("basis state %d out of range [0,%d)", basisState, len(qs.Amplitudes))
+// Probability returns the probability of measuring a specific basis state
+func (s *State) Probability(basisState int) float64 {
+	if basisState < 0 || basisState >= len(s.amplitudes) {
+		return 0
 	}
-
-	return cmplx.Abs(qs.Amplitudes[basisState]) * cmplx.Abs(qs.Amplitudes[basisState]), nil
+	return math.Pow(cmplx.Abs(s.amplitudes[basisState]), 2)
 }
 
-// Clone creates a deep copy of the quantum state.
-// This is useful for preserving the original state when applying operations.
-func (qs *QuantumState) Clone() *QuantumState {
-	newAmplitudes := make([]complex128, len(qs.Amplitudes))
-	copy(newAmplitudes, qs.Amplitudes)
+// Clone creates a copy of this quantum state
+func (s *State) Clone() quantum.QuantumState {
+	newAmplitudes := make([]complex128, len(s.amplitudes))
+	copy(newAmplitudes, s.amplitudes)
 
-	return &QuantumState{
-		Amplitudes: newAmplitudes,
-		NQubits:    qs.NQubits,
+	return &State{
+		numQubits:  s.numQubits,
+		amplitudes: newAmplitudes,
 	}
 }
 
-// PrintState prints the state in binary notation with amplitudes
-func (qs *QuantumState) PrintState() {
-	for i, amp := range qs.Amplitudes {
-		if cmplx.Abs(amp) > 0.001 { // Only print non-negligible amplitudes
-			fmt.Printf("|%0*b> : %.3f + %.3fi\n",
-				qs.NQubits, i,
-				real(amp), imag(amp))
-		}
-	}
+// isNormalized checks if the state is properly normalized
+func (s *State) isNormalized() bool {
+	sum := s.probabilitySum()
+	return math.Abs(sum-1.0) <= 1e-10
 }
 
-// IsNormalized checks if the quantum state is properly normalized
-func (qs *QuantumState) IsNormalized() bool {
+// probabilitySum calculates the sum of probabilities for all basis states
+func (s *State) probabilitySum() float64 {
 	sum := 0.0
-	for _, amp := range qs.Amplitudes {
-		sum += cmplx.Abs(amp) * cmplx.Abs(amp)
+	for _, amp := range s.amplitudes {
+		sum += math.Pow(cmplx.Abs(amp), 2)
 	}
-	return cmplx.Abs(complex(sum, 0)-complex(1.0, 0)) < 1e-10
-}
-
-// Normalize ensures the quantum state has unit norm.
-// This is done by dividing each amplitude by the square root of the sum of squared amplitudes.
-func (qs *QuantumState) Normalize() {
-	sum := 0.0
-	for _, amp := range qs.Amplitudes {
-		sum += cmplx.Abs(amp) * cmplx.Abs(amp)
-	}
-
-	normFactor := 1.0 / complex(math.Sqrt(sum), 0)
-	for i := range qs.Amplitudes {
-		qs.Amplitudes[i] *= normFactor
-	}
-}
-
-// ApplyCNOT applies a Controlled-NOT gate with the specified control and target qubits.
-// The control qubit is the first argument and the target qubit is the second argument.
-// The CNOT gate leaves the target qubit unchanged if the control qubit is |0⟩, and flips the
-// target qubit if the control qubit is |1⟩. This is represented by the 4×4 matrix where the
-// bottom-right 2×2 submatrix is swapped compared to the identity matrix.
-func (qs *QuantumState) ApplyCNOT(controlQubit, targetQubit int) error {
-	if controlQubit < 0 || controlQubit >= qs.NQubits {
-		return fmt.Errorf("control qubit index %d out of range [0,%d)", controlQubit, qs.NQubits)
-	}
-	if targetQubit < 0 || targetQubit >= qs.NQubits {
-		return fmt.Errorf("target qubit index %d out of range [0,%d)", targetQubit, qs.NQubits)
-	}
-	if controlQubit == targetQubit {
-		return fmt.Errorf("control and target qubits must be different, got %d for both", controlQubit)
-	}
-
-	newAmplitudes := make([]complex128, len(qs.Amplitudes))
-
-	for state := 0; state < len(qs.Amplitudes); state++ {
-		if (state>>controlQubit)&1 == 1 {
-			newState := state ^ (1 << targetQubit)
-			newAmplitudes[newState] = qs.Amplitudes[state]
-		} else {
-			newAmplitudes[state] = qs.Amplitudes[state]
-		}
-	}
-
-	qs.Amplitudes = newAmplitudes
-	return nil
-}
-
-// ApplyMatrix applies an operation to the specified qubit using a 2x2 unitary matrix.
-// The matrix is applied to the qubit in the computational basis |0⟩ and |1⟩.
-func (qs *QuantumState) ApplyMatrix(qubit int, matrix [2][2]complex128) error {
-	if qubit < 0 || qubit >= qs.NQubits {
-		return fmt.Errorf("qubit index %d out of range [0,%d)", qubit, qs.NQubits)
-	}
-
-	newAmplitudes := make([]complex128, len(qs.Amplitudes))
-
-	// For each basis state
-	for state := 0; state < len(qs.Amplitudes); state++ {
-		// Check the bit at target qubit position
-		bit := (state >> qubit) & 1
-		// Calculate the state with flipped bit at the target position
-		flipped := state ^ (1 << qubit)
-
-		if bit == 0 {
-			// If qubit is |0⟩: Apply first row of the matrix
-			newAmplitudes[state] += matrix[0][0] * qs.Amplitudes[state]
-			newAmplitudes[flipped] += matrix[0][1] * qs.Amplitudes[state]
-		} else {
-			// If qubit is |1⟩: Apply second row of the matrix
-			newAmplitudes[flipped] += matrix[1][0] * qs.Amplitudes[state]
-			newAmplitudes[state] += matrix[1][1] * qs.Amplitudes[state]
-		}
-	}
-
-	qs.Amplitudes = newAmplitudes
-	return nil
-}
-
-// Apply2QubitMatrix applies a 4x4 matrix operation to two qubits.
-// The matrix is applied to the qubits in the computational basis |00⟩, |01⟩, |10⟩, |11⟩.
-// The matrix is specified as a 4x4 complex matrix.
-func (qs *QuantumState) Apply2QubitMatrix(qubit1, qubit2 int, matrix [4][4]complex128) error {
-	if qubit1 < 0 || qubit1 >= qs.NQubits {
-		return fmt.Errorf("first qubit index %d out of range [0,%d)", qubit1, qs.NQubits)
-	}
-	if qubit2 < 0 || qubit2 >= qs.NQubits {
-		return fmt.Errorf("second qubit index %d out of range [0,%d)", qubit2, qs.NQubits)
-	}
-	if qubit1 == qubit2 {
-		return fmt.Errorf("qubit indices must be different, got %d for both", qubit1)
-	}
-
-	newAmplitudes := make([]complex128, len(qs.Amplitudes))
-
-	// For each basis state
-	for state := 0; state < len(qs.Amplitudes); state++ {
-		// Extract the bits at the target positions
-		bit1 := (state >> qubit1) & 1
-		bit2 := (state >> qubit2) & 1
-		inputIdx := (bit1 << 1) | bit2
-
-		// For each possible output
-		for outputIdx := 0; outputIdx < 4; outputIdx++ {
-			outBit1 := (outputIdx >> 1) & 1
-			outBit2 := outputIdx & 1
-
-			// Calculate new state by setting the target bits
-			newState := state
-			if bit1 != outBit1 {
-				newState ^= (1 << qubit1)
-			}
-			if bit2 != outBit2 {
-				newState ^= (1 << qubit2)
-			}
-
-			// Apply matrix element
-			newAmplitudes[newState] += matrix[inputIdx][outputIdx] * qs.Amplitudes[state]
-		}
-	}
-
-	qs.Amplitudes = newAmplitudes
-	return nil
+	return sum
 }

@@ -120,6 +120,25 @@ These gates operate on two or more qubits, often creating entanglement or perfor
 
 ---
 
+### Enumeration of Gates
+#### Single-Qubit Gates
+1. X Gate (NOT Gate)
+2. Y Gate
+3. Z Gate
+4. Hadamard Gate (H Gate)
+5. Phase Gate (S Gate)
+6. T Gate
+7. Rotation Gates (Rx, Ry, Rz)
+
+#### Multi-Qubit Gates
+1. CNOT Gate (Controlled NOT)
+2. CZ Gate (Controlled Z)
+3. SWAP Gate
+4. Toffoli Gate (CCNOT)
+5. Controlled-U Gate
+
+---
+
 ### **Significance**
 - **Universal Gate Sets**: A small set of gates (e.g., H, T, CNOT) is sufficient to approximate any quantum operation, making them "universal" for quantum computing.
 - **Applications**: These gates are used in quantum algorithms like Shor’s (factoring), Grover’s (search), and quantum error correction.

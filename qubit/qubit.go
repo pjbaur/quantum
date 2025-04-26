@@ -1,117 +1,98 @@
 package qubit
 
 import (
+	"math"
 	"math/cmplx"
 	"math/rand"
 
-	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum"
 )
 
-// Qubit represents a single quantum bit with complex amplitudes
+// Qubit implements the quantum.Qubit interface
 type Qubit struct {
-	Alpha complex128 // Amplitude for |0⟩ state
-	Beta  complex128 // Amplitude for |1⟩ state
+	alpha complex128
+	beta  complex128
 }
 
-// ApplyMatrix applies a 2x2 unitary matrix to the qubit's state
-func (q *Qubit) ApplyMatrix(matrix [2][2]complex128) {
-	newAlpha := matrix[0][0]*q.Alpha + matrix[0][1]*q.Beta
-	newBeta := matrix[1][0]*q.Alpha + matrix[1][1]*q.Beta
-
-	q.Alpha = newAlpha
-	q.Beta = newBeta
-}
-
-// ApplyHadamard applies the Hadamard gate to the qubit
-func (q *Qubit) ApplyHadamard() {
-	q.ApplyMatrix(gates.H)
-}
-
-// ApplyX applies the Pauli-X gate to the qubit
-func (q *Qubit) ApplyX() {
-	q.ApplyMatrix(gates.X)
-}
-
-// ApplyZ applies the Pauli-Z gate to the qubit
-func (q *Qubit) ApplyZ() {
-	q.ApplyMatrix(gates.Z)
-}
-
-// ApplyT applies the T gate to the qubit
-func (q *Qubit) ApplyT() {
-	q.ApplyMatrix(gates.T)
-}
-
-// ApplyS applies the S gate to the qubit
-func (q *Qubit) ApplyS() {
-	q.ApplyMatrix(gates.S)
-}
-
-// ApplyY applies the Pauli-Y gate to the qubit
-func (q *Qubit) ApplyY() {
-	q.ApplyMatrix(gates.Y)
-}
-
-// ApplyCNot applies the CNOT gate to the qubit
-func (q *Qubit) ApplyCNot(control int) {
-	q.ApplyMatrix(gates.CNot(control))
-}
-
-// ApplyCZ applies the CZ gate to the qubit
-func (q *Qubit) ApplyCZ(control int) {
-	q.ApplyMatrix(gates.CZ(control))
-}
-
-// NewQubit creates a new qubit initialized to |0⟩ state
-func NewQubit() *Qubit {
+// New creates a new qubit in the |0⟩ state
+func New() *Qubit {
 	return &Qubit{
-		Alpha: 1.0 + 0i,
-		Beta:  0.0 + 0i,
+		alpha: 1.0,
+		beta:  0.0,
 	}
 }
 
-// NewQubitFromValues creates a new qubit with specified amplitude values
-func NewQubitFromValues(alpha, beta complex128) *Qubit {
-	return &Qubit{
-		Alpha: alpha,
-		Beta:  beta,
+// NewWithValues creates a new qubit with specific amplitudes
+// Returns error if amplitudes would not result in a normalized state
+func NewWithValues(alpha, beta complex128) (*Qubit, error) {
+	q := &Qubit{}
+	if err := q.Set(alpha, beta); err != nil {
+		return nil, err
 	}
+	return q, nil
 }
 
-// Measure collapses the qubit to either |0⟩ or |1⟩ based on probability
-// Returns the result (0 or 1) and updates the qubit's state
-func (q *Qubit) Measure() int {
-	prob0 := cmplx.Abs(q.Alpha) * cmplx.Abs(q.Alpha)
-	if rand.Float64() < prob0 {
-		q.Alpha = 1.0 + 0i
-		q.Beta = 0.0 + 0i
-		return 0
+// Alpha returns the amplitude of the |0⟩ state
+func (q *Qubit) Alpha() complex128 {
+	return q.alpha
+}
+
+// Beta returns the amplitude of the |1⟩ state
+func (q *Qubit) Beta() complex128 {
+	return q.beta
+}
+
+// Set updates the amplitudes of the qubit
+func (q *Qubit) Set(alpha, beta complex128) error {
+	// Calculate probability sum to check normalization
+	probSum := math.Pow(cmplx.Abs(alpha), 2) + math.Pow(cmplx.Abs(beta), 2)
+
+	// Allow a small floating-point error margin
+	if math.Abs(probSum-1.0) > 1e-10 {
+		return &quantum.NormalizationError{Sum: probSum}
 	}
-	q.Alpha = 0.0 + 0i
-	q.Beta = 1.0 + 0i
-	return 1
+
+	q.alpha = alpha
+	q.beta = beta
+	return nil
 }
 
 // Probability0 returns the probability of measuring |0⟩
 func (q *Qubit) Probability0() float64 {
-	return cmplx.Abs(q.Alpha) * cmplx.Abs(q.Alpha)
+	return math.Pow(cmplx.Abs(q.alpha), 2)
 }
 
 // Probability1 returns the probability of measuring |1⟩
 func (q *Qubit) Probability1() float64 {
-	return cmplx.Abs(q.Beta) * cmplx.Abs(q.Beta)
+	return math.Pow(cmplx.Abs(q.beta), 2)
 }
 
-// IsNormalized checks if the qubit state is properly normalized
-func (q *Qubit) IsNormalized() bool {
-	sum := q.Probability0() + q.Probability1()
-	return cmplx.Abs(complex(sum, 0)-complex(1.0, 0)) < 1e-10
-}
-
-// Clone creates a copy of the qubit
-func (q *Qubit) Clone() *Qubit {
-	return &Qubit{
-		Alpha: q.Alpha,
-		Beta:  q.Beta,
+// Measure collapses the qubit to either |0⟩ or |1⟩
+func (q *Qubit) Measure() int {
+	prob0 := q.Probability0()
+	if rand.Float64() < prob0 {
+		// Collapse to |0⟩
+		q.alpha = 1.0
+		q.beta = 0.0
+		return 0
+	} else {
+		// Collapse to |1⟩
+		q.alpha = 0.0
+		q.beta = 1.0
+		return 1
 	}
+}
+
+// Clone creates a copy of this qubit
+func (q *Qubit) Clone() quantum.Qubit {
+	return &Qubit{
+		alpha: q.alpha,
+		beta:  q.beta,
+	}
+}
+
+// IsNormalized checks if the qubit is properly normalized
+func (q *Qubit) IsNormalized() bool {
+	sum := math.Pow(cmplx.Abs(q.alpha), 2) + math.Pow(cmplx.Abs(q.beta), 2)
+	return math.Abs(sum-1.0) <= 1e-10
 }

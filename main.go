@@ -13,9 +13,9 @@ import (
 func showUsage() {
 	fmt.Println("Quantum Computing in Go")
 	fmt.Println("======================")
-	fmt.Println("Usage: go run main.go [example-name]")
+	fmt.Println("Usage: go run main.go [demo]")
 	fmt.Println("")
-	fmt.Println("Available examples:")
+	fmt.Println("Available Demos:")
 	fmt.Println("  all       - Run all demonstrations")
 	fmt.Println("  hadamard  - Hadamard gate demonstrations")
 	fmt.Println("  tgate     - T-gate demonstrations")
