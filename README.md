@@ -4,31 +4,34 @@ This project provides a basic simulation of quantum computing concepts using the
 
 ## Features
 
--   **Qubit Representation:** Represents a qubit using complex numbers for alpha and beta amplitudes.
--   **Hadamard Gate:** Implements the Hadamard gate, a fundamental quantum gate that puts a qubit into superposition.
--   **Measurement:** Simulates the measurement of a qubit, collapsing it into either the |0> or |1> state with probabilities determined by the qubit's amplitudes.
--   **Testing:** Includes comprehensive unit tests to ensure the correctness of the implemented operations.
+- Single and multi-qubit simulation
+- Hadamard, Pauli (X, Y, Z), S, T, and CNOT gates
+- Measurement and probability calculations
+- Demonstrations of superposition, entanglement, and quantum teleportation
+- Modular, testable Go code
 
 ## Getting Started
 
 ### Prerequisites
 
--   Go (version 1.18 or later)
+- Go (version 1.18 or later)
 
 ### Installation
 
-1.  Clone the repository:
+1. Clone the repository:
 
     ```bash
     git clone https://github.com/pjbaur/quantum.git
     cd quantum
     ```
 
-2.  Run the main program:
+2. Run the main program:
 
     ```bash
-    go run quantum.go
+    go run main.go
     ```
+
+    This will display a menu of available quantum computing demonstrations, including Hadamard, T-gate, and Bell state examples.
 
 3. Run the tests:
 
@@ -36,47 +39,44 @@ This project provides a basic simulation of quantum computing concepts using the
     go test
     ```
 
+    This will run all unit tests in [`quantum_test.go`](quantum_test.go).
+
 ## Usage
 
-### `quantum.go`
+The main entry point is [`main.go`](main.go), which provides a command-line interface to run various quantum computing demonstrations. Example usage:
 
-The `quantum.go` file contains the main program, which demonstrates the basic usage of the qubit, Hadamard gate, and measurement.
+```bash
+go run main.go hadamard   # Run Hadamard gate demonstrations
+go run main.go tgate      # Run T-gate demonstrations
+go run main.go bell       # Run Bell state demonstrations
+go run main.go all        # Run all demonstrations sequentially
+```
 
-```go
-package main
+### Project Structure
 
-import (
-	"fmt"
-	"math"
-	"math/cmplx"
-	"math/rand"
-)
+- [`main.go`](main.go): Entry point and CLI for running demonstrations.
+- [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
+- [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
+- [`gates/gates.go`](gates/gates.go): Definitions of quantum gates (H, X, Y, Z, S, T, CNOT, etc).
+- [`measurement/measurement.go`](measurement/measurement.go): Measurement operations for qubits and quantum states.
+- [`examples/`](examples/): Example programs and demonstrations:
+  - [`hadamard.go`](examples/hadamard.go): Hadamard gate and superposition.
+  - [`tgate.go`](examples/tgate.go): T-gate and phase operations.
+  - [`bell.go`](examples/bell.go): Bell states, entanglement, and teleportation.
 
-// ... (Qubit struct and methods) ...
+## Testing
 
-func main() {
-	trials := 10
-	zeros := 0
-	ones := 0
+Run all tests with:
 
-	for i := 0; i < trials; i++ {
-		qubit := NewQubit()
-		fmt.Printf("Initial state: Alpha=%.3f, Beta=%.3f\n", real(qubit.Alpha), real(qubit.Beta))
+```bash
+go test
+```
 
-		qubit.ApplyHadamard()
-		fmt.Printf("After Hadamard: Alpha=%.3f, Beta=%.3f\n", real(qubit.Alpha), real(qubit.Beta))
+See [`quantum_test.go`](quantum_test.go) for comprehensive unit tests covering qubit operations, gates, measurement, and multi-qubit states.
 
-		result := qubit.Measure()
-		fmt.Printf("Measured: %d\n", result)
-		if result == 0 {
-			zeros++
-		} else {
-			ones++
-		}
-	}
+---
 
-	fmt.Printf("\nResults: %d zeros, %d ones\n", zeros, ones)
-}
+For more details on quantum gates and their matrix representations, see [QUANTUM-HELP.md](QUANTUM-HELP.md).
 
 ## Expansion
 
