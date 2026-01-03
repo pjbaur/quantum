@@ -15,6 +15,10 @@ import (
 type State struct {
 	numQubits  int
 	amplitudes []complex128
+	scratch    []complex128
+	comboMasks []int
+	inputs     []complex128
+	outputs    []complex128
 }
 
 // New creates a new quantum state with the specified number of qubits
@@ -91,18 +95,35 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 	}
 
 	// Validate target qubits.
-	seen := make(map[int]struct{}, len(targets))
-	for _, target := range targets {
-		if target < 0 || target >= s.numQubits {
-			return &quantum.QubitsOutOfRangeError{
-				Index:    target,
-				MaxIndex: s.numQubits - 1,
+	if s.numQubits <= 64 {
+		var seen uint64
+		for _, target := range targets {
+			if target < 0 || target >= s.numQubits {
+				return &quantum.QubitsOutOfRangeError{
+					Index:    target,
+					MaxIndex: s.numQubits - 1,
+				}
 			}
+			bit := uint64(1) << target
+			if seen&bit != 0 {
+				return errors.New("targets must be unique")
+			}
+			seen |= bit
 		}
-		if _, exists := seen[target]; exists {
-			return errors.New("targets must be unique")
+	} else {
+		seen := make(map[int]struct{}, len(targets))
+		for _, target := range targets {
+			if target < 0 || target >= s.numQubits {
+				return &quantum.QubitsOutOfRangeError{
+					Index:    target,
+					MaxIndex: s.numQubits - 1,
+				}
+			}
+			if _, exists := seen[target]; exists {
+				return errors.New("targets must be unique")
+			}
+			seen[target] = struct{}{}
 		}
-		seen[target] = struct{}{}
 	}
 
 	if len(targets) == 1 && requiredQubits == 1 {
@@ -152,8 +173,7 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 		}
 	}
 
-	// Create a copy of amplitudes to work with
-	newAmplitudes := make([]complex128, len(s.amplitudes))
+	newAmplitudes := s.ensureScratch()
 
 	// Iterate through all basis states
 	for i := range s.amplitudes {
@@ -175,7 +195,7 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 	}
 
 	// Update amplitudes
-	s.amplitudes = newAmplitudes
+	s.amplitudes, s.scratch = newAmplitudes, s.amplitudes
 
 	return nil
 }
@@ -191,7 +211,12 @@ func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 		targetMask |= 1 << target
 	}
 
-	comboMasks := make([]int, comboCount)
+	comboMasks := s.comboMasks
+	if cap(comboMasks) < comboCount {
+		comboMasks = make([]int, comboCount)
+	}
+	comboMasks = comboMasks[:comboCount]
+	s.comboMasks = comboMasks
 	for combo := 0; combo < comboCount; combo++ {
 		mask := 0
 		for i, target := range targets {
@@ -203,9 +228,21 @@ func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 		comboMasks[combo] = mask
 	}
 
-	inputs := make([]complex128, comboCount)
-	outputs := make([]complex128, comboCount)
-	newAmplitudes := make([]complex128, len(s.amplitudes))
+	inputs := s.inputs
+	if cap(inputs) < comboCount {
+		inputs = make([]complex128, comboCount)
+	}
+	inputs = inputs[:comboCount]
+	s.inputs = inputs
+
+	outputs := s.outputs
+	if cap(outputs) < comboCount {
+		outputs = make([]complex128, comboCount)
+	}
+	outputs = outputs[:comboCount]
+	s.outputs = outputs
+
+	newAmplitudes := s.ensureScratch()
 
 	for base := 0; base < len(s.amplitudes); base++ {
 		if base&targetMask != 0 {
@@ -229,7 +266,7 @@ func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 		}
 	}
 
-	s.amplitudes = newAmplitudes
+	s.amplitudes, s.scratch = newAmplitudes, s.amplitudes
 	return nil
 }
 
@@ -257,7 +294,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 	}
 
 	// Collapse the state based on the measurement
-	newAmplitudes := make([]complex128, len(s.amplitudes))
+	newAmplitudes := s.ensureScratch()
 	normalizationFactor := 0.0
 
 	for i, amplitude := range s.amplitudes {
@@ -265,6 +302,8 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
 			newAmplitudes[i] = amplitude
 			normalizationFactor += math.Pow(cmplx.Abs(amplitude), 2)
+		} else {
+			newAmplitudes[i] = 0
 		}
 	}
 
@@ -274,7 +313,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		newAmplitudes[i] /= complex(normalizationFactor, 0)
 	}
 
-	s.amplitudes = newAmplitudes
+	s.amplitudes, s.scratch = newAmplitudes, s.amplitudes
 	return result, nil
 }
 
@@ -310,4 +349,11 @@ func (s *State) probabilitySum() float64 {
 		sum += math.Pow(cmplx.Abs(amp), 2)
 	}
 	return sum
+}
+
+func (s *State) ensureScratch() []complex128 {
+	if len(s.scratch) != len(s.amplitudes) {
+		s.scratch = make([]complex128, len(s.amplitudes))
+	}
+	return s.scratch
 }
