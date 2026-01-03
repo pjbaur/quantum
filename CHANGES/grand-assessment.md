@@ -22,23 +22,23 @@ The project is a Go-based quantum computing simulator with clear package separat
 
 ## Prioritized Recommendations
 
-### Immediate (Phase 2)
+### [x] Immediate (Phase 2)
 - Implement multi-qubit gate application logic in `state.ApplyGate` and validate with Bell state tests.
 - Finish circuit abstraction and examples to improve usability.
 - Remove debug prints from tests.
 
-### Near Term (Phase 3)
+### [ ] Near Term (Phase 3)
 - Update CLI to use the `flag` package with clear `--help` output.
 - Add CI for `go test`, `go vet`, linting, and coverage.
 - Align README with actual project structure and usage.
 
-### Mid Term (Phase 4)
+### [ ] Mid Term (Phase 4)
 - Profile state operations and reduce allocations.
 - Explore sparse state representations for larger qubit counts.
 - Add gate registration and helper composition/decomposition utilities.
 - Introduce an algorithm package (Grover, Deutsch-Jozsa).
 
-### Longer Term (Phase 5)
+### [ ] Longer Term (Phase 5)
 - Add visualization tools (text-based state views, Bloch sphere for single qubits).
 - Implement density matrix support and common noise models.
 - Explore parallel simulation of independent circuits.
