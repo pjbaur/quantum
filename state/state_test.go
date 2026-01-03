@@ -108,7 +108,10 @@ func TestApplyGateErrors(t *testing.T) {
 			targets: []int{0},
 			errCheck: func(err error) bool {
 				var targetErr *quantum.InvalidGateApplicationError
-				return errors.As(err, &targetErr)
+				if !errors.As(err, &targetErr) {
+					return false
+				}
+				return targetErr.RequiredLen == 2 && targetErr.ActualLen == 1
 			},
 		},
 	}

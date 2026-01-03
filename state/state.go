@@ -2,6 +2,7 @@ package state
 
 import (
 	"math"
+	"math/bits"
 	"math/cmplx"
 	"math/rand"
 
@@ -83,12 +84,13 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 
 	// Implement gate application logic based on gate type
 	// (simple version shown here, would need to be expanded)
-	if len(targets) == 1 && len(gate.Matrix()) == 2 {
+	requiredQubits := requiredQubitsFromMatrix(gate.Matrix())
+	if len(targets) == 1 && requiredQubits == 1 {
 		// Single-qubit gate
 		return s.applySingleQubitGate(gate, targets[0])
 	}
 
-	if len(targets) == 2 && len(gate.Matrix()) == 4 {
+	if len(targets) == 2 && requiredQubits == 2 {
 		if targets[0] == targets[1] {
 			return &quantum.InvalidGateApplicationError{
 				Gate:        gate.Name(),
@@ -101,9 +103,17 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 
 	return &quantum.InvalidGateApplicationError{
 		Gate:        gate.Name(),
-		RequiredLen: len(gate.Matrix()),
+		RequiredLen: requiredQubits,
 		ActualLen:   len(targets),
 	}
+}
+
+func requiredQubitsFromMatrix(matrix [][]complex128) int {
+	size := len(matrix)
+	if size == 0 || size&(size-1) != 0 {
+		return size
+	}
+	return bits.Len(uint(size)) - 1
 }
 
 // applySingleQubitGate applies a single-qubit gate to the specified qubit
