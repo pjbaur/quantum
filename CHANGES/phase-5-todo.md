@@ -4,10 +4,10 @@ Organized for parallel development across visualization, density matrices/noise,
 
 ## Workstream 1: Visualization tools
 
-- [ ] Define text-based state views for multi-qubit states (basis index, amplitude, probability).
-- [ ] Add a single-qubit Bloch sphere visualization output (ASCII or data export for plotting).
-- [ ] Provide small examples/demos for visualization outputs.
-- [ ] Document visualization usage in README or docs.
+- [x] Define text-based state views for multi-qubit states (basis index, amplitude, probability).
+- [x] Add a single-qubit Bloch sphere visualization output (ASCII or data export for plotting).
+- [x] Provide small examples/demos for visualization outputs.
+- [x] Document visualization usage in README or docs.
 
 ## Workstream 2: Density matrices and noise
 

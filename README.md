@@ -9,6 +9,7 @@ This project provides a basic simulation of quantum computing concepts using the
 - Measurement and probability calculations for qubits and quantum states
 - Circuit abstraction for sequencing gate operations
 - Demonstrations of superposition, entanglement, and quantum teleportation
+- Visualization helpers for state tables and Bloch vectors
 - Modular, testable Go code
 - Little-endian qubit indexing (qubit 0 is the least-significant bit)
 
@@ -52,7 +53,22 @@ go run ./cmd/quantum hadamard   # Run Hadamard gate demonstrations
 go run ./cmd/quantum tgate      # Run T-gate demonstrations
 go run ./cmd/quantum bell       # Run Bell state demonstrations
 go run ./cmd/quantum algorithm  # Run Deutsch-Jozsa and Grover demonstrations
+go run ./cmd/quantum visual     # Run visualization demonstrations
 go run ./cmd/quantum all        # Run all demonstrations sequentially
+```
+
+### Visualization
+
+Use the `visualization` package to format multi-qubit state tables and export Bloch vectors for plotting. Example usage:
+
+```go
+opts := visualization.DefaultStateViewOptions()
+opts.MinProbability = 0.001
+fmt.Println(visualization.FormatStateView(state, opts))
+
+vector := visualization.BlochVectorFromQubit(qubit)
+fmt.Println(visualization.FormatBlochVector(vector, 4))
+fmt.Println(visualization.BlochCSV(vector, 4))
 ```
 
 ### Project Structure
@@ -63,11 +79,13 @@ go run ./cmd/quantum all        # Run all demonstrations sequentially
 - [`quantum/`](quantum/): Core interfaces and error types shared across packages.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
+- [`visualization/`](visualization/): Text-based state views and Bloch vector export helpers.
 - [`internal/examples/`](internal/examples/): Example programs and demonstrations:
   - [`hadamard.go`](internal/examples/hadamard.go): Hadamard gate and superposition.
   - [`tgate.go`](internal/examples/tgate.go): T-gate and phase operations.
   - [`bell.go`](internal/examples/bell.go): Bell states, entanglement, and teleportation.
   - [`algorithm.go`](internal/examples/algorithm.go): Deutsch-Jozsa and Grover algorithms.
+  - [`visualization.go`](internal/examples/visualization.go): State table and Bloch vector outputs.
 - Measurement helpers currently live on `state.State` and `qubit.Qubit`; a dedicated `measurement` package is TODO.
 
 ## Testing
@@ -98,4 +116,3 @@ Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
 ---
 
 For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).
-
