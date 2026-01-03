@@ -6,9 +6,9 @@ documentation, and tests, with minimal scope changes.
 
 ## Goals
 - [x] Enable multi-qubit gate application in `state.State.ApplyGate`.
-- [ ] Ensure Bell-state examples work as written.
-- [ ] Add required package-level documentation for `package quantum`.
-- [ ] Add tests for multi-qubit gate application and coverage in `QuantumState`.
+- [x] Ensure Bell-state examples work as written.
+- [x] Add required package-level documentation for `package quantum`.
+- [x] Add tests for multi-qubit gate application and coverage in `QuantumState`.
 
 ## Plan
 
@@ -41,8 +41,8 @@ documentation, and tests, with minimal scope changes.
    - Files: `state/state_test.go` (new or existing test file).
 
 ## Validation
-- [ ] `go test ./...`
-- [ ] Optional: run the Bell demo in `cmd/quantum` to manually verify output.
+- [x] `go test ./...`
+- [x] Optional: run the Bell demo in `cmd/quantum` to manually verify output.
 
 ## Assumptions / Notes
 - Multi-qubit gates are limited to 2-qubit (4x4) matrices for this phase.
