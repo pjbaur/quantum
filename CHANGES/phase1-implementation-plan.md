@@ -32,7 +32,7 @@ documentation, and tests, with minimal scope changes.
    - Keep the comment consistent with existing README usage.
    - Files: `quantum/interfaces.go` (preferred) or `quantum/errortypes.go`.
 
-4. [ ] Add tests for multi-qubit gates and `QuantumState.ApplyGate`.
+4. [x] Add tests for multi-qubit gates and `QuantumState.ApplyGate`.
    - Table-driven tests for:
      - CNOT on |00> and |10> cases (control qubit behavior).
      - SWAP on a simple two-qubit state.

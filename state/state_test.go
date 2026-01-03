@@ -1,0 +1,142 @@
+package state_test
+
+import (
+	"errors"
+	"math"
+	"math/cmplx"
+	"testing"
+
+	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/quantum"
+	"github.com/pjbaur/quantum/state"
+)
+
+const tolerance = 1e-10
+
+func TestApplyGateCNOTControlBehavior(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     func(quantum.QuantumState) error
+		targets   []int
+		wantIndex int
+	}{
+		{
+			name: "control |0> leaves |00> unchanged",
+			setup: func(quantum.QuantumState) error {
+				return nil
+			},
+			targets:   []int{1, 0},
+			wantIndex: 0,
+		},
+		{
+			name: "control |1> flips target",
+			setup: func(qs quantum.QuantumState) error {
+				return qs.ApplyGate(gates.NewPauliX(), 1)
+			},
+			targets:   []int{1, 0},
+			wantIndex: 3,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var qs quantum.QuantumState = state.New(2)
+			if err := tt.setup(qs); err != nil {
+				t.Fatalf("setup failed: %v", err)
+			}
+
+			if err := qs.ApplyGate(gates.NewCNOT(), tt.targets...); err != nil {
+				t.Fatalf("ApplyGate returned error: %v", err)
+			}
+
+			assertBasisState(t, qs, tt.wantIndex)
+			assertNormalized(t, qs)
+		})
+	}
+}
+
+func TestApplyGateSwap(t *testing.T) {
+	var qs quantum.QuantumState = state.New(2)
+	if err := qs.ApplyGate(gates.NewPauliX(), 0); err != nil {
+		t.Fatalf("ApplyGate(PauliX) returned error: %v", err)
+	}
+
+	if err := qs.ApplyGate(gates.NewSwap(), 0, 1); err != nil {
+		t.Fatalf("ApplyGate(SWAP) returned error: %v", err)
+	}
+
+	assertBasisState(t, qs, 2)
+	assertNormalized(t, qs)
+}
+
+func TestApplyGateErrors(t *testing.T) {
+	tests := []struct {
+		name     string
+		gate     quantum.Gate
+		targets  []int
+		errCheck func(error) bool
+	}{
+		{
+			name:    "target out of range",
+			gate:    gates.NewHadamard(),
+			targets: []int{2},
+			errCheck: func(err error) bool {
+				var targetErr *quantum.QubitsOutOfRangeError
+				return errors.As(err, &targetErr)
+			},
+		},
+		{
+			name:    "invalid target count for CNOT",
+			gate:    gates.NewCNOT(),
+			targets: []int{0},
+			errCheck: func(err error) bool {
+				var targetErr *quantum.InvalidGateApplicationError
+				return errors.As(err, &targetErr)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var qs quantum.QuantumState = state.New(2)
+			err := qs.ApplyGate(tt.gate, tt.targets...)
+			if err == nil {
+				t.Fatalf("expected error, got nil")
+			}
+			if !tt.errCheck(err) {
+				t.Fatalf("unexpected error type: %T", err)
+			}
+		})
+	}
+}
+
+func assertBasisState(t *testing.T, qs quantum.QuantumState, wantIndex int) {
+	t.Helper()
+
+	totalStates := 1 << qs.NumQubits()
+	for i := 0; i < totalStates; i++ {
+		amp := qs.Amplitude(i)
+		if i == wantIndex {
+			if cmplx.Abs(amp-1) > tolerance {
+				t.Fatalf("expected basis state %d amplitude 1, got %v", wantIndex, amp)
+			}
+			continue
+		}
+		if cmplx.Abs(amp) > tolerance {
+			t.Fatalf("expected basis state %d amplitude 0, got %v", i, amp)
+		}
+	}
+}
+
+func assertNormalized(t *testing.T, qs quantum.QuantumState) {
+	t.Helper()
+
+	sum := 0.0
+	totalStates := 1 << qs.NumQubits()
+	for i := 0; i < totalStates; i++ {
+		sum += qs.Probability(i)
+	}
+	if math.Abs(sum-1.0) > tolerance {
+		t.Fatalf("expected normalized state, probability sum = %v", sum)
+	}
+}
