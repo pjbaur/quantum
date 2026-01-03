@@ -1,6 +1,7 @@
 package sparsestate
 
 import (
+	"errors"
 	"math"
 	"math/cmplx"
 	"testing"
@@ -109,6 +110,105 @@ func TestSparseSwapMatchesDense(t *testing.T) {
 	}
 
 	assertStatesMatch(t, dense, sparse)
+}
+
+type denseTwoQubitGate struct {
+	matrix [][]complex128
+}
+
+func newDenseTwoQubitGate() *denseTwoQubitGate {
+	return &denseTwoQubitGate{
+		matrix: [][]complex128{
+			{1, 0, 0, 0},
+			{0, 0, 1, 0},
+			{0, 1, 0, 0},
+			{0, 0, 0, -1},
+		},
+	}
+}
+
+func (g *denseTwoQubitGate) Apply(q quantum.Qubit) error {
+	return errors.New("dense two-qubit gate requires multi-qubit apply")
+}
+
+func (g *denseTwoQubitGate) Name() string {
+	return "DenseTwoQubit"
+}
+
+func (g *denseTwoQubitGate) Matrix() [][]complex128 {
+	return g.matrix
+}
+
+func TestSparseTwoQubitTargetOrderingMatchesDense(t *testing.T) {
+	tests := []struct {
+		name      string
+		gate      quantum.Gate
+		targets   []int
+		numQubits int
+		setup     func(quantum.QuantumState) error
+	}{
+		{
+			name:      "cnot reversed non-adjacent targets",
+			gate:      gates.NewCNOT(),
+			targets:   []int{2, 0},
+			numQubits: 3,
+			setup: func(qs quantum.QuantumState) error {
+				if err := qs.ApplyGate(gates.NewHadamard(), 2); err != nil {
+					return err
+				}
+				return qs.ApplyGate(gates.NewPauliX(), 0)
+			},
+		},
+		{
+			name:      "swap reversed targets",
+			gate:      gates.NewSwap(),
+			targets:   []int{2, 0},
+			numQubits: 3,
+			setup: func(qs quantum.QuantumState) error {
+				if err := qs.ApplyGate(gates.NewHadamard(), 2); err != nil {
+					return err
+				}
+				return qs.ApplyGate(gates.NewPauliX(), 0)
+			},
+		},
+		{
+			name:      "generic two-qubit gate with non-sorted targets",
+			gate:      newDenseTwoQubitGate(),
+			targets:   []int{3, 1},
+			numQubits: 4,
+			setup: func(qs quantum.QuantumState) error {
+				if err := qs.ApplyGate(gates.NewHadamard(), 1); err != nil {
+					return err
+				}
+				return qs.ApplyGate(gates.NewPauliX(), 3)
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			dense := state.New(tt.numQubits)
+			sparse := New(tt.numQubits)
+
+			if tt.setup != nil {
+				if err := tt.setup(dense); err != nil {
+					t.Fatalf("dense setup failed: %v", err)
+				}
+				if err := tt.setup(sparse); err != nil {
+					t.Fatalf("sparse setup failed: %v", err)
+				}
+			}
+
+			if err := dense.ApplyGate(tt.gate, tt.targets...); err != nil {
+				t.Fatalf("dense ApplyGate failed: %v", err)
+			}
+			if err := sparse.ApplyGate(tt.gate, tt.targets...); err != nil {
+				t.Fatalf("sparse ApplyGate failed: %v", err)
+			}
+
+			assertStatesMatch(t, dense, sparse)
+		})
+	}
 }
 
 func TestSparseSetAmplitudeNormalization(t *testing.T) {

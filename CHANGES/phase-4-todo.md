@@ -42,5 +42,7 @@ Organized for parallel development across profiling, performance, extensibility,
 - [x] Add short examples that compile and run in the current module layout.
 
 Additional (bonus?) TODOs:
-  1. run targeted benchmarks again to see how generic two‑qubit gates affect performance
+  1. [x] run targeted benchmarks again to see how generic two‑qubit gates affect performance
+     Results (`go test ./state -bench BenchmarkApplyGenericTwoQubitGate -benchmem -run '^$'`):
+     ApplyGenericTwoQubitGate 66800 ns/op 3 B/op 0 allocs/op.
   2. add sparse‑specific tests for target ordering edge cases

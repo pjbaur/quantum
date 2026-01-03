@@ -93,6 +93,8 @@ go test ./circuit -bench BenchmarkCircuitExecute \
 
 Inspect profiles with `go tool pprof CHANGES/profiles/ws1-circuit-cpu.pprof`
 
+Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
+
 ---
 
 For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).
