@@ -17,6 +17,6 @@ Organized for parallel development across CLI, CI, and documentation workstreams
 
 ## Workstream 3: README alignment
 
-- Update CLI usage examples to match the current command path.
-- Update example locations to match repository structure.
-- Document the current state of the measurement package (empty or TODO).
+- [x] Update CLI usage examples to match the current command path.
+- [x] Update example locations to match repository structure.
+- [x] Document the current state of the measurement package (empty or TODO).

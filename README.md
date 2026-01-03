@@ -45,7 +45,7 @@ This project provides a basic simulation of quantum computing concepts using the
 
 ## Usage
 
-The main entry point is [`cmd/quantum/main.go`](cmd/quantum/main.go), which provides a command-line interface to run various quantum computing demonstrations. Example usage:
+The main entry point is [`cmd/quantum/main.go`](cmd/quantum/main.go), which provides a command-line interface to run various quantum computing demonstrations. Example usage (from the repository root):
 
 ```bash
 go run ./cmd/quantum hadamard   # Run Hadamard gate demonstrations
@@ -62,11 +62,11 @@ go run ./cmd/quantum all        # Run all demonstrations sequentially
 - [`quantum/`](quantum/): Core interfaces and error types shared across packages.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
-- [`measurement/`](measurement/): Reserved package (currently empty; measurement lives on `state.State` and `qubit.Qubit`).
 - [`internal/examples/`](internal/examples/): Example programs and demonstrations:
   - [`hadamard.go`](internal/examples/hadamard.go): Hadamard gate and superposition.
   - [`tgate.go`](internal/examples/tgate.go): T-gate and phase operations.
   - [`bell.go`](internal/examples/bell.go): Bell states, entanglement, and teleportation.
+- Measurement helpers currently live on `state.State` and `qubit.Qubit`; a dedicated `measurement` package is TODO.
 
 ## Testing
 
