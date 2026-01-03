@@ -20,11 +20,11 @@ Organized for parallel development across profiling, performance, extensibility,
 
 ## Workstream 3: Gate registry and composition utilities
 
-- [ ] Define a minimal gate registry API (name -> gate) without new dependencies.
-- [ ] Add helper utilities for composing gates into larger matrices.
-- [ ] Add helper utilities for decomposing common multi-qubit gates into primitives.
-- [ ] Add tests for registry lookup and composition/decomposition correctness.
-- [ ] Keep existing gate types and exported symbols stable.
+- [x] Define a minimal gate registry API (name -> gate) without new dependencies.
+- [x] Add helper utilities for composing gates into larger matrices.
+- [x] Add helper utilities for decomposing common multi-qubit gates into primitives.
+- [x] Add tests for registry lookup and composition/decomposition correctness.
+- [x] Keep existing gate types and exported symbols stable.
 
 ## Workstream 4: Algorithm package (Grover, Deutsch-Jozsa)
 
