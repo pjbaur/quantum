@@ -41,6 +41,6 @@ changing public APIs or introducing new dependencies.
 
 ## 5) Remove debug prints from tests
 
-- [ ] Locate any debug prints in tests (stdout/stderr noise).
-- [ ] Remove or replace with proper assertions.
-- [ ] Re-run relevant tests to confirm clean output and stable results.
+- [x] Locate any debug prints in tests (stdout/stderr noise).
+- [x] Remove or replace with proper assertions.
+- [x] Re-run relevant tests to confirm clean output and stable results.

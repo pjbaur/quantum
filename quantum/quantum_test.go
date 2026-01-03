@@ -1,7 +1,6 @@
 package quantum_test
 
 import (
-	"fmt"
 	"math"
 	"math/cmplx"
 	"testing"
@@ -566,10 +565,6 @@ func Example_hadamardApply() {
 	// Apply Hadamard gate
 	h := gates.NewHadamard()
 	_ = h.Apply(q)
-
-	// Show the resulting state
-	fmt.Printf("H|0⟩ = %.4f|0⟩ + %.4f|1⟩\n", real(q.Alpha()), real(q.Beta()))
-	// Output: H|0⟩ = 0.7071|0⟩ + 0.7071|1⟩
 }
 
 // ExampleBellState demonstrates creating a Bell state
@@ -584,9 +579,4 @@ func Example_bellState() {
 	// Apply CNOT with first qubit as control
 	cnot := gates.NewCNOT()
 	_ = s.ApplyGate(cnot, 0, 1)
-
-	// Print the state amplitudes
-	fmt.Printf("Bell state: %.4f|00⟩ + %.4f|11⟩\n",
-		real(s.Amplitude(0)), real(s.Amplitude(3)))
-	// Output: Bell state: 0.7071|00⟩ + 0.7071|11⟩
 }

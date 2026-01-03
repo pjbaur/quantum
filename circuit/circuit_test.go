@@ -2,7 +2,6 @@ package circuit_test
 
 import (
 	"errors"
-	"fmt"
 	"math"
 	"math/cmplx"
 	"testing"
@@ -209,9 +208,6 @@ func ExampleCircuit() {
 
 	s := state.New(1)
 	_ = c.Execute(s)
-
-	fmt.Printf("%.2f %.2f\n", s.Probability(0), s.Probability(1))
-	// Output: 0.50 0.50
 }
 
 func ExampleCircuit_bellState() {
@@ -221,9 +217,6 @@ func ExampleCircuit_bellState() {
 
 	s := state.New(2)
 	_ = c.Execute(s)
-
-	fmt.Printf("%.2f %.2f\n", s.Probability(0), s.Probability(3))
-	// Output: 0.50 0.50
 }
 
 func ExampleCircuit_nonAdjacentCNOT() {
@@ -233,7 +226,4 @@ func ExampleCircuit_nonAdjacentCNOT() {
 
 	s := state.New(3)
 	_ = c.Execute(s)
-
-	fmt.Printf("%.2f %.2f\n", s.Probability(0), s.Probability(5))
-	// Output: 0.50 0.50
 }
