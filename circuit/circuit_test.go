@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	"math/cmplx"
 	"testing"
 
 	"github.com/pjbaur/quantum/circuit"
@@ -70,6 +71,74 @@ func TestExecuteAppliesOperations(t *testing.T) {
 
 	if prob := s.Probability(1); math.Abs(prob-1.0) > 1e-10 {
 		t.Fatalf("expected |1⟩ probability 1.0, got %v", prob)
+	}
+}
+
+func TestExecuteMultiQubitCircuits(t *testing.T) {
+	invSqrt2 := 1 / math.Sqrt(2)
+	tests := []struct {
+		name      string
+		numQubits int
+		setup     func(*circuit.Circuit) error
+		want      map[int]complex128
+	}{
+		{
+			name:      "bell state on two qubits",
+			numQubits: 2,
+			setup: func(c *circuit.Circuit) error {
+				if err := c.AddGate(gates.NewHadamard(), 0); err != nil {
+					return err
+				}
+				return c.AddGate(gates.NewCNOT(), 0, 1)
+			},
+			want: map[int]complex128{
+				0: complex(invSqrt2, 0),
+				3: complex(invSqrt2, 0),
+			},
+		},
+		{
+			name:      "non-adjacent CNOT wiring",
+			numQubits: 3,
+			setup: func(c *circuit.Circuit) error {
+				if err := c.AddGate(gates.NewHadamard(), 0); err != nil {
+					return err
+				}
+				return c.AddGate(gates.NewCNOT(), 0, 2)
+			},
+			want: map[int]complex128{
+				0: complex(invSqrt2, 0),
+				5: complex(invSqrt2, 0),
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := circuit.New(tt.numQubits)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := tt.setup(c); err != nil {
+				t.Fatalf("setup failed: %v", err)
+			}
+
+			s := state.New(tt.numQubits)
+			if err := c.Execute(s); err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+
+			totalStates := 1 << tt.numQubits
+			for i := 0; i < totalStates; i++ {
+				wantAmp, ok := tt.want[i]
+				if !ok {
+					wantAmp = 0
+				}
+				got := s.Amplitude(i)
+				if cmplx.Abs(got-wantAmp) > 1e-10 {
+					t.Fatalf("state %d amplitude = %v, want %v", i, got, wantAmp)
+				}
+			}
+		})
 	}
 }
 

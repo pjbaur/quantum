@@ -26,11 +26,11 @@ changing public APIs or introducing new dependencies.
 
 ## 3) Circuit abstraction completion
 
-- [ ] Audit the current circuit API to identify missing features or partial methods.
-- [ ] Implement any incomplete circuit wiring or gate scheduling behavior.
-- [ ] Ensure circuit execution uses `state.ApplyGate` for consistency.
-- [ ] Validate circuit execution with simple multi-qubit examples.
-- [ ] Keep the API minimal and idiomatic; do not add new exported symbols unless needed.
+- [x] Audit the current circuit API to identify missing features or partial methods.
+- [x] Implement any incomplete circuit wiring or gate scheduling behavior.
+- [x] Ensure circuit execution uses `state.ApplyGate` for consistency.
+- [x] Validate circuit execution with simple multi-qubit examples.
+- [x] Keep the API minimal and idiomatic; do not add new exported symbols unless needed.
 
 ## 4) Examples and usability improvements
 
