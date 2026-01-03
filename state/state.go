@@ -1,6 +1,8 @@
 package state
 
 import (
+	"errors"
+	"fmt"
 	"math"
 	"math/bits"
 	"math/cmplx"
@@ -70,9 +72,26 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 	return nil
 }
 
-// ApplyGate applies a gate to the specified qubit(s)
+// ApplyGate applies a gate to the specified qubit(s).
+// Qubit indices are little-endian (qubit 0 is the least-significant bit).
+// Gate matrix ordering follows the targets slice, with targets[0] as the
+// most-significant bit in the gate's basis ordering.
 func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
-	// Validate target qubits
+	requiredQubits, err := gateQubitCount(gate)
+	if err != nil {
+		return err
+	}
+
+	if len(targets) != requiredQubits {
+		return &quantum.InvalidGateApplicationError{
+			Gate:        gate.Name(),
+			RequiredLen: requiredQubits,
+			ActualLen:   len(targets),
+		}
+	}
+
+	// Validate target qubits.
+	seen := make(map[int]struct{}, len(targets))
 	for _, target := range targets {
 		if target < 0 || target >= s.numQubits {
 			return &quantum.QubitsOutOfRangeError{
@@ -80,25 +99,19 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 				MaxIndex: s.numQubits - 1,
 			}
 		}
+		if _, exists := seen[target]; exists {
+			return errors.New("targets must be unique")
+		}
+		seen[target] = struct{}{}
 	}
 
-	// Implement gate application logic based on gate type
-	// (simple version shown here, would need to be expanded)
-	requiredQubits := requiredQubitsFromMatrix(gate.Matrix())
 	if len(targets) == 1 && requiredQubits == 1 {
 		// Single-qubit gate
 		return s.applySingleQubitGate(gate, targets[0])
 	}
 
-	if len(targets) == 2 && requiredQubits == 2 {
-		if targets[0] == targets[1] {
-			return &quantum.InvalidGateApplicationError{
-				Gate:        gate.Name(),
-				RequiredLen: 2,
-				ActualLen:   1,
-			}
-		}
-		return s.applyTwoQubitGate(gate, targets[0], targets[1])
+	if requiredQubits > 1 {
+		return s.applyMultiQubitGate(gate, targets)
 	}
 
 	return &quantum.InvalidGateApplicationError{
@@ -108,12 +121,24 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 	}
 }
 
-func requiredQubitsFromMatrix(matrix [][]complex128) int {
-	size := len(matrix)
-	if size == 0 || size&(size-1) != 0 {
-		return size
+func gateQubitCount(gate quantum.Gate) (int, error) {
+	matrix := gate.Matrix()
+	if len(matrix) == 0 {
+		return 0, fmt.Errorf("gate %s has empty matrix", gate.Name())
 	}
-	return bits.Len(uint(size)) - 1
+
+	size := len(matrix)
+	for _, row := range matrix {
+		if len(row) != size {
+			return 0, fmt.Errorf("gate %s matrix must be square", gate.Name())
+		}
+	}
+
+	if size&(size-1) != 0 {
+		return 0, fmt.Errorf("gate %s matrix size %d is not a power of two", gate.Name(), size)
+	}
+
+	return bits.Len(uint(size)) - 1, nil
 }
 
 // applySingleQubitGate applies a single-qubit gate to the specified qubit
@@ -155,49 +180,53 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 	return nil
 }
 
-// applyTwoQubitGate applies a two-qubit gate to the specified qubits
-func (s *State) applyTwoQubitGate(gate quantum.Gate, target0, target1 int) error {
+// applyMultiQubitGate applies a multi-qubit gate to the specified qubits.
+func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 	matrix := gate.Matrix()
-	if len(matrix) != 4 {
-		return &quantum.InvalidGateApplicationError{
-			Gate:        gate.Name(),
-			RequiredLen: 4,
-			ActualLen:   len(matrix),
-		}
+	targetCount := len(targets)
+	comboCount := 1 << targetCount
+
+	targetMask := 0
+	for _, target := range targets {
+		targetMask |= 1 << target
 	}
-	for i := range matrix {
-		if len(matrix[i]) != 4 {
-			return &quantum.InvalidGateApplicationError{
-				Gate:        gate.Name(),
-				RequiredLen: 4,
-				ActualLen:   len(matrix[i]),
+
+	comboMasks := make([]int, comboCount)
+	for combo := 0; combo < comboCount; combo++ {
+		mask := 0
+		for i, target := range targets {
+			shift := targetCount - 1 - i
+			if (combo>>shift)&1 == 1 {
+				mask |= 1 << target
 			}
 		}
+		comboMasks[combo] = mask
 	}
 
+	inputs := make([]complex128, comboCount)
+	outputs := make([]complex128, comboCount)
 	newAmplitudes := make([]complex128, len(s.amplitudes))
-	mask0 := 1 << target0
-	mask1 := 1 << target1
 
 	for base := 0; base < len(s.amplitudes); base++ {
-		if (base&mask0) != 0 || (base&mask1) != 0 {
+		if base&targetMask != 0 {
 			continue
 		}
 
-		i00 := base
-		i01 := base | mask1
-		i10 := base | mask0
-		i11 := base | mask0 | mask1
+		for combo := 0; combo < comboCount; combo++ {
+			inputs[combo] = s.amplitudes[base|comboMasks[combo]]
+		}
 
-		a00 := s.amplitudes[i00]
-		a01 := s.amplitudes[i01]
-		a10 := s.amplitudes[i10]
-		a11 := s.amplitudes[i11]
+		for row := 0; row < comboCount; row++ {
+			sum := complex(0, 0)
+			for col := 0; col < comboCount; col++ {
+				sum += matrix[row][col] * inputs[col]
+			}
+			outputs[row] = sum
+		}
 
-		newAmplitudes[i00] = matrix[0][0]*a00 + matrix[0][1]*a01 + matrix[0][2]*a10 + matrix[0][3]*a11
-		newAmplitudes[i01] = matrix[1][0]*a00 + matrix[1][1]*a01 + matrix[1][2]*a10 + matrix[1][3]*a11
-		newAmplitudes[i10] = matrix[2][0]*a00 + matrix[2][1]*a01 + matrix[2][2]*a10 + matrix[2][3]*a11
-		newAmplitudes[i11] = matrix[3][0]*a00 + matrix[3][1]*a01 + matrix[3][2]*a10 + matrix[3][3]*a11
+		for combo := 0; combo < comboCount; combo++ {
+			newAmplitudes[base|comboMasks[combo]] = outputs[combo]
+		}
 	}
 
 	s.amplitudes = newAmplitudes
