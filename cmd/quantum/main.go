@@ -26,10 +26,12 @@ func usage() {
 	fmt.Fprintln(out, "  tgate     - T-gate demonstrations")
 	fmt.Fprintln(out, "  bell      - Bell state demonstrations")
 	fmt.Fprintln(out, "  algorithm - Algorithm demonstrations (Deutsch-Jozsa, Grover)")
+	fmt.Fprintln(out, "  visual    - Visualization demonstrations")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Examples:")
 	fmt.Fprintln(out, "  go run ./cmd/quantum hadamard       - Run Hadamard gate examples")
 	fmt.Fprintln(out, "  go run ./cmd/quantum -demo bell     - Run Bell state examples")
+	fmt.Fprintln(out, "  go run ./cmd/quantum visual         - Run visualization examples")
 	fmt.Fprintln(out, "  go run ./cmd/quantum all 3          - Run all examples with param")
 }
 
@@ -43,6 +45,8 @@ func runDemos(demoType string) error {
 		examples.RunAllBellDemos()
 	case "algorithm":
 		examples.RunAllAlgorithmDemos()
+	case "visual":
+		examples.RunAllVisualizationDemos()
 	case "all":
 		fmt.Println("\n========================================================")
 		fmt.Println("             QUANTUM COMPUTING IN GO")
@@ -62,6 +66,10 @@ func runDemos(demoType string) error {
 		fmt.Scanln()
 
 		examples.RunAllAlgorithmDemos()
+		fmt.Println("\nPress Enter to continue to visualization demonstrations...")
+		fmt.Scanln()
+
+		examples.RunAllVisualizationDemos()
 
 		fmt.Println("\n========================================================")
 		fmt.Println("             ALL DEMONSTRATIONS COMPLETED")
