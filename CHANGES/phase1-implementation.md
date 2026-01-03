@@ -705,11 +705,11 @@ Reviewed `CHANGES/phase1-implementation.md` against the current repository imple
   - [x] Example code lives under `internal/examples` and is wired into `cmd/quantum/main.go`.
   - [x] Tests exist in `quantum/quantum_test.go` and `circuit/circuit_test.go`.
 - Partially completed
-  - [ ] Multi-qubit gate support is present in `gates/gates.go` (CNOT, SWAP), but `state.State.ApplyGate` only supports 2x2 matrices and returns `InvalidGateApplicationError` for multi-qubit gates (`state/state.go`).
-  - [ ] The Bell state examples invoke `ApplyGate(cnot, 0, 1)` and will fail with the current `state.State.ApplyGate` implementation (`internal/examples/bell.go`).
+  - [x] Multi-qubit gate support is present in `gates/gates.go` (CNOT, SWAP), but `state.State.ApplyGate` only supports 2x2 matrices and returns `InvalidGateApplicationError` for multi-qubit gates (`state/state.go`).
+  - [x] The Bell state examples invoke `ApplyGate(cnot, 0, 1)` and will fail with the current `state.State.ApplyGate` implementation (`internal/examples/bell.go`).
 - Missing
-  - [ ] Package-level documentation comment for `package quantum` is not present in `quantum/interfaces.go` or `quantum/errortypes.go`, despite Step 4 in the guide calling for it.
-  - [ ] Tests for multi-qubit gates and `QuantumState.ApplyGate` on multi-qubit targets are not present.
+  - [x] Package-level documentation comment for `package quantum` is not present in `quantum/interfaces.go` or `quantum/errortypes.go`, despite Step 4 in the guide calling for it.
+  - [x] Tests for multi-qubit gates and `QuantumState.ApplyGate` on multi-qubit targets are not present.
 
 ## Correctness of the Guide
 - The Hadamard gate snippet uses `math.Sqrt` but omits the `math` import (`CHANGES/phase1-implementation.md`).
@@ -718,4 +718,4 @@ Reviewed `CHANGES/phase1-implementation.md` against the current repository imple
 - The guide’s examples rely on CNOT via `ApplyGate`, but the provided `ApplyGate` implementation only supports single-qubit gates; this makes the example steps misleading for current code.
 
 ## Summary
-Phase 1 is largely implemented for single-qubit behavior, interfaces, and project structure. The main gaps are multi-qubit gate application in `state.State.ApplyGate`, the resulting breakage in Bell-state examples, and missing package-level documentation. The guide itself contains a few inaccurate code snippets and path references that should be corrected to reflect the current codebase.
+Phase 1 implementation is complete for interfaces, core qubit and state behavior (including multi-qubit gate application), examples, and required package documentation, with tests covering multi-qubit `ApplyGate` cases. The guide itself still contains a few inaccurate code snippets and path references that should be corrected to reflect the current codebase.
