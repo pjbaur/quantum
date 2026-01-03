@@ -27,12 +27,12 @@ The project is a Go-based quantum computing simulator with clear package separat
 - Finish circuit abstraction and examples to improve usability.
 - Remove debug prints from tests.
 
-### [ ] Near Term (Phase 3)
+### [x] Near Term (Phase 3)
 - Update CLI to use the `flag` package with clear `--help` output.
 - Add CI for `go test`, `go vet`, linting, and coverage.
 - Align README with actual project structure and usage.
 
-### [ ] Mid Term (Phase 4)
+### [x] Mid Term (Phase 4)
 - Profile state operations and reduce allocations.
 - Explore sparse state representations for larger qubit counts.
 - Add gate registration and helper composition/decomposition utilities.
