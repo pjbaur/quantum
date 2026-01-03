@@ -1,6 +1,7 @@
 package main
 
 import (
+	"flag"
 	"fmt"
 	"math/rand"
 	"os"
@@ -10,23 +11,28 @@ import (
 	"github.com/pjbaur/quantum/internal/examples"
 )
 
-func showUsage() {
-	fmt.Println("Quantum Computing in Go")
-	fmt.Println("======================")
-	fmt.Println("Usage: go run ./cmd/quantum [demo]")
-	fmt.Println("")
-	fmt.Println("Available Demos:")
-	fmt.Println("  all       - Run all demonstrations")
-	fmt.Println("  hadamard  - Hadamard gate demonstrations")
-	fmt.Println("  tgate     - T-gate demonstrations")
-	fmt.Println("  bell      - Bell state demonstrations")
-	fmt.Println("")
-	fmt.Println("Examples:")
-	fmt.Println("  go run ./cmd/quantum hadamard  - Run Hadamard gate examples")
-	fmt.Println("  go run ./cmd/quantum all       - Run all examples sequentially")
+func usage() {
+	out := flag.CommandLine.Output()
+	fmt.Fprintln(out, "Quantum Computing in Go")
+	fmt.Fprintln(out, "======================")
+	fmt.Fprintln(out, "Usage: quantum [options] <demo> [param]")
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Options:")
+	flag.PrintDefaults()
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Available Demos:")
+	fmt.Fprintln(out, "  all       - Run all demonstrations")
+	fmt.Fprintln(out, "  hadamard  - Hadamard gate demonstrations")
+	fmt.Fprintln(out, "  tgate     - T-gate demonstrations")
+	fmt.Fprintln(out, "  bell      - Bell state demonstrations")
+	fmt.Fprintln(out, "")
+	fmt.Fprintln(out, "Examples:")
+	fmt.Fprintln(out, "  go run ./cmd/quantum hadamard       - Run Hadamard gate examples")
+	fmt.Fprintln(out, "  go run ./cmd/quantum -demo bell     - Run Bell state examples")
+	fmt.Fprintln(out, "  go run ./cmd/quantum all 3          - Run all examples with param")
 }
 
-func runDemos(demoType string) {
+func runDemos(demoType string) error {
 	switch demoType {
 	case "hadamard":
 		examples.RunAllHadamardDemos()
@@ -54,12 +60,57 @@ func runDemos(demoType string) {
 		fmt.Println("             ALL DEMONSTRATIONS COMPLETED")
 		fmt.Println("========================================================")
 	default:
-		fmt.Printf("Unknown example: %s\n", demoType)
-		showUsage()
+		return fmt.Errorf("unknown demo: %s", demoType)
 	}
+	return nil
 }
 
 func main() {
+	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, all)")
+	paramFlag := flag.Int("param", 0, "Optional numeric parameter for demos")
+	flag.Usage = usage
+	flag.Parse()
+
+	demoType := *demoFlag
+	param := *paramFlag
+	args := flag.Args()
+
+	if demoType != "" && len(args) > 0 {
+		fmt.Fprintln(os.Stderr, "demo provided both as flag and positional argument")
+		flag.Usage()
+		os.Exit(2)
+	}
+
+	if demoType == "" {
+		if len(args) == 0 {
+			flag.Usage()
+			os.Exit(2)
+		}
+		demoType = args[0]
+		args = args[1:]
+	}
+
+	if len(args) > 0 {
+		if *paramFlag != 0 {
+			fmt.Fprintln(os.Stderr, "param provided both as flag and positional argument")
+			flag.Usage()
+			os.Exit(2)
+		}
+		parsedParam, err := strconv.Atoi(args[0])
+		if err != nil {
+			fmt.Fprintf(os.Stderr, "invalid parameter: %s\n", args[0])
+			os.Exit(2)
+		}
+		param = parsedParam
+		args = args[1:]
+	}
+
+	if len(args) > 0 {
+		fmt.Fprintln(os.Stderr, "too many arguments")
+		flag.Usage()
+		os.Exit(2)
+	}
+
 	// Seed the random number generator with current time
 	rand.Seed(time.Now().UnixNano())
 
@@ -69,30 +120,13 @@ func main() {
 	fmt.Println("*            Quantum Circuit Simulator                 *")
 	fmt.Println("********************************************************")
 
-	// Process command line arguments
-	args := os.Args
-	if len(args) < 2 {
-		showUsage()
-		return
-	}
-
-	// Run the specified demonstration
-	demoType := args[1]
-
-	// Check for optional parameters
-	var param int = 0
-	if len(args) >= 3 {
-		var err error
-		param, err = strconv.Atoi(args[2])
-		if err != nil {
-			fmt.Printf("Invalid parameter: %s\n", args[2])
-			return
-		}
-	}
-
 	// Placeholder for using param if needed
 	_ = param
 
 	// Run the selected demonstrations
-	runDemos(demoType)
+	if err := runDemos(demoType); err != nil {
+		fmt.Fprintln(os.Stderr, err)
+		flag.Usage()
+		os.Exit(2)
+	}
 }

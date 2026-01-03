@@ -4,9 +4,9 @@ Organized for parallel development across CLI, CI, and documentation workstreams
 
 ## Workstream 1: CLI flags and help
 
-- Replace custom CLI parsing with the standard `flag` package.
-- Define clear `--help` output with usage examples and option descriptions.
-- Verify CLI flags cover current usage paths and exit codes are consistent.
+- [x] Replace custom CLI parsing with the standard `flag` package.
+- [x] Define clear `--help` output with usage examples and option descriptions.
+- [x] Verify CLI flags cover current usage paths and exit codes are consistent.
 
 ## Workstream 2: CI pipeline
 
