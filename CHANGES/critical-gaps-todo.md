@@ -16,7 +16,7 @@
 - [x] Cross-check README and guide docs against actual package layout and exported APIs.
 
 ## 3. Build friction (Go version and noisy tests)
-- [ ] Review `go.mod` Go version against supported toolchains and decide target version policy.
-- [ ] If adjustment is needed, update `go.mod` and any CI/tooling expectations accordingly.
-- [ ] Locate and remove debug prints from tests to reduce noisy output.
-- [ ] Re-run `go test ./...` to confirm clean output after changes.
+- [x] Review `go.mod` Go version against supported toolchains and decide target version policy.
+- [x] If adjustment is needed, update `go.mod` and any CI/tooling expectations accordingly.
+- [x] Locate and remove debug prints from tests to reduce noisy output.
+- [x] Re-run `go test ./...` to confirm clean output after changes.

@@ -197,7 +197,6 @@ func TestQubitClone(t *testing.T) {
 	}
 
 	// Clone the qubit
-	fmt.Printf("Debugging Clone(): %+v\n", original) // Add this to see the qubit's state before it fails
 	clone := original.Clone()
 
 	// Check that the clone has the same values
