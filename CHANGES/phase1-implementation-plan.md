@@ -20,7 +20,7 @@ documentation, and tests, with minimal scope changes.
    - Confirm single-qubit code path remains unchanged for 2x2 matrices.
    - Files: `state/state.go`.
 
-2. [ ] Make Bell-state examples succeed with multi-qubit gates.
+2. [x] Make Bell-state examples succeed with multi-qubit gates.
    - Re-run the example flow mentally to ensure `ApplyGate(cnot, 0, 1)` now
      executes without error.
    - No API changes expected; only behavior change in state gate application.

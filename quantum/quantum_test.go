@@ -412,18 +412,18 @@ func TestQuantumStateGateApplication(t *testing.T) {
 	// Create a 2-qubit system
 	s := state.New(2)
 
-	// Apply Hadamard to first qubit
+	// Apply Hadamard to first qubit (least significant bit)
 	h := gates.NewHadamard()
 	err := s.ApplyGate(h, 0)
 	if err != nil {
 		t.Errorf("Error applying Hadamard to qubit 0: %v", err)
 	}
 
-	// Should get (|00⟩ + |10⟩)/√2
+	// Should get (|00⟩ + |01⟩)/√2 in little-endian ordering
 	expectedAmplitudes := []complex128{
 		complex(1/math.Sqrt2, 0),
-		0,
 		complex(1/math.Sqrt2, 0),
+		0,
 		0,
 	}
 
