@@ -88,6 +88,17 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 		return s.applySingleQubitGate(gate, targets[0])
 	}
 
+	if len(targets) == 2 && len(gate.Matrix()) == 4 {
+		if targets[0] == targets[1] {
+			return &quantum.InvalidGateApplicationError{
+				Gate:        gate.Name(),
+				RequiredLen: 2,
+				ActualLen:   1,
+			}
+		}
+		return s.applyTwoQubitGate(gate, targets[0], targets[1])
+	}
+
 	return &quantum.InvalidGateApplicationError{
 		Gate:        gate.Name(),
 		RequiredLen: len(gate.Matrix()),
@@ -131,6 +142,55 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 	// Update amplitudes
 	s.amplitudes = newAmplitudes
 
+	return nil
+}
+
+// applyTwoQubitGate applies a two-qubit gate to the specified qubits
+func (s *State) applyTwoQubitGate(gate quantum.Gate, target0, target1 int) error {
+	matrix := gate.Matrix()
+	if len(matrix) != 4 {
+		return &quantum.InvalidGateApplicationError{
+			Gate:        gate.Name(),
+			RequiredLen: 4,
+			ActualLen:   len(matrix),
+		}
+	}
+	for i := range matrix {
+		if len(matrix[i]) != 4 {
+			return &quantum.InvalidGateApplicationError{
+				Gate:        gate.Name(),
+				RequiredLen: 4,
+				ActualLen:   len(matrix[i]),
+			}
+		}
+	}
+
+	newAmplitudes := make([]complex128, len(s.amplitudes))
+	mask0 := 1 << target0
+	mask1 := 1 << target1
+
+	for base := 0; base < len(s.amplitudes); base++ {
+		if (base&mask0) != 0 || (base&mask1) != 0 {
+			continue
+		}
+
+		i00 := base
+		i01 := base | mask1
+		i10 := base | mask0
+		i11 := base | mask0 | mask1
+
+		a00 := s.amplitudes[i00]
+		a01 := s.amplitudes[i01]
+		a10 := s.amplitudes[i10]
+		a11 := s.amplitudes[i11]
+
+		newAmplitudes[i00] = matrix[0][0]*a00 + matrix[0][1]*a01 + matrix[0][2]*a10 + matrix[0][3]*a11
+		newAmplitudes[i01] = matrix[1][0]*a00 + matrix[1][1]*a01 + matrix[1][2]*a10 + matrix[1][3]*a11
+		newAmplitudes[i10] = matrix[2][0]*a00 + matrix[2][1]*a01 + matrix[2][2]*a10 + matrix[2][3]*a11
+		newAmplitudes[i11] = matrix[3][0]*a00 + matrix[3][1]*a01 + matrix[3][2]*a10 + matrix[3][3]*a11
+	}
+
+	s.amplitudes = newAmplitudes
 	return nil
 }
 

@@ -33,3 +33,13 @@ type InvalidGateApplicationError struct {
 func (e *InvalidGateApplicationError) Error() string {
 	return fmt.Sprintf("gate %s requires %d qubits but got %d", e.Gate, e.RequiredLen, e.ActualLen)
 }
+
+// IncompatibleQubitCountError indicates mismatched qubit counts for an operation.
+type IncompatibleQubitCountError struct {
+	Expected int
+	Actual   int
+}
+
+func (e *IncompatibleQubitCountError) Error() string {
+	return fmt.Sprintf("expected %d qubits but got %d", e.Expected, e.Actual)
+}
