@@ -1,15 +1,16 @@
 # Schrödinger's Gopher
 
-This project provides a basic simulation of quantum computing concepts using the Go programming language. It focuses on the fundamental building block of quantum computing: the qubit, and implements core operations like the Hadamard gate and measurement.
+This project provides a basic simulation of quantum computing concepts using the Go programming language. It focuses on the fundamental building block of quantum computing: the qubit, and implements core operations like the Hadamard gate, multi-qubit state evolution, and measurement.
 
 ## Features
 
-- Single and multi-qubit simulation
-- Hadamard, Pauli (X, Y, Z), S, T, and CNOT gates
-- Measurement and probability calculations
+- Single- and multi-qubit simulation with a shared `quantum` interface layer
+- Hadamard, Pauli (X, Y, Z), S, T, CNOT, and SWAP gates
+- Measurement and probability calculations for qubits and quantum states
+- Circuit abstraction for sequencing gate operations
 - Demonstrations of superposition, entanglement, and quantum teleportation
 - Modular, testable Go code
-- Uses the [little-endian](https://www.gutenberg.org/ebooks/829) convention
+- Little-endian qubit indexing (qubit 0 is the least-significant bit)
 
 ## Getting Started
 
@@ -37,10 +38,10 @@ This project provides a basic simulation of quantum computing concepts using the
 3. Run the tests:
 
     ```bash
-    go test
+    go test ./...
     ```
 
-    This will run all unit tests in [`quantum_test.go`](quantum_test.go).
+    This will run all unit tests across the module.
 
 ## Usage
 
@@ -56,9 +57,11 @@ go run ./cmd/quantum all        # Run all demonstrations sequentially
 ### Project Structure
 
 - [`cmd/quantum/main.go`](cmd/quantum/main.go): Entry point and CLI for running demonstrations.
+- [`circuit/`](circuit/): Circuit abstraction for sequencing gate operations.
+- [`gates/gates.go`](gates/gates.go): Definitions of quantum gates (H, X, Y, Z, S, T, CNOT, SWAP, etc).
+- [`quantum/`](quantum/): Core interfaces and error types shared across packages.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
-- [`gates/gates.go`](gates/gates.go): Definitions of quantum gates (H, X, Y, Z, S, T, CNOT, etc).
 - [`measurement/`](measurement/): Reserved package (currently empty; measurement lives on `state.State` and `qubit.Qubit`).
 - [`internal/examples/`](internal/examples/): Example programs and demonstrations:
   - [`hadamard.go`](internal/examples/hadamard.go): Hadamard gate and superposition.
@@ -70,72 +73,11 @@ go run ./cmd/quantum all        # Run all demonstrations sequentially
 Run all tests with:
 
 ```bash
-go test
+go test ./...
 ```
 
-See [`quantum_test.go`](quantum_test.go) for comprehensive unit tests covering qubit operations, gates, measurement, and multi-qubit states.
+Tests live in [`quantum/quantum_test.go`](quantum/quantum_test.go), [`state/state_test.go`](state/state_test.go), and [`circuit/circuit_test.go`](circuit/circuit_test.go), covering qubit operations, gates, measurement, circuits, and multi-qubit states.
 
 ---
 
-For more details on quantum gates and their matrix representations, see [QUANTUM-HELP.md](QUANTUM-HELP.md).
-
-## Expansion
-
-To extend this further, you could:
-- Add more gates (X, Y, Z, CNOT, etc.)
-- Implement entanglement operations
-- Add error checking for invalid qubit indices
-- **Error Handling**: Check normalization (\( |\alpha|^2 + |\beta|^2 = 1 \)) after operations.
-- Add methods to access individual qubit states
-- Quantum Circuit abstraction: Add a circuit model to compose operations more easily.
-- Gate decomposition: Support for decomposing complex operations into your basic gates.
-- Density matrix representation: For mixed states and noisy simulations.
-- Performance optimizations: Consider sparse representations for states with many zeros.
-- Visualization tools: Add methods to visualize quantum states (Bloch sphere for single qubits).
-
-## Refactoring
-
-quantum/
-├── cmd/
-│   └── quantum/
-│       └── main.go         # Entry point
-├── gates/
-│   └── gates.go            # Gate definitions (H, T, etc.)
-├── internal/
-│   └── examples/
-│       ├── hadamard.go     # Hadamard examples
-│       ├── tgate.go        # T-gate examples
-│       └── bell.go         # Bell state examples
-├── measurement/            # Reserved (currently empty)
-├── qubit/
-│   └── qubit.go            # Single qubit representation
-└── state/
-    └── state.go            # Multi-qubit state representation
-
-Key Benefits:
-
-Separation of concerns: Each file would handle a specific aspect of quantum simulation
-Better testability: You could write focused tests for each component
-Easier maintenance: Smaller files are easier to understand and modify
-Better collaboration: Multiple developers could work on different parts simultaneously
-Clearer imports: Dependencies between components would be more explicit
-
-
-Implementation Approach:
-
-Start by identifying logical groupings in your code
-Move related functions and types into their own files
-Ensure each file has a clear purpose and responsibility
-Maintain consistent naming conventions across files
-Use interfaces where appropriate to define clear boundaries
-
-
-Additional Improvements:
-
-Add interfaces for circuit design patterns
-Create a separate package for common quantum algorithms
-Add a visualization package for quantum states
-
-
-
-This approach would make your code more manageable as you implement additional gates (like S, X, Y, Z gates) or more advanced quantum algorithms in the future.
+For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).
