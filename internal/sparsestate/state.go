@@ -103,10 +103,7 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 	}
 
 	if requiredQubits == 2 {
-		if gate.Name() != "CNOT" {
-			return fmt.Errorf("sparse state supports only CNOT for two-qubit gates")
-		}
-		return s.applyCNOT(targets[0], targets[1])
+		return s.applyTwoQubitGate(gate, targets)
 	}
 
 	return &quantum.InvalidGateApplicationError{
@@ -172,6 +169,55 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 	return nil
 }
 
+func (s *State) applyTwoQubitGate(gate quantum.Gate, targets []int) error {
+	if gate.Name() == "CNOT" {
+		return s.applyCNOT(targets[0], targets[1])
+	}
+
+	matrix := gate.Matrix()
+	if len(matrix) != 4 || len(matrix[0]) != 4 {
+		return &quantum.InvalidGateApplicationError{
+			Gate:        gate.Name(),
+			RequiredLen: 4,
+			ActualLen:   len(matrix),
+		}
+	}
+
+	comboMasks, targetMask := buildComboMasks(targets)
+	bases := make(map[int]struct{}, len(s.amplitudes))
+	for index := range s.amplitudes {
+		bases[index&^targetMask] = struct{}{}
+	}
+
+	inputs := make([]complex128, 4)
+	outputs := make([]complex128, 4)
+	newAmplitudes := make(map[int]complex128, len(s.amplitudes))
+
+	for base := range bases {
+		for combo := 0; combo < 4; combo++ {
+			inputs[combo] = s.amplitudes[base|comboMasks[combo]]
+		}
+
+		for row := 0; row < 4; row++ {
+			sum := complex(0, 0)
+			for col := 0; col < 4; col++ {
+				sum += matrix[row][col] * inputs[col]
+			}
+			outputs[row] = sum
+		}
+
+		for combo := 0; combo < 4; combo++ {
+			value := outputs[combo]
+			if !isNearZero(value) {
+				newAmplitudes[base|comboMasks[combo]] = value
+			}
+		}
+	}
+
+	s.amplitudes = newAmplitudes
+	return nil
+}
+
 func (s *State) applyCNOT(control, target int) error {
 	controlMask := 1 << control
 	targetMask := 1 << target
@@ -188,6 +234,27 @@ func (s *State) applyCNOT(control, target int) error {
 
 	s.amplitudes = newAmplitudes
 	return nil
+}
+
+func buildComboMasks(targets []int) ([]int, int) {
+	comboMasks := make([]int, 4)
+	targetMask := 0
+	for _, target := range targets {
+		targetMask |= 1 << target
+	}
+
+	for combo := 0; combo < 4; combo++ {
+		mask := 0
+		for i, target := range targets {
+			shift := len(targets) - 1 - i
+			if (combo>>shift)&1 == 1 {
+				mask |= 1 << target
+			}
+		}
+		comboMasks[combo] = mask
+	}
+
+	return comboMasks, targetMask
 }
 
 // Measure measures the specified qubit and collapses the state.

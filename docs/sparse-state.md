@@ -18,7 +18,7 @@ Practical rule of thumb for this prototype:
 The sparse state prototype is implemented in the internal `sparsestate` package and supports:
 
 - Single-qubit gates via generic 2x2 matrix application.
-- Two-qubit CNOT via index permutation.
+- Two-qubit gates via 4x4 matrix application (with CNOT optimized by index permutation).
 - Measurement, cloning, and amplitude/probability queries.
 
 ## Accuracy and Performance Comparison

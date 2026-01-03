@@ -90,6 +90,27 @@ func TestSparseCNOTMatchesDense(t *testing.T) {
 	assertStatesMatch(t, dense, sparse)
 }
 
+func TestSparseSwapMatchesDense(t *testing.T) {
+	dense := state.New(2)
+	sparse := New(2)
+
+	if err := dense.ApplyGate(gates.NewPauliX(), 0); err != nil {
+		t.Fatalf("dense ApplyGate failed: %v", err)
+	}
+	if err := sparse.ApplyGate(gates.NewPauliX(), 0); err != nil {
+		t.Fatalf("sparse ApplyGate failed: %v", err)
+	}
+
+	if err := dense.ApplyGate(gates.NewSwap(), 0, 1); err != nil {
+		t.Fatalf("dense ApplyGate failed: %v", err)
+	}
+	if err := sparse.ApplyGate(gates.NewSwap(), 0, 1); err != nil {
+		t.Fatalf("sparse ApplyGate failed: %v", err)
+	}
+
+	assertStatesMatch(t, dense, sparse)
+}
+
 func TestSparseSetAmplitudeNormalization(t *testing.T) {
 	sparse := New(2)
 
