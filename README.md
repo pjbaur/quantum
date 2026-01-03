@@ -95,6 +95,11 @@ Inspect profiles with `go tool pprof CHANGES/profiles/ws1-circuit-cpu.pprof`
 
 Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
 
+## Demos
+
+### Visualization
+`go run ./cmd/quantum visual`
+
 ---
 
 For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).

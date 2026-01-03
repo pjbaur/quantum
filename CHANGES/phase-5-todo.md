@@ -22,3 +22,14 @@ Organized for parallel development across visualization, density matrices/noise,
 - [ ] Add a parallel execution strategy for independent circuits.
 - [ ] Benchmark parallel execution vs. serial execution on representative workloads.
 - [ ] Document any concurrency limits or configuration knobs.
+
+## Suggestions from Workstreams:
+
+### Visualization
+1. Run the new demo: go run ./cmd/quantum visual
+2. If you want sample output in docs, I can add a short snippet to README.md
+
+### Parallel batch circuit execution
+Next steps if you want to validate perf:
+1. go test ./circuit -bench BenchmarkCircuitExecuteBatch -benchmem -run '^$'
+2. go test ./circuit -bench BenchmarkCircuitExecuteBatchParallel -benchmem -run '^$'
