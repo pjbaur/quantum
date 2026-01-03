@@ -11,10 +11,10 @@ Organized for parallel development across visualization, density matrices/noise,
 
 ## Workstream 2: Density matrices and noise
 
-- [ ] Introduce a density matrix representation behind internal types or build tags.
-- [ ] Implement density matrix evolution for single-qubit gates.
-- [ ] Add common noise models (e.g., depolarizing, dephasing, amplitude damping).
-- [ ] Validate density matrix behavior with tests (trace, positivity, expected distributions).
+- [x] Introduce a density matrix representation behind internal types or build tags.
+- [x] Implement density matrix evolution for single-qubit gates.
+- [x] Add common noise models (e.g., depolarizing, dephasing, amplitude damping).
+- [x] Validate density matrix behavior with tests (trace, positivity, expected distributions).
 
 ## Workstream 3: Parallel simulation
 
