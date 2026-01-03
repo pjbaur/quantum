@@ -51,6 +51,7 @@ The main entry point is [`cmd/quantum/main.go`](cmd/quantum/main.go), which prov
 go run ./cmd/quantum hadamard   # Run Hadamard gate demonstrations
 go run ./cmd/quantum tgate      # Run T-gate demonstrations
 go run ./cmd/quantum bell       # Run Bell state demonstrations
+go run ./cmd/quantum algorithm  # Run Deutsch-Jozsa and Grover demonstrations
 go run ./cmd/quantum all        # Run all demonstrations sequentially
 ```
 
@@ -66,6 +67,7 @@ go run ./cmd/quantum all        # Run all demonstrations sequentially
   - [`hadamard.go`](internal/examples/hadamard.go): Hadamard gate and superposition.
   - [`tgate.go`](internal/examples/tgate.go): T-gate and phase operations.
   - [`bell.go`](internal/examples/bell.go): Bell states, entanglement, and teleportation.
+  - [`algorithm.go`](internal/examples/algorithm.go): Deutsch-Jozsa and Grover algorithms.
 - Measurement helpers currently live on `state.State` and `qubit.Qubit`; a dedicated `measurement` package is TODO.
 
 ## Testing
