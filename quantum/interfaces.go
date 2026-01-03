@@ -1,3 +1,5 @@
+// Package quantum defines core interfaces for qubits, gates, and multi-qubit
+// state simulation used throughout the project.
 package quantum
 
 // Qubit represents a quantum bit with amplitude coefficients

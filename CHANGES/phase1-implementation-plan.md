@@ -26,7 +26,7 @@ documentation, and tests, with minimal scope changes.
    - No API changes expected; only behavior change in state gate application.
    - Files: `internal/examples/bell.go` (verify, no edits unless needed).
 
-3. [ ] Add package-level documentation for `package quantum`.
+3. [x] Add package-level documentation for `package quantum`.
    - Add a package comment in either `quantum/interfaces.go` or
      `quantum/errortypes.go`.
    - Keep the comment consistent with existing README usage.
