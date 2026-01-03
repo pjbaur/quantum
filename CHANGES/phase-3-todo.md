@@ -10,10 +10,10 @@ Organized for parallel development across CLI, CI, and documentation workstreams
 
 ## Workstream 2: CI pipeline
 
-- Add a CI workflow that runs `go test ./...`.
-- Add a CI step for `go vet ./...`.
-- Add linting in CI (choose the existing or CI-enforced linter, if any).
-- Add coverage reporting in CI and set a baseline threshold.
+- [x] Add a CI workflow that runs `go test ./...`.
+- [x] Add a CI step for `go vet ./...`.
+- [x] Add linting in CI (choose the existing or CI-enforced linter, if any).
+- [x] Add coverage reporting in CI and set a baseline threshold.
 
 ## Workstream 3: README alignment
 
