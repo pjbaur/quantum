@@ -38,7 +38,7 @@ The project is a Go-based quantum computing simulator with clear package separat
 - Add gate registration and helper composition/decomposition utilities.
 - Introduce an algorithm package (Grover, Deutsch-Jozsa).
 
-### [ ] Longer Term (Phase 5)
+### [x] Longer Term (Phase 5)
 - Add visualization tools (text-based state views, Bloch sphere for single qubits).
 - Implement density matrix support and common noise models.
 - Explore parallel simulation of independent circuits.
