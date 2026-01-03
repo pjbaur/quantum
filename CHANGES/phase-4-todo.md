@@ -35,11 +35,11 @@ Organized for parallel development across profiling, performance, extensibility,
 
 ## Workstream 4: Algorithm package (Grover, Deutsch-Jozsa)
 
-- [ ] Introduce `algorithm` package with minimal public surface.
-- [ ] Implement Deutsch-Jozsa using existing gates and circuit/state APIs.
-- [ ] Implement Grover's algorithm for small qubit counts.
-- [ ] Add tests validating algorithm output distributions.
-- [ ] Add short examples that compile and run in the current module layout.
+- [x] Introduce `algorithm` package with minimal public surface.
+- [x] Implement Deutsch-Jozsa using existing gates and circuit/state APIs.
+- [x] Implement Grover's algorithm for small qubit counts.
+- [x] Add tests validating algorithm output distributions.
+- [x] Add short examples that compile and run in the current module layout.
 
 Additional (bonus?) TODOs:
   1. run targeted benchmarks again to see how generic two‑qubit gates affect performance
