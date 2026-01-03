@@ -1,5 +1,5 @@
 /*
-This `examples/bell.go` file contains several demonstration functions focused on Bell states and
+This `internal/examples/bell.go` file contains several demonstration functions focused on Bell states and
 their applications in quantum information:
 
 1. `BellStateCreationDemo()` - Demonstrates the step-by-step creation of a Bell state using Hadamard and
@@ -9,9 +9,7 @@ their applications in quantum information:
     most important quantum information protocols.
 4. `RunAllBellDemos()` - A convenience function that runs all the demonstrations in sequence.
 
-The code assumes your new package structure with imports from packages like `quantum/state`. It includes detailed explanations of Bell states and their properties, focusing on entanglement and non-classical correlations that make Bell states fundamental to quantum information science.
-
-Note that the implementation includes some placeholder functions (like `Measure()` and `ApplyGate()`) that would need to be implemented in your `state` package. The exact implementation would depend on how you design your state representation and measurement operations.
+The code assumes the current package structure with imports from packages like `quantum/state`. It includes detailed explanations of Bell states and their properties, focusing on entanglement and non-classical correlations that make Bell states fundamental to quantum information science.
 */
 
 package examples

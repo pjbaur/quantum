@@ -13,7 +13,7 @@ import (
 func showUsage() {
 	fmt.Println("Quantum Computing in Go")
 	fmt.Println("======================")
-	fmt.Println("Usage: go run main.go [demo]")
+	fmt.Println("Usage: go run ./cmd/quantum [demo]")
 	fmt.Println("")
 	fmt.Println("Available Demos:")
 	fmt.Println("  all       - Run all demonstrations")
@@ -22,8 +22,8 @@ func showUsage() {
 	fmt.Println("  bell      - Bell state demonstrations")
 	fmt.Println("")
 	fmt.Println("Examples:")
-	fmt.Println("  go run main.go hadamard  - Run Hadamard gate examples")
-	fmt.Println("  go run main.go all       - Run all examples sequentially")
+	fmt.Println("  go run ./cmd/quantum hadamard  - Run Hadamard gate examples")
+	fmt.Println("  go run ./cmd/quantum all       - Run all examples sequentially")
 }
 
 func runDemos(demoType string) {

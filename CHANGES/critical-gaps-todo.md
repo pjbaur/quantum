@@ -9,11 +9,11 @@
 - [x] Verify state normalization is preserved after multi-qubit gate application.
 
 ## 2. Documentation drift vs repository structure
-- [ ] Inventory docs that reference outdated paths (CLI entry point, examples location, measurement package).
-- [ ] Update CLI usage instructions to reference `cmd/quantum` and current demo flow.
-- [ ] Update example references to `internal/examples` and ensure each example file name matches docs.
-- [ ] Document the current status of `measurement` package and remove or flag empty/placeholder references.
-- [ ] Cross-check README and guide docs against actual package layout and exported APIs.
+- [x] Inventory docs that reference outdated paths (CLI entry point, examples location, measurement package).
+- [x] Update CLI usage instructions to reference `cmd/quantum` and current demo flow.
+- [x] Update example references to `internal/examples` and ensure each example file name matches docs.
+- [x] Document the current status of `measurement` package and remove or flag empty/placeholder references.
+- [x] Cross-check README and guide docs against actual package layout and exported APIs.
 
 ## 3. Build friction (Go version and noisy tests)
 - [ ] Review `go.mod` Go version against supported toolchains and decide target version policy.

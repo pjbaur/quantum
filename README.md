@@ -15,7 +15,7 @@ This project provides a basic simulation of quantum computing concepts using the
 
 ### Prerequisites
 
-- Go (version 1.18 or later)
+- Go (version 1.21 or later)
 
 ### Installation
 
@@ -29,7 +29,7 @@ This project provides a basic simulation of quantum computing concepts using the
 2. Run the main program:
 
     ```bash
-    go run main.go
+    go run ./cmd/quantum
     ```
 
     This will display a menu of available quantum computing demonstrations, including Hadamard, T-gate, and Bell state examples.
@@ -44,26 +44,26 @@ This project provides a basic simulation of quantum computing concepts using the
 
 ## Usage
 
-The main entry point is [`main.go`](main.go), which provides a command-line interface to run various quantum computing demonstrations. Example usage:
+The main entry point is [`cmd/quantum/main.go`](cmd/quantum/main.go), which provides a command-line interface to run various quantum computing demonstrations. Example usage:
 
 ```bash
-go run main.go hadamard   # Run Hadamard gate demonstrations
-go run main.go tgate      # Run T-gate demonstrations
-go run main.go bell       # Run Bell state demonstrations
-go run main.go all        # Run all demonstrations sequentially
+go run ./cmd/quantum hadamard   # Run Hadamard gate demonstrations
+go run ./cmd/quantum tgate      # Run T-gate demonstrations
+go run ./cmd/quantum bell       # Run Bell state demonstrations
+go run ./cmd/quantum all        # Run all demonstrations sequentially
 ```
 
 ### Project Structure
 
-- [`main.go`](main.go): Entry point and CLI for running demonstrations.
+- [`cmd/quantum/main.go`](cmd/quantum/main.go): Entry point and CLI for running demonstrations.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
 - [`gates/gates.go`](gates/gates.go): Definitions of quantum gates (H, X, Y, Z, S, T, CNOT, etc).
-- [`measurement/measurement.go`](measurement/measurement.go): Measurement operations for qubits and quantum states.
-- [`examples/`](examples/): Example programs and demonstrations:
-  - [`hadamard.go`](examples/hadamard.go): Hadamard gate and superposition.
-  - [`tgate.go`](examples/tgate.go): T-gate and phase operations.
-  - [`bell.go`](examples/bell.go): Bell states, entanglement, and teleportation.
+- [`measurement/`](measurement/): Reserved package (currently empty; measurement lives on `state.State` and `qubit.Qubit`).
+- [`internal/examples/`](internal/examples/): Example programs and demonstrations:
+  - [`hadamard.go`](internal/examples/hadamard.go): Hadamard gate and superposition.
+  - [`tgate.go`](internal/examples/tgate.go): T-gate and phase operations.
+  - [`bell.go`](internal/examples/bell.go): Bell states, entanglement, and teleportation.
 
 ## Testing
 
@@ -96,20 +96,21 @@ To extend this further, you could:
 ## Refactoring
 
 quantum/
+├── cmd/
+│   └── quantum/
+│       └── main.go         # Entry point
 ├── gates/
-│   ├── gates.go        # Gate definitions (H, T, etc.)
-│   └── operations.go   # Gate application logic
+│   └── gates.go            # Gate definitions (H, T, etc.)
+├── internal/
+│   └── examples/
+│       ├── hadamard.go     # Hadamard examples
+│       ├── tgate.go        # T-gate examples
+│       └── bell.go         # Bell state examples
+├── measurement/            # Reserved (currently empty)
 ├── qubit/
-│   └── qubit.go        # Single qubit representation
-├── state/
-│   └── state.go        # Multi-qubit state representation  
-├── measurement/
-│   └── measurement.go  # Measurement operations
-├── examples/
-│   ├── hadamard.go     # Hadamard examples
-│   ├── tgate.go        # T-gate examples
-│   └── bell.go         # Bell state examples
-└── main.go             # Entry point
+│   └── qubit.go            # Single qubit representation
+└── state/
+    └── state.go            # Multi-qubit state representation
 
 Key Benefits:
 
