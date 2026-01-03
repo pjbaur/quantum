@@ -69,21 +69,101 @@ func TestApplyGateSwap(t *testing.T) {
 	assertNormalized(t, qs)
 }
 
-func TestApplyGateBellState(t *testing.T) {
-	var qs quantum.QuantumState = state.New(2)
-	if err := qs.ApplyGate(gates.NewHadamard(), 0); err != nil {
-		t.Fatalf("ApplyGate(Hadamard) returned error: %v", err)
-	}
-	if err := qs.ApplyGate(gates.NewCNOT(), 0, 1); err != nil {
-		t.Fatalf("ApplyGate(CNOT) returned error: %v", err)
+func TestApplyGateBellStates(t *testing.T) {
+	invSqrt2 := 1 / math.Sqrt(2)
+	tests := []struct {
+		name      string
+		postGates []struct {
+			gate   quantum.Gate
+			target int
+		}
+		want [4]complex128
+	}{
+		{
+			name: "Phi+",
+			want: [4]complex128{
+				complex(invSqrt2, 0),
+				0,
+				0,
+				complex(invSqrt2, 0),
+			},
+		},
+		{
+			name: "Phi-",
+			postGates: []struct {
+				gate   quantum.Gate
+				target int
+			}{
+				{gate: gates.NewPauliZ(), target: 1},
+			},
+			want: [4]complex128{
+				complex(invSqrt2, 0),
+				0,
+				0,
+				complex(-invSqrt2, 0),
+			},
+		},
+		{
+			name: "Psi+",
+			postGates: []struct {
+				gate   quantum.Gate
+				target int
+			}{
+				{gate: gates.NewPauliX(), target: 1},
+			},
+			want: [4]complex128{
+				0,
+				complex(invSqrt2, 0),
+				complex(invSqrt2, 0),
+				0,
+			},
+		},
+		{
+			name: "Psi-",
+			postGates: []struct {
+				gate   quantum.Gate
+				target int
+			}{
+				{gate: gates.NewPauliX(), target: 1},
+				{gate: gates.NewPauliZ(), target: 1},
+			},
+			want: [4]complex128{
+				0,
+				complex(invSqrt2, 0),
+				complex(-invSqrt2, 0),
+				0,
+			},
+		},
 	}
 
-	want := complex(1/math.Sqrt(2), 0)
-	assertAmplitude(t, qs, 0, want)
-	assertAmplitude(t, qs, 3, want)
-	assertAmplitude(t, qs, 1, 0)
-	assertAmplitude(t, qs, 2, 0)
-	assertNormalized(t, qs)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			var qs quantum.QuantumState = state.New(2)
+			if err := qs.ApplyGate(gates.NewHadamard(), 0); err != nil {
+				t.Fatalf("ApplyGate(Hadamard) returned error: %v", err)
+			}
+			if err := qs.ApplyGate(gates.NewCNOT(), 0, 1); err != nil {
+				t.Fatalf("ApplyGate(CNOT) returned error: %v", err)
+			}
+
+			for _, step := range tt.postGates {
+				if err := qs.ApplyGate(step.gate, step.target); err != nil {
+					t.Fatalf("ApplyGate(%s) returned error: %v", step.gate.Name(), err)
+				}
+			}
+
+			for i, want := range tt.want {
+				assertAmplitude(t, qs, i, want)
+			}
+
+			for i := 0; i < len(tt.want); i++ {
+				wantProb := cmplx.Abs(tt.want[i])
+				wantProb *= wantProb
+				assertProbability(t, qs, i, wantProb)
+			}
+			assertNormalized(t, qs)
+		})
+	}
 }
 
 func TestApplyGateErrors(t *testing.T) {
@@ -154,6 +234,15 @@ func assertAmplitude(t *testing.T, qs quantum.QuantumState, index int, want comp
 	amp := qs.Amplitude(index)
 	if cmplx.Abs(amp-want) > tolerance {
 		t.Fatalf("expected amplitude %v at index %d, got %v", want, index, amp)
+	}
+}
+
+func assertProbability(t *testing.T, qs quantum.QuantumState, index int, want float64) {
+	t.Helper()
+
+	prob := qs.Probability(index)
+	if math.Abs(prob-want) > tolerance {
+		t.Fatalf("expected probability %v at index %d, got %v", want, index, prob)
 	}
 }
 
