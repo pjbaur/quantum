@@ -18,7 +18,7 @@ Organized for parallel development across visualization, density matrices/noise,
 
 ## Workstream 3: Parallel simulation
 
-- [ ] Identify independent circuit execution paths that can be parallelized.
-- [ ] Add a parallel execution strategy for independent circuits.
-- [ ] Benchmark parallel execution vs. serial execution on representative workloads.
-- [ ] Document any concurrency limits or configuration knobs.
+- [x] Identify independent circuit execution paths that can be parallelized.
+- [x] Add a parallel execution strategy for independent circuits.
+- [x] Benchmark parallel execution vs. serial execution on representative workloads.
+- [x] Document any concurrency limits or configuration knobs.

@@ -8,6 +8,7 @@ This project provides a basic simulation of quantum computing concepts using the
 - Hadamard, Pauli (X, Y, Z), S, T, CNOT, and SWAP gates
 - Measurement and probability calculations for qubits and quantum states
 - Circuit abstraction for sequencing gate operations
+- Parallel batch execution for independent circuit runs with configurable worker limits
 - Demonstrations of superposition, entanglement, and quantum teleportation
 - Modular, testable Go code
 - Little-endian qubit indexing (qubit 0 is the least-significant bit)
@@ -70,6 +71,19 @@ go run ./cmd/quantum all        # Run all demonstrations sequentially
   - [`algorithm.go`](internal/examples/algorithm.go): Deutsch-Jozsa and Grover algorithms.
 - Measurement helpers currently live on `state.State` and `qubit.Qubit`; a dedicated `measurement` package is TODO.
 
+### Parallel Circuit Execution
+
+Independent circuits that operate on distinct quantum states can be executed in
+parallel. Use `MaxParallelism` to cap concurrency.
+
+```go
+executions := []circuit.Execution{
+	{Circuit: c1, State: s1},
+	{Circuit: c2, State: s2},
+}
+err := circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 4})
+```
+
 ## Testing
 
 Run all tests with:
@@ -98,4 +112,3 @@ Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
 ---
 
 For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).
-
