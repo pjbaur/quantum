@@ -235,6 +235,8 @@ func (q *Qubit) IsNormalized() bool {
 package gates
 
 import (
+	"math"
+
 	"github.com/pjbaur/quantum"
 )
 
@@ -509,7 +511,7 @@ mv examples/tgate.go internal/examples/
 mv examples/bell.go internal/examples/
 ```
 
-### Step 3: Update Main File
+### Step 3: Update Main File (`cmd/quantum/main.go`)
 
 ```go
 package main
@@ -552,7 +554,7 @@ func main() {
 func showUsage() {
 	fmt.Println("Quantum Computing Demonstrations")
 	fmt.Println("\nUsage:")
-	fmt.Println("  go run main.go [demo]")
+	fmt.Println("  go run ./cmd/quantum [demo]")
 	fmt.Println("\nAvailable Demos:")
 	fmt.Println("  hadamard   - Hadamard gate demonstrations")
 	fmt.Println("  tgate      - T-gate demonstrations")
@@ -610,9 +612,9 @@ Create comprehensive tests for your interfaces and implementations:
 package qubit
 
 import (
-	"math/cmplx"
+	"math"
 	"testing"
-	
+
 	"github.com/pjbaur/quantum"
 )
 
@@ -633,7 +635,7 @@ func TestNewWithValues(t *testing.T) {
 	}{
 		{"Valid state 1", 1.0, 0.0, false},
 		{"Valid state 2", 0.0, 1.0, false},
-		{"Valid superposition", complex(1/cmplx.Sqrt2, 0), complex(1/cmplx.Sqrt2, 0), false},
+		{"Valid superposition", complex(1/math.Sqrt(2), 0), complex(1/math.Sqrt(2), 0), false},
 		{"Invalid state", 1.0, 1.0, true},
 	}
 	
@@ -712,10 +714,7 @@ Reviewed `CHANGES/phase1-implementation.md` against the current repository imple
   - [x] Tests for multi-qubit gates and `QuantumState.ApplyGate` on multi-qubit targets are not present.
 
 ## Correctness of the Guide
-- The Hadamard gate snippet uses `math.Sqrt` but omits the `math` import (`CHANGES/phase1-implementation.md`).
-- The test snippet references `cmplx.Sqrt2`, which is not part of the Go standard library (`CHANGES/phase1-implementation.md`).
-- The guide suggests updating a root `main.go`, but the actual entry point is `cmd/quantum/main.go`.
-- The guide’s examples rely on CNOT via `ApplyGate`, but the provided `ApplyGate` implementation only supports single-qubit gates; this makes the example steps misleading for current code.
+No known inaccuracies remain after aligning the snippets and paths with the current codebase.
 
 ## Summary
-Phase 1 implementation is complete for interfaces, core qubit and state behavior (including multi-qubit gate application), examples, and required package documentation, with tests covering multi-qubit `ApplyGate` cases. The guide itself still contains a few inaccurate code snippets and path references that should be corrected to reflect the current codebase.
+Phase 1 implementation is complete for interfaces, core qubit and state behavior (including multi-qubit gate application), examples, and required package documentation, with tests covering multi-qubit `ApplyGate` cases.
