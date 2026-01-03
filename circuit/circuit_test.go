@@ -213,3 +213,27 @@ func ExampleCircuit() {
 	fmt.Printf("%.2f %.2f\n", s.Probability(0), s.Probability(1))
 	// Output: 0.50 0.50
 }
+
+func ExampleCircuit_bellState() {
+	c, _ := circuit.New(2)
+	_ = c.AddGate(gates.NewHadamard(), 0)
+	_ = c.AddGate(gates.NewCNOT(), 0, 1)
+
+	s := state.New(2)
+	_ = c.Execute(s)
+
+	fmt.Printf("%.2f %.2f\n", s.Probability(0), s.Probability(3))
+	// Output: 0.50 0.50
+}
+
+func ExampleCircuit_nonAdjacentCNOT() {
+	c, _ := circuit.New(3)
+	_ = c.AddGate(gates.NewHadamard(), 0)
+	_ = c.AddGate(gates.NewCNOT(), 0, 2)
+
+	s := state.New(3)
+	_ = c.Execute(s)
+
+	fmt.Printf("%.2f %.2f\n", s.Probability(0), s.Probability(5))
+	// Output: 0.50 0.50
+}

@@ -34,10 +34,10 @@ changing public APIs or introducing new dependencies.
 
 ## 4) Examples and usability improvements
 
-- [ ] Add or update examples that demonstrate multi-qubit circuits.
-- [ ] Include at least one example that produces a Bell state.
-- [ ] Ensure examples compile and run with the current module layout.
-- [ ] Keep examples small and focused; avoid unnecessary complexity.
+- [x] Add or update examples that demonstrate multi-qubit circuits.
+- [x] Include at least one example that produces a Bell state.
+- [x] Ensure examples compile and run with the current module layout.
+- [x] Keep examples small and focused; avoid unnecessary complexity.
 
 ## 5) Remove debug prints from tests
 
