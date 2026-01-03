@@ -78,6 +78,20 @@ go test ./...
 
 Tests live in [`quantum/quantum_test.go`](quantum/quantum_test.go), [`state/state_test.go`](state/state_test.go), and [`circuit/circuit_test.go`](circuit/circuit_test.go), covering qubit operations, gates, measurement, circuits, and multi-qubit states.
 
+## Benchmarking
+```bash
+go test ./state -bench Benchmark -benchmem -run '^$'
+
+go test ./circuit -bench BenchmarkCircuitExecute \
+    -benchmem \
+    -run '^$' \
+    -cpuprofile CHANGES/profiles/ws1-circuit-cpu.pprof \
+    -memprofile CHANGES/profiles/ws1-circuit-mem.pprof
+```
+
+Inspect profiles with `go tool pprof CHANGES/profiles/ws1-circuit-cpu.pprof`
+
 ---
 
 For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).
+

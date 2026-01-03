@@ -33,3 +33,7 @@ Organized for parallel development across profiling, performance, extensibility,
 - [ ] Implement Grover's algorithm for small qubit counts.
 - [ ] Add tests validating algorithm output distributions.
 - [ ] Add short examples that compile and run in the current module layout.
+
+Additional (bonus?) TODOs:
+  1. run targeted benchmarks again to see how generic two‑qubit gates affect performance
+  2. add sparse‑specific tests for target ordering edge cases
