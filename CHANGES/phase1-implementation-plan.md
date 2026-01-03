@@ -5,14 +5,14 @@ This plan covers the "Partially completed" and "Missing" items listed in
 documentation, and tests, with minimal scope changes.
 
 ## Goals
-- [ ] Enable multi-qubit gate application in `state.State.ApplyGate`.
+- [x] Enable multi-qubit gate application in `state.State.ApplyGate`.
 - [ ] Ensure Bell-state examples work as written.
 - [ ] Add required package-level documentation for `package quantum`.
 - [ ] Add tests for multi-qubit gate application and coverage in `QuantumState`.
 
 ## Plan
 
-1. [ ] Implement multi-qubit gate application in `state.State.ApplyGate`.
+1. [x] Implement multi-qubit gate application in `state.State.ApplyGate`.
    - Add an internal path for 4x4 (2-qubit) gates (CNOT, SWAP) using the
      existing `gates` matrices.
    - Validate target indices and target count; preserve current error types
