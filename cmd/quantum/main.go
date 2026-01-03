@@ -25,6 +25,7 @@ func usage() {
 	fmt.Fprintln(out, "  hadamard  - Hadamard gate demonstrations")
 	fmt.Fprintln(out, "  tgate     - T-gate demonstrations")
 	fmt.Fprintln(out, "  bell      - Bell state demonstrations")
+	fmt.Fprintln(out, "  algorithm - Algorithm demonstrations (Deutsch-Jozsa, Grover)")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Examples:")
 	fmt.Fprintln(out, "  go run ./cmd/quantum hadamard       - Run Hadamard gate examples")
@@ -40,6 +41,8 @@ func runDemos(demoType string) error {
 		examples.RunAllTGateDemos()
 	case "bell":
 		examples.RunAllBellDemos()
+	case "algorithm":
+		examples.RunAllAlgorithmDemos()
 	case "all":
 		fmt.Println("\n========================================================")
 		fmt.Println("             QUANTUM COMPUTING IN GO")
@@ -55,6 +58,10 @@ func runDemos(demoType string) error {
 		fmt.Scanln()
 
 		examples.RunAllBellDemos()
+		fmt.Println("\nPress Enter to continue to algorithm demonstrations...")
+		fmt.Scanln()
+
+		examples.RunAllAlgorithmDemos()
 
 		fmt.Println("\n========================================================")
 		fmt.Println("             ALL DEMONSTRATIONS COMPLETED")
@@ -66,7 +73,7 @@ func runDemos(demoType string) error {
 }
 
 func main() {
-	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, all)")
+	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, all)")
 	paramFlag := flag.Int("param", 0, "Optional numeric parameter for demos")
 	flag.Usage = usage
 	flag.Parse()
