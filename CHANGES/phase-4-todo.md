@@ -19,11 +19,11 @@ Organized for parallel development across profiling, performance, extensibility,
 
 ## Workstream 2: Sparse state representation exploration
 
-- [ ] Define criteria for when sparse state is beneficial (qubit count, sparsity threshold).
-- [ ] Prototype a sparse state representation behind internal types or build tags.
-- [ ] Implement minimal gate application for sparse states (single-qubit + CNOT).
-- [ ] Compare accuracy and performance against dense state benchmarks.
-- [ ] Decide on adoption path without changing public interfaces.
+- [x] Define criteria for when sparse state is beneficial (qubit count, sparsity threshold).
+- [x] Prototype a sparse state representation behind internal types or build tags.
+- [x] Implement minimal gate application for sparse states (single-qubit + CNOT).
+- [x] Compare accuracy and performance against dense state benchmarks.
+- [x] Decide on adoption path without changing public interfaces.
 
 ## Workstream 3: Gate registry and composition utilities
 
