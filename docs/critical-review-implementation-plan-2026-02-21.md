@@ -1,0 +1,248 @@
+# Implementation Plan for `critical-review-2026-02-21.md`
+
+This plan implements all findings and recommendations in `docs/critical-review-2026-02-21.md`, with explicit sequencing and parallelizable workstreams.
+
+## Goals
+
+- [ ] Resolve all highest-priority correctness and API risks.
+- [ ] Resolve all medium-priority maintainability and UX gaps.
+- [ ] Close documented test coverage gaps.
+- [ ] Keep behavior changes deliberate, documented, and reviewable.
+
+## Worktree Topology (Parallel Execution)
+
+Use dedicated worktrees so teams can ship independent PRs in parallel with low merge contention.
+
+- [ ] `ws1-api-core`: state-vector-first API, gate interface cleanup, constructor consistency, shared validation helpers.
+- [ ] `ws2-concurrency`: `ExecuteAllParallel` safety guarantees, misuse detection, concurrency tests.
+- [ ] `ws3-sparse-backend`: sparse backend capability strategy and implementation/contract enforcement.
+- [ ] `ws4-algorithms`: Grover + Deutsch-Jozsa scalability refactor and negative-path test coverage.
+- [ ] `ws5-cli-docs-tests`: CLI/help drift fixes, dead parameter resolution, visualization helper tests, docs alignment.
+- [ ] `ws6-integration`: final integration pass, conflict resolution, cross-package verification, release notes.
+
+## Phase 0 (Do First): “What To Do Differently” Decisions and Guardrails
+
+This phase sets project-level direction before code-heavy changes. No feature work starts before these checkboxes are done.
+
+### 0.1 State-vector-first API direction (`ws1-api-core`)
+
+- [ ] Write an API decision note defining matrix+targets `ApplyGate` as the primary execution model.
+- [ ] Decide deprecation strategy for `Apply(q Qubit)` paths (soft deprecate vs remove in major version).
+- [ ] Define compatibility policy for existing callers that still use qubit-level APIs.
+
+### 0.2 Enforceable concurrency contract (`ws2-concurrency`)
+
+- [ ] Choose contract: fail fast on shared pointers, or clone internally before parallel execution.
+- [ ] Define deterministic error behavior for unsafe shared-state submissions.
+- [ ] Document performance tradeoff of the chosen contract in package docs.
+
+### 0.3 Explicit backend capability model (`ws3-sparse-backend`)
+
+- [ ] Choose strategy: full generic k-qubit sparse gate support, or explicit capability limits.
+- [ ] If keeping limits, define capability-check API so unsupported operations fail early/clearly.
+- [ ] Define compatibility behavior between `circuit` execution and backend capability checks.
+
+### 0.4 Diagnostics and constructor consistency policy (`ws1-api-core` + `ws3-sparse-backend`)
+
+- [ ] Define normalization error contract to report attempted (pre-rollback) sum.
+- [ ] Standardize invalid qubit-count constructor behavior across `circuit`, dense `state`, and sparse `state`.
+- [ ] Decide whether coercion-to-1 is removed or gated for backward compatibility.
+
+### 0.5 UX drift prevention policy (`ws5-cli-docs-tests`)
+
+- [ ] Define CLI contract source of truth (flags, demos, optional params, examples).
+- [ ] Decide whether the currently unused optional CLI parameter is removed or implemented.
+- [ ] Add a docs synchronization checklist to PR template or release checklist.
+
+### 0.6 Regression prevention test strategy (`ws2/ws4/ws5`)
+
+- [ ] Define minimum new test matrix: negative paths, misuse paths, helper-level output tests.
+- [ ] Add race-focused test command expectations for concurrency-sensitive packages.
+
+## Phase 1: Highest-Priority Correctness and API Safety
+
+### 1.1 Gate API and legacy qubit path cleanup (`ws1-api-core`)
+
+- [ ] Refactor `quantum.Gate` usage so multi-qubit execution is centered on matrix+targets paths.
+- [ ] Isolate/deprecate misleading single-qubit `Apply(q Qubit)` gate methods.
+- [ ] Remove or mark clearly non-physical helper methods that bypass entanglement-correct simulation.
+- [ ] Update inline package docs to warn against legacy single-qubit simulation paths for circuit execution.
+- [ ] Add migration notes for downstream callers.
+
+### 1.2 Enforced parallel execution safety (`ws2-concurrency`)
+
+- [ ] Update `ExecuteAllParallel` to enforce independence contract at runtime.
+- [ ] Implement duplicate state detection (pointer identity or equivalent robust keying).
+- [ ] Return explicit, actionable error messages on shared-state misuse.
+- [ ] Add fast-path behavior for valid independent states with minimal overhead.
+
+### 1.3 Sparse backend compatibility guarantees (`ws3-sparse-backend`)
+
+- [ ] Implement chosen sparse strategy from Phase 0:
+- [ ] If generic support: add k-qubit gate application path and validation.
+- [ ] If explicit limits: add capability interface/checks and fail early during planning/execution.
+- [ ] Ensure circuit execution path does not silently proceed into unsupported sparse operations.
+- [ ] Add backend capability documentation and examples.
+
+### 1.4 Correct normalization diagnostics and rollback reporting (`ws1-api-core` + `ws3-sparse-backend`)
+
+- [ ] Capture attempted normalization sum before rollback in dense `SetAmplitude`.
+- [ ] Capture attempted normalization sum before rollback in sparse `SetAmplitude`.
+- [ ] Ensure error payloads and messages are consistent across dense/sparse implementations.
+- [ ] Add precise tests asserting attempted-vs-post-rollback sums.
+
+### 1.5 Constructor invalid-input consistency (`ws1-api-core` + `ws3-sparse-backend`)
+
+- [ ] Align `state.New`, sparse `New`, and `circuit.New` behavior for invalid qubit counts.
+- [ ] Add consistent error type/message semantics across constructors.
+- [ ] Update call sites and tests to match the standardized behavior.
+
+## Phase 2: Medium-Priority Maintainability and UX
+
+### 2.1 CLI help/behavior consistency (`ws5-cli-docs-tests`)
+
+- [ ] Add missing `visual` demo option in `-demo` help text.
+- [ ] Resolve optional parameter drift by either implementing behavior or removing dead parsing.
+- [ ] Add CLI tests or golden help-output assertions to prevent future drift.
+- [ ] Update user-facing docs/examples to match implemented CLI behavior.
+
+### 2.2 Algorithm scalability refactor (`ws4-algorithms`)
+
+- [ ] Replace full dense matrix construction in Grover with direct state-vector transformations where possible.
+- [ ] Replace full dense matrix construction in Deutsch-Jozsa with scalable operator application strategy.
+- [ ] Preserve algorithm correctness with deterministic output/state assertions.
+- [ ] Add focused benchmarks to compare pre/post memory/time for representative qubit counts.
+
+### 2.3 Shared gate-matrix validation (`ws1-api-core`)
+
+- [ ] Extract `gateQubitCount` into a single shared location/package.
+- [ ] Migrate `circuit`, dense `state`, and sparse backend to the shared helper.
+- [ ] Remove duplicated implementations and unify error strings.
+- [ ] Add table-driven validation tests that cover all current call sites.
+
+## Phase 3: Test Coverage Expansion (Documented Gaps)
+
+### 3.1 Algorithm negative-path tests (`ws4-algorithms`)
+
+- [ ] Add table-driven invalid-input tests for `DeutschJozsa` error paths.
+- [ ] Add table-driven invalid-input tests for `Grover` error paths.
+- [ ] Assert error type/message specificity, not only generic failure.
+
+### 3.2 Parallel shared-state hazard tests (`ws2-concurrency`)
+
+- [ ] Add tests that intentionally pass shared state pointers to `ExecuteAllParallel`.
+- [ ] Assert fail-fast behavior (or clone semantics) based on Phase 0 decision.
+- [ ] Add race-focused tests for concurrent independent-state executions.
+
+### 3.3 Visualization helper direct tests (`ws5-cli-docs-tests`)
+
+- [ ] Add direct unit tests for `FormatBlochVector`.
+- [ ] Add direct unit tests for `BlochCSV`.
+- [ ] Include formatting edge cases (rounding, sign, delimiter, invalid inputs if applicable).
+
+## Phase 4: Integration, Hardening, and Release Readiness (`ws6-integration`)
+
+### 4.1 Merge and conflict control
+
+- [ ] Merge `ws1` first (API/core contracts), then `ws2` + `ws3`, then `ws4` + `ws5`.
+- [ ] Resolve cross-package conflicts in `circuit`, `state`, and `quantum` interfaces.
+- [ ] Re-run full test suite after each merge step.
+
+### 4.2 Verification checklist
+
+- [ ] `gofmt` on all touched files.
+- [ ] `go test ./...`
+- [ ] `go vet ./...`
+- [ ] `go test -race ./...` (or targeted race suites if environment constraints persist).
+- [ ] Ensure no documented high/medium findings remain unaddressed.
+
+### 4.3 Documentation and migration output
+
+- [ ] Update `docs/critical-review-2026-02-21.md` with completion links/PR references.
+- [ ] Add migration notes for API/deprecation/constructor behavior changes.
+- [ ] Update CLI and backend capability docs.
+- [ ] Publish final “resolved findings” summary in `docs/`.
+
+## Worktree-by-Worktree Deliverables
+
+### `ws1-api-core`
+
+- [ ] API decision note + migration strategy.
+- [ ] Gate API cleanup/deprecation implementation.
+- [ ] Constructor consistency implementation.
+- [ ] Shared gate validation helper.
+- [ ] Normalization diagnostics fix (dense side).
+
+### `ws2-concurrency`
+
+- [ ] Enforced `ExecuteAllParallel` contract.
+- [ ] Shared-state misuse detection and explicit errors.
+- [ ] Hazard/race regression tests.
+- [ ] Package docs for concurrency contract.
+
+### `ws3-sparse-backend`
+
+- [ ] Sparse capability strategy implementation (generic support or explicit contract).
+- [ ] Early failure hooks for unsupported gates.
+- [ ] Normalization diagnostics fix (sparse side).
+- [ ] Sparse backend docs/tests aligned with selected capability model.
+
+### `ws4-algorithms`
+
+- [ ] Grover scalability refactor.
+- [ ] Deutsch-Jozsa scalability refactor.
+- [ ] Negative-path coverage for both algorithms.
+- [ ] Benchmark evidence and regression checks.
+
+### `ws5-cli-docs-tests`
+
+- [ ] CLI help and behavior alignment.
+- [ ] Dead optional parameter resolution.
+- [ ] Direct visualization helper tests.
+- [ ] Documentation and examples sync pass.
+
+### `ws6-integration`
+
+- [ ] Merge-order execution and integration fixes.
+- [ ] Full verification execution and evidence capture.
+- [ ] Final completion report mapping to every review finding.
+
+## Dependency Map (Execution Order)
+
+- [ ] Phase 0 decisions complete before any breaking API/code-path changes.
+- [ ] `ws1-api-core` must land before `ws4-algorithms` finalization if shared validation API changes.
+- [ ] `ws2-concurrency` and `ws3-sparse-backend` can proceed in parallel after Phase 0 decisions.
+- [ ] `ws5-cli-docs-tests` can run in parallel with `ws2/ws3/ws4`.
+- [ ] `ws6-integration` starts only after all feature worktrees are merged or ready to merge.
+
+## Traceability Checklist: Review Item Coverage
+
+### Highest-Priority Findings
+
+- [ ] `quantum.Gate` misleading for multi-qubit usage.
+- [ ] Fragile `ExecuteAllParallel` caller contract.
+- [ ] Sparse backend not drop-in for general circuits.
+- [ ] Normalization diagnostics wrong after rollback.
+
+### Medium-Priority Findings
+
+- [ ] CLI help/behavior inconsistency (`visual` + optional parameter).
+- [ ] Algorithm scalability issues due to dense matrix construction.
+- [ ] Duplicated gate matrix validation logic.
+- [ ] Constructor inconsistency on invalid qubit counts.
+
+### Test Coverage Gaps
+
+- [ ] Missing negative-path tests for `DeutschJozsa` and `Grover`.
+- [ ] Missing shared-state misuse tests for parallel execution.
+- [ ] Missing direct tests for `FormatBlochVector` and `BlochCSV`.
+
+## Suggested PR Sequence
+
+- [ ] PR1: Phase 0 decision docs + non-breaking guardrails.
+- [ ] PR2: `ws1-api-core` correctness/API contract updates.
+- [ ] PR3: `ws2-concurrency` enforcement + tests.
+- [ ] PR4: `ws3-sparse-backend` capability implementation + tests.
+- [ ] PR5: `ws4-algorithms` scalability + negative-path tests.
+- [ ] PR6: `ws5-cli-docs-tests` UX/docs/test fixes.
+- [ ] PR7: `ws6-integration` final merge, verification, and closure report.
