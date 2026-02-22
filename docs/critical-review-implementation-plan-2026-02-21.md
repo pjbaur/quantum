@@ -35,23 +35,41 @@ This phase sets project-level direction before code-heavy changes. No feature wo
   - No external consumers; hard removal acceptable
   - See: `docs/compatibility-policy.md`
 
-### 0.2 Enforceable concurrency contract (`ws2-concurrency`)
+### 0.2 Enforceable concurrency contract (`ws2-concurrency`) ✅ COMPLETE
 
-- [ ] Choose contract: fail fast on shared pointers, or clone internally before parallel execution.
-- [ ] Define deterministic error behavior for unsafe shared-state submissions.
-- [ ] Document performance tradeoff of the chosen contract in package docs.
+- [x] Choose contract: fail fast on shared pointers, or clone internally before parallel execution.
+  - Decision: Fail-fast with shared-state detection
+  - See: `docs/adr/0002-concurrency-contract.md`
+- [x] Define deterministic error behavior for unsafe shared-state submissions.
+  - `SharedStateError` with duplicate indices
+  - See: `docs/adr/0002-concurrency-contract.md`
+- [x] Document performance tradeoff of the chosen contract in package docs.
+  - O(n) pointer validation overhead documented in ADR
 
-### 0.3 Explicit backend capability model (`ws3-sparse-backend`)
+### 0.3 Explicit backend capability model (`ws3-sparse-backend`) ✅ COMPLETE
 
-- [ ] Choose strategy: full generic k-qubit sparse gate support, or explicit capability limits.
-- [ ] If keeping limits, define capability-check API so unsupported operations fail early/clearly.
-- [ ] Define compatibility behavior between `circuit` execution and backend capability checks.
+- [x] Choose strategy: full generic k-qubit sparse gate support, or explicit capability limits.
+  - Decision: Explicit capability limits (1-2 qubit gates only)
+  - See: `docs/adr/0003-sparse-backend-capability.md`
+- [x] If keeping limits, define capability-check API so unsupported operations fail early/clearly.
+  - `BackendCapabilities` interface with `SupportsGateQubits()` and `MaxGateQubits()`
+  - `UnsupportedOperationError` for 3+ qubit gates
+  - See: `docs/adr/0003-sparse-backend-capability.md`
+- [x] Define compatibility behavior between `circuit` execution and backend capability checks.
+  - Circuit compilation checks backend capabilities before execution
 
-### 0.4 Diagnostics and constructor consistency policy (`ws1-api-core` + `ws3-sparse-backend`)
+### 0.4 Diagnostics and constructor consistency policy (`ws1-api-core` + `ws3-sparse-backend`) ✅ COMPLETE
 
-- [ ] Define normalization error contract to report attempted (pre-rollback) sum.
-- [ ] Standardize invalid qubit-count constructor behavior across `circuit`, dense `state`, and sparse `state`.
-- [ ] Decide whether coercion-to-1 is removed or gated for backward compatibility.
+- [x] Define normalization error contract to report attempted (pre-rollback) sum.
+  - `NormalizationError` extended with `AttemptedSum` and `CurrentSum` fields
+  - See: `docs/adr/0004-diagnostics-constructor-consistency.md`
+- [x] Standardize invalid qubit-count constructor behavior across `circuit`, dense `state`, and sparse `state`.
+  - All constructors return error for `numQubits <= 0`
+  - New `InvalidQubitCountError` type
+  - See: `docs/adr/0004-diagnostics-constructor-consistency.md`
+- [x] Decide whether coercion-to-1 is removed or gated for backward compatibility.
+  - Decision: Removed entirely (no external consumers)
+  - See: `docs/adr/0004-diagnostics-constructor-consistency.md`
 
 ### 0.5 UX drift prevention policy (`ws5-cli-docs-tests`)
 
@@ -244,7 +262,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ## Suggested PR Sequence
 
-- [ ] PR1: Phase 0 decision docs + non-breaking guardrails.
+- [x] PR1: Phase 0 decision docs + non-breaking guardrails.
 - [ ] PR2: `ws1-api-core` correctness/API contract updates.
 - [ ] PR3: `ws2-concurrency` enforcement + tests.
 - [ ] PR4: `ws3-sparse-backend` capability implementation + tests.
