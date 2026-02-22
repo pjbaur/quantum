@@ -24,11 +24,16 @@ Use dedicated worktrees so teams can ship independent PRs in parallel with low m
 
 This phase sets project-level direction before code-heavy changes. No feature work starts before these checkboxes are done.
 
-### 0.1 State-vector-first API direction (`ws1-api-core`)
+### 0.1 State-vector-first API direction (`ws1-api-core`) ✅ COMPLETE
 
-- [ ] Write an API decision note defining matrix+targets `ApplyGate` as the primary execution model.
-- [ ] Decide deprecation strategy for `Apply(q Qubit)` paths (soft deprecate vs remove in major version).
-- [ ] Define compatibility policy for existing callers that still use qubit-level APIs.
+- [x] Write an API decision note defining matrix+targets `ApplyGate` as the primary execution model.
+  - See: `docs/adr/0001-state-vector-first-api.md`
+- [x] Decide deprecation strategy for `Apply(q Qubit)` paths (soft deprecate vs remove in major version).
+  - Decision: Hard removal in v2.0
+  - See: `docs/deprecation-policy-v2.md`
+- [x] Define compatibility policy for existing callers that still use qubit-level APIs.
+  - No external consumers; hard removal acceptable
+  - See: `docs/compatibility-policy.md`
 
 ### 0.2 Enforceable concurrency contract (`ws2-concurrency`)
 
