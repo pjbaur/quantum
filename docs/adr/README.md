@@ -40,6 +40,9 @@ What becomes easier or harder as a result?
 | Number | Title | Status | Date |
 |--------|-------|--------|------|
 | 0001 | State-Vector-First API Direction | Accepted | 2026-02-21 |
+| 0002 | Concurrency Contract for Parallel Execution | Accepted | 2026-02-21 |
+| 0003 | Sparse Backend Capability Model | Accepted | 2026-02-21 |
+| 0004 | Diagnostics and Constructor Consistency | Accepted | 2026-02-21 |
 
 ## Process
 
