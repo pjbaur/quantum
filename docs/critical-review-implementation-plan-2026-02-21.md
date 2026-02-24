@@ -71,26 +71,33 @@ This phase sets project-level direction before code-heavy changes. No feature wo
   - Decision: Removed entirely (no external consumers)
   - See: `docs/adr/0004-diagnostics-constructor-consistency.md`
 
-### 0.5 UX drift prevention policy (`ws5-cli-docs-tests`)
+### 0.5 UX drift prevention policy (`ws5-cli-docs-tests`) ✅ COMPLETE
 
-- [ ] Define CLI contract source of truth (flags, demos, optional params, examples).
-- [ ] Decide whether the currently unused optional CLI parameter is removed or implemented.
-- [ ] Add a docs synchronization checklist to PR template or release checklist.
+- [x] Define CLI contract source of truth (flags, demos, optional params, examples).
+  - Source of truth: `cmd/quantum/main.go` - `usage()` function and `runDemos()` switch
+  - See: `docs/adr/0006-cli-contract-and-drift-prevention.md`
+- [x] Decide whether the currently unused optional CLI parameter is removed or implemented.
+  - Decision: Removed (`-param` flag and positional param were dead code)
+  - See: `docs/adr/0006-cli-contract-and-drift-prevention.md`
+- [x] Add a docs synchronization checklist to PR template or release checklist.
+  - Created: `.github/PULL_REQUEST_TEMPLATE.md` with CLI/docs sync section
 
-### 0.6 Regression prevention test strategy (`ws2/ws4/ws5`)
+### 0.6 Regression prevention test strategy (`ws2/ws4/ws5`) ✅ COMPLETE
 
-- [ ] Define minimum new test matrix: negative paths, misuse paths, helper-level output tests.
-- [ ] Add race-focused test command expectations for concurrency-sensitive packages.
+- [x] Define minimum new test matrix: negative paths, misuse paths, helper-level output tests.
+  - See: `docs/adr/0005-regression-prevention-test-strategy.md`
+- [x] Add race-focused test command expectations for concurrency-sensitive packages.
+  - Race test patterns and CI expectations documented in ADR-0005
 
 ## Phase 1: Highest-Priority Correctness and API Safety
 
-### 1.1 Gate API and legacy qubit path cleanup (`ws1-api-core`)
+### 1.1 Gate API and legacy qubit path cleanup (`ws1-api-core`) ✅ COMPLETE
 
-- [ ] Refactor `quantum.Gate` usage so multi-qubit execution is centered on matrix+targets paths.
-- [ ] Isolate/deprecate misleading single-qubit `Apply(q Qubit)` gate methods.
-- [ ] Remove or mark clearly non-physical helper methods that bypass entanglement-correct simulation.
-- [ ] Update inline package docs to warn against legacy single-qubit simulation paths for circuit execution.
-- [ ] Add migration notes for downstream callers.
+- [x] Refactor `quantum.Gate` usage so multi-qubit execution is centered on matrix+targets paths.
+- [x] Isolate/deprecate misleading single-qubit `Apply(q Qubit)` gate methods.
+- [x] Remove or mark clearly non-physical helper methods that bypass entanglement-correct simulation.
+- [x] Update inline package docs to warn against legacy single-qubit simulation paths for circuit execution.
+- [x] Add migration notes for downstream callers.
 
 ### 1.2 Enforced parallel execution safety (`ws2-concurrency`)
 
@@ -107,12 +114,12 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [ ] Ensure circuit execution path does not silently proceed into unsupported sparse operations.
 - [ ] Add backend capability documentation and examples.
 
-### 1.4 Correct normalization diagnostics and rollback reporting (`ws1-api-core` + `ws3-sparse-backend`)
+### 1.4 Correct normalization diagnostics and rollback reporting (`ws1-api-core` + `ws3-sparse-backend`) ✅ COMPLETE
 
-- [ ] Capture attempted normalization sum before rollback in dense `SetAmplitude`.
-- [ ] Capture attempted normalization sum before rollback in sparse `SetAmplitude`.
-- [ ] Ensure error payloads and messages are consistent across dense/sparse implementations.
-- [ ] Add precise tests asserting attempted-vs-post-rollback sums.
+- [x] Capture attempted normalization sum before rollback in dense `SetAmplitude`.
+- [x] Capture attempted normalization sum before rollback in sparse `SetAmplitude`.
+- [x] Ensure error payloads and messages are consistent across dense/sparse implementations.
+- [x] Add precise tests asserting attempted-vs-post-rollback sums.
 
 ### 1.5 Constructor invalid-input consistency (`ws1-api-core` + `ws3-sparse-backend`)
 

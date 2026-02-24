@@ -218,6 +218,7 @@ func TestQubitClone(t *testing.T) {
 // TestGateHadamard tests the Hadamard gate
 func TestGateHadamard(t *testing.T) {
 	h := gates.NewHadamard()
+	x := gates.NewPauliX()
 
 	// Check name
 	if h.Name() != "Hadamard" {
@@ -241,8 +242,8 @@ func TestGateHadamard(t *testing.T) {
 	}
 
 	// Test Hadamard on |0⟩ (should give |+⟩)
-	q := qubit.New()
-	err := h.Apply(q)
+	s := state.New(1)
+	err := s.ApplyGate(h, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying H to |0⟩: %v", err)
 	}
@@ -250,14 +251,16 @@ func TestGateHadamard(t *testing.T) {
 	expectedAlpha := complex(1/math.Sqrt2, 0)
 	expectedBeta := complex(1/math.Sqrt2, 0)
 
-	if cmplx.Abs(q.Alpha()-expectedAlpha) > 1e-10 || cmplx.Abs(q.Beta()-expectedBeta) > 1e-10 {
+	if cmplx.Abs(s.Amplitude(0)-expectedAlpha) > 1e-10 || cmplx.Abs(s.Amplitude(1)-expectedBeta) > 1e-10 {
 		t.Errorf("H|0⟩ should be |+⟩. Expected α=%v, β=%v, got α=%v, β=%v",
-			expectedAlpha, expectedBeta, q.Alpha(), q.Beta())
+			expectedAlpha, expectedBeta, s.Amplitude(0), s.Amplitude(1))
 	}
 
 	// Test Hadamard on |1⟩ (should give |-⟩)
-	q, _ = qubit.NewWithValues(0.0, 1.0)
-	err = h.Apply(q)
+	s = state.New(1)
+	// Use X gate to flip to |1⟩
+	s.ApplyGate(x, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying H to |1⟩: %v", err)
 	}
@@ -265,24 +268,25 @@ func TestGateHadamard(t *testing.T) {
 	expectedAlpha = complex(1/math.Sqrt2, 0)
 	expectedBeta = complex(-1/math.Sqrt2, 0)
 
-	if cmplx.Abs(q.Alpha()-expectedAlpha) > 1e-10 || cmplx.Abs(q.Beta()-expectedBeta) > 1e-10 {
+	if cmplx.Abs(s.Amplitude(0)-expectedAlpha) > 1e-10 || cmplx.Abs(s.Amplitude(1)-expectedBeta) > 1e-10 {
 		t.Errorf("H|1⟩ should be |-⟩. Expected α=%v, β=%v, got α=%v, β=%v",
-			expectedAlpha, expectedBeta, q.Alpha(), q.Beta())
+			expectedAlpha, expectedBeta, s.Amplitude(0), s.Amplitude(1))
 	}
 
 	// Test Hadamard twice (should return to original state)
-	q = qubit.New() // |0⟩
-	_ = h.Apply(q)  // |+⟩
-	_ = h.Apply(q)  // should be |0⟩ again
+	s = state.New(1) // |0⟩
+	_ = s.ApplyGate(h, 0)  // |+⟩
+	_ = s.ApplyGate(h, 0)  // should be |0⟩ again
 
-	if cmplx.Abs(q.Alpha()-1.0) > 1e-10 || cmplx.Abs(q.Beta()) > 1e-10 {
-		t.Errorf("H²|0⟩ should be |0⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if cmplx.Abs(s.Amplitude(0)-1.0) > 1e-10 || cmplx.Abs(s.Amplitude(1)) > 1e-10 {
+		t.Errorf("H²|0⟩ should be |0⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 }
 
 // TestGatePauliX tests the Pauli-X (NOT) gate
 func TestGatePauliX(t *testing.T) {
 	x := gates.NewPauliX()
+	h := gates.NewHadamard()
 
 	// Check name
 	if x.Name() != "PauliX" {
@@ -290,44 +294,47 @@ func TestGatePauliX(t *testing.T) {
 	}
 
 	// Test X on |0⟩ (should give |1⟩)
-	q := qubit.New()
-	err := x.Apply(q)
+	s := state.New(1)
+	err := s.ApplyGate(x, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying X to |0⟩: %v", err)
 	}
 
-	if q.Alpha() != 0.0 || q.Beta() != 1.0 {
-		t.Errorf("X|0⟩ should be |1⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if s.Amplitude(0) != 0.0 || s.Amplitude(1) != 1.0 {
+		t.Errorf("X|0⟩ should be |1⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 
 	// Test X on |1⟩ (should give |0⟩)
-	q, _ = qubit.NewWithValues(0.0, 1.0)
-	err = x.Apply(q)
+	s = state.New(1)
+	s.ApplyGate(x, 0) // Now |1⟩
+	err = s.ApplyGate(x, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying X to |1⟩: %v", err)
 	}
 
-	if q.Alpha() != 1.0 || q.Beta() != 0.0 {
-		t.Errorf("X|1⟩ should be |0⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if s.Amplitude(0) != 1.0 || s.Amplitude(1) != 0.0 {
+		t.Errorf("X|1⟩ should be |0⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 
 	// Test X gate on superposition |+⟩
-	q, _ = qubit.NewWithValues(complex(1/math.Sqrt2, 0), complex(1/math.Sqrt2, 0))
-	err = x.Apply(q)
+	s = state.New(1)
+	s.ApplyGate(h, 0) // Create |+⟩
+	err = s.ApplyGate(x, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying X to |+⟩: %v", err)
 	}
 
 	// X|+⟩ = |+⟩
-	if cmplx.Abs(q.Alpha()-complex(1/math.Sqrt2, 0)) > 1e-10 ||
-		cmplx.Abs(q.Beta()-complex(1/math.Sqrt2, 0)) > 1e-10 {
-		t.Errorf("X|+⟩ should be |+⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if cmplx.Abs(s.Amplitude(0)-complex(1/math.Sqrt2, 0)) > 1e-10 ||
+		cmplx.Abs(s.Amplitude(1)-complex(1/math.Sqrt2, 0)) > 1e-10 {
+		t.Errorf("X|+⟩ should be |+⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 }
 
 // TestGateT tests the T (π/8) gate
 func TestGateT(t *testing.T) {
 	tGate := gates.NewT()
+	x := gates.NewPauliX()
 
 	// Check name
 	if tGate.Name() != "T" {
@@ -335,32 +342,34 @@ func TestGateT(t *testing.T) {
 	}
 
 	// Test T on |0⟩ (should remain |0⟩)
-	q := qubit.New()
-	err := tGate.Apply(q)
+	s := state.New(1)
+	err := s.ApplyGate(tGate, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying T to |0⟩: %v", err)
 	}
 
-	if q.Alpha() != 1.0 || q.Beta() != 0.0 {
-		t.Errorf("T|0⟩ should be |0⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if s.Amplitude(0) != 1.0 || s.Amplitude(1) != 0.0 {
+		t.Errorf("T|0⟩ should be |0⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 
 	// Test T on |1⟩ (should add phase e^(iπ/4))
-	q, _ = qubit.NewWithValues(0.0, 1.0)
-	err = tGate.Apply(q)
+	s = state.New(1)
+	s.ApplyGate(x, 0) // Flip to |1⟩
+	err = s.ApplyGate(tGate, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying T to |1⟩: %v", err)
 	}
 
 	expectedPhase := complex(math.Cos(math.Pi/4), math.Sin(math.Pi/4))
-	if cmplx.Abs(q.Alpha()) > 1e-10 || cmplx.Abs(q.Beta()-expectedPhase) > 1e-10 {
-		t.Errorf("T|1⟩ should be e^(iπ/4)|1⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if cmplx.Abs(s.Amplitude(0)) > 1e-10 || cmplx.Abs(s.Amplitude(1)-expectedPhase) > 1e-10 {
+		t.Errorf("T|1⟩ should be e^(iπ/4)|1⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 
 	// Test 8 applications of T (should return to original state)
-	q, _ = qubit.NewWithValues(0.0, 1.0)
+	s = state.New(1)
+	s.ApplyGate(x, 0) // Flip to |1⟩
 	for i := 0; i < 8; i++ {
-		err = tGate.Apply(q)
+		err = s.ApplyGate(tGate, 0)
 		if err != nil {
 			t.Errorf("Unexpected error in T gate application %d: %v", i, err)
 		}
@@ -368,8 +377,8 @@ func TestGateT(t *testing.T) {
 
 	// Check that we're back to |1⟩ after 8 T gates (modulo global phase)
 	// Due to floating point, we'll check magnitude of α is close to 0 and β close to 1
-	if cmplx.Abs(q.Alpha()) > 1e-10 || math.Abs(cmplx.Abs(q.Beta())-1.0) > 1e-10 {
-		t.Errorf("T⁸|1⟩ should be |1⟩. Got α=%v, β=%v", q.Alpha(), q.Beta())
+	if cmplx.Abs(s.Amplitude(0)) > 1e-10 || math.Abs(cmplx.Abs(s.Amplitude(1))-1.0) > 1e-10 {
+		t.Errorf("T⁸|1⟩ should be |1⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
 	}
 }
 
@@ -557,14 +566,14 @@ func TestInvalidOperations(t *testing.T) {
 	}
 }
 
-// ExampleQubitHadamard demonstrates using the Hadamard gate on a qubit
+// Example_hadamardApply demonstrates using the Hadamard gate on a state
 func Example_hadamardApply() {
-	// Create a new qubit in |0⟩ state
-	q := qubit.New()
+	// Create a new 1-qubit state in |0⟩ state
+	s := state.New(1)
 
-	// Apply Hadamard gate
+	// Apply Hadamard gate using state-vector-first API
 	h := gates.NewHadamard()
-	_ = h.Apply(q)
+	_ = s.ApplyGate(h, 0)
 }
 
 // ExampleBellState demonstrates creating a Bell state

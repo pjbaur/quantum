@@ -19,7 +19,6 @@ import (
 	"math/rand"
 
 	"github.com/pjbaur/quantum/gates"
-	"github.com/pjbaur/quantum/qubit"
 	"github.com/pjbaur/quantum/state"
 )
 
@@ -133,28 +132,28 @@ func QuantumTeleportationDemo() {
 
 	// Step 1: Create the qubit state to teleport
 	// We'll create a random state to make it interesting
-	// angle := rand.Float64() * 2 * 3.14159
-	sourceQubit, err := qubit.NewWithValues(
-		complex(float64(rand.Float64()), 0),
-		complex(float64(rand.Float64()), 0),
-	)
+	sourceState := state.New(1)
+	h := gates.NewHadamard()
 
+	// Create a superposition state
+	err := sourceState.ApplyGate(h, 0)
 	if err != nil {
-		// If random values don't create a normalized state, use a simple superposition
-		h := gates.NewHadamard()
-		sourceQubit = qubit.New()
-		h.Apply(sourceQubit)
+		fmt.Printf("Error preparing source state: %v\n", err)
+		return
 	}
 
 	fmt.Println("1. Preparing source qubit to teleport:")
-	fmt.Printf("   |ψ⟩ = %.4f|0⟩ + %.4f|1⟩\n", sourceQubit.Alpha(), sourceQubit.Beta())
+	fmt.Printf("   |ψ⟩ = %.4f|0⟩ + %.4f|1⟩\n", sourceState.Amplitude(0), sourceState.Amplitude(1))
 	fmt.Printf("   Probabilities: |0⟩=%.2f, |1⟩=%.2f\n",
-		sourceQubit.Probability0(), sourceQubit.Probability1())
+		sourceState.Probability(0), sourceState.Probability(1))
+
+	// Store the original amplitudes for later comparison
+	sourceAlpha := sourceState.Amplitude(0)
+	sourceBeta := sourceState.Amplitude(1)
 
 	// Step 2: Create entangled pair (Bell state) between sender and receiver
 	fmt.Println("\n2. Creating entangled pair between sender and receiver:")
 	entangledPair := state.New(2)
-	h := gates.NewHadamard()
 	cnot := gates.NewCNOT()
 
 	err = entangledPair.ApplyGate(h, 0)
@@ -188,12 +187,13 @@ func QuantumTeleportationDemo() {
 	// Step 5: Receiver applies corrections based on classical bits
 	fmt.Println("\n5. Receiver applies corrections based on classical bits")
 
-	receiverQubit := qubit.New()
+	receiverState := state.New(1)
+	x := gates.NewPauliX()
+	z := gates.NewPauliZ()
 
 	// Apply X gate if needed
 	if senderMeasurement2 == 1 {
-		xGate := gates.NewPauliX()
-		err = xGate.Apply(receiverQubit)
+		err = receiverState.ApplyGate(x, 0)
 		if err != nil {
 			fmt.Printf("Error applying X correction: %v\n", err)
 			return
@@ -203,8 +203,7 @@ func QuantumTeleportationDemo() {
 
 	// Apply Z gate if needed
 	if senderMeasurement1 == 1 {
-		zGate := gates.NewPauliZ()
-		err = zGate.Apply(receiverQubit)
+		err = receiverState.ApplyGate(z, 0)
 		if err != nil {
 			fmt.Printf("Error applying Z correction: %v\n", err)
 			return
@@ -214,19 +213,20 @@ func QuantumTeleportationDemo() {
 
 	// In a real implementation, the receiver's qubit would now match the source
 	// For demonstration, we'll just set it to the original values
-	receiverQubit.Set(sourceQubit.Alpha(), sourceQubit.Beta())
+	receiverState.SetAmplitude(0, sourceAlpha)
+	receiverState.SetAmplitude(1, sourceBeta)
 
 	// Step 6: Verify teleportation success
 	fmt.Println("\n6. Teleportation complete")
 	fmt.Println("   Original qubit:")
-	fmt.Printf("   |ψ⟩ = %.4f|0⟩ + %.4f|1⟩\n", sourceQubit.Alpha(), sourceQubit.Beta())
+	fmt.Printf("   |ψ⟩ = %.4f|0⟩ + %.4f|1⟩\n", sourceAlpha, sourceBeta)
 
 	fmt.Println("   Teleported qubit:")
-	fmt.Printf("   |ψ⟩ = %.4f|0⟩ + %.4f|1⟩\n", receiverQubit.Alpha(), receiverQubit.Beta())
+	fmt.Printf("   |ψ⟩ = %.4f|0⟩ + %.4f|1⟩\n", receiverState.Amplitude(0), receiverState.Amplitude(1))
 
 	// Measure both to show they're the same
-	originalMeasurement := sourceQubit.Measure()
-	teleportedMeasurement := receiverQubit.Measure()
+	originalMeasurement, _ := sourceState.Measure(0)
+	teleportedMeasurement, _ := receiverState.Measure(0)
 
 	fmt.Printf("\n   Original qubit measurement: |%d⟩\n", originalMeasurement)
 	fmt.Printf("   Teleported qubit measurement: |%d⟩\n", teleportedMeasurement)

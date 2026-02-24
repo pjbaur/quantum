@@ -28,12 +28,10 @@ type Qubit interface {
 	Clone() Qubit
 }
 
-// Gate represents a quantum gate operation
+// Gate represents a quantum gate operation.
+// Gates provide metadata (name, matrix) but do not apply themselves directly.
+// Use QuantumState.ApplyGate(gate, targets...) to apply gates to state vectors.
 type Gate interface {
-	// Apply applies the gate to the given qubit
-	// For multi-qubit gates, specific implementations will handle the details
-	Apply(q Qubit) error
-
 	// Name returns the name of the gate
 	Name() string
 
@@ -68,4 +66,15 @@ type QuantumState interface {
 
 	// Clone creates a copy of this quantum state
 	Clone() QuantumState
+}
+
+// BackendCapabilities describes what operations a quantum state backend supports.
+type BackendCapabilities interface {
+	// SupportsGateQubits returns whether this backend can apply gates
+	// operating on the specified number of qubits.
+	SupportsGateQubits(qubitCount int) bool
+
+	// MaxGateQubits returns the maximum number of qubits a gate can operate on.
+	// Returns 0 if there is no limit.
+	MaxGateQubits() int
 }

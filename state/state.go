@@ -68,9 +68,14 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 	s.amplitudes[basisState] = value
 
 	if !s.isNormalized() {
+		// Capture the attempted sum before rollback
+		attemptedSum := s.probabilitySum()
 		// Restore the previous value
 		s.amplitudes[basisState] = oldValue
-		return &quantum.NormalizationError{Sum: s.probabilitySum()}
+		return &quantum.NormalizationError{
+			AttemptedSum: attemptedSum,
+			CurrentSum:   s.probabilitySum(),
+		}
 	}
 
 	return nil

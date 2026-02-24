@@ -34,13 +34,21 @@ func BlochVectorDemo() {
 	fmt.Println("\nBloch Vector Demonstration")
 	fmt.Println("---------------------------")
 
-	q := qubit.New()
-	if err := gates.NewHadamard().Apply(q); err != nil {
+	// Use state-vector-first API to apply gates
+	s := state.New(1)
+	if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
 		fmt.Printf("Hadamard error: %v\n", err)
 		return
 	}
-	if err := gates.NewS().Apply(q); err != nil {
+	if err := s.ApplyGate(gates.NewS(), 0); err != nil {
 		fmt.Printf("S gate error: %v\n", err)
+		return
+	}
+
+	// Create a qubit from the state amplitudes for visualization
+	q, err := qubit.NewWithValues(s.Amplitude(0), s.Amplitude(1))
+	if err != nil {
+		fmt.Printf("Error creating qubit for visualization: %v\n", err)
 		return
 	}
 

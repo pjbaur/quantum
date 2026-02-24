@@ -6,7 +6,6 @@ import (
 	"time"
 
 	"github.com/pjbaur/quantum/gates"
-	"github.com/pjbaur/quantum/qubit"
 	"github.com/pjbaur/quantum/state"
 )
 
@@ -15,26 +14,26 @@ import (
 func HadamardSingleQubitDemo() {
 	fmt.Println("\n=== Hadamard Gate Demonstration ===")
 
-	// Create a new qubit in |0⟩ state
-	q := qubit.New()
-	fmt.Printf("Initial state: |0⟩ (α=%v, β=%v)\n", q.Alpha(), q.Beta())
+	// Create a new 1-qubit state in |0⟩ state
+	s := state.New(1)
+	fmt.Printf("Initial state: |0⟩ (α=%v, β=%v)\n", s.Amplitude(0), s.Amplitude(1))
 
-	// Create and apply Hadamard gate
+	// Create and apply Hadamard gate using state-vector-first API
 	h := gates.NewHadamard()
-	err := h.Apply(q)
+	err := s.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error applying Hadamard gate: %v\n", err)
 		return
 	}
 
-	fmt.Printf("After H: |+⟩ (α=%v, β=%v)\n", q.Alpha(), q.Beta())
+	fmt.Printf("After H: |+⟩ (α=%v, β=%v)\n", s.Amplitude(0), s.Amplitude(1))
 	fmt.Printf("Probabilities: |0⟩=%.2f, |1⟩=%.2f\n",
-		q.Probability0(), q.Probability1())
+		s.Probability(0), s.Probability(1))
 
 	// Perform measurement
-	result := q.Measure()
+	result, _ := s.Measure(0)
 	fmt.Printf("Measurement result: |%d⟩\n", result)
-	fmt.Printf("Final state: (α=%v, β=%v)\n", q.Alpha(), q.Beta())
+	fmt.Printf("Final state: (α=%v, β=%v)\n", s.Amplitude(0), s.Amplitude(1))
 }
 
 // HadamardMultipleQubitsDemo demonstrates Hadamard gates applied to multiple qubits
