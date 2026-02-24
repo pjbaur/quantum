@@ -9,6 +9,25 @@ import (
 	"github.com/pjbaur/quantum/quantum"
 )
 
+// validateIndependentStates checks that all state pointers in the executions
+// are unique. It returns a SharedStateError if any state is shared between
+// multiple executions.
+func validateIndependentStates(executions []Execution) error {
+	seen := make(map[quantum.QuantumState]int)
+	for i, exec := range executions {
+		if exec.State == nil {
+			continue // nil states are caught by executeOne
+		}
+		if firstIdx, exists := seen[exec.State]; exists {
+			return &quantum.SharedStateError{
+				DuplicateIndices: []int{firstIdx, i},
+			}
+		}
+		seen[exec.State] = i
+	}
+	return nil
+}
+
 // Execution pairs a circuit with the state it should operate on.
 // Circuits and states must be independent to safely execute in parallel.
 type Execution struct {
@@ -35,9 +54,18 @@ func ExecuteAll(executions []Execution) error {
 
 // ExecuteAllParallel applies each circuit to its state using worker goroutines.
 // It returns the first error encountered; other executions may still run.
+//
+// SAFETY: All Execution.State values must be unique pointers. Passing the same
+// state to multiple executions will return a SharedStateError before any
+// concurrent execution begins.
 func ExecuteAllParallel(executions []Execution, opts ParallelOptions) error {
 	if len(executions) == 0 {
 		return nil
+	}
+
+	// Validate state independence before parallel execution
+	if err := validateIndependentStates(executions); err != nil {
+		return err
 	}
 
 	workers := opts.MaxParallelism

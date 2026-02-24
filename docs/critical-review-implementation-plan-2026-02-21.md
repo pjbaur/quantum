@@ -99,12 +99,12 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Update inline package docs to warn against legacy single-qubit simulation paths for circuit execution.
 - [x] Add migration notes for downstream callers.
 
-### 1.2 Enforced parallel execution safety (`ws2-concurrency`)
+### 1.2 Enforced parallel execution safety (`ws2-concurrency`) ✅ COMPLETE
 
-- [ ] Update `ExecuteAllParallel` to enforce independence contract at runtime.
-- [ ] Implement duplicate state detection (pointer identity or equivalent robust keying).
-- [ ] Return explicit, actionable error messages on shared-state misuse.
-- [ ] Add fast-path behavior for valid independent states with minimal overhead.
+- [x] Update `ExecuteAllParallel` to enforce independence contract at runtime.
+- [x] Implement duplicate state detection (pointer identity or equivalent robust keying).
+- [x] Return explicit, actionable error messages on shared-state misuse.
+- [x] Add fast-path behavior for valid independent states with minimal overhead.
 
 ### 1.3 Sparse backend compatibility guarantees (`ws3-sparse-backend`)
 
@@ -205,10 +205,10 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### `ws2-concurrency`
 
-- [ ] Enforced `ExecuteAllParallel` contract.
-- [ ] Shared-state misuse detection and explicit errors.
-- [ ] Hazard/race regression tests.
-- [ ] Package docs for concurrency contract.
+- [x] Enforced `ExecuteAllParallel` contract.
+- [x] Shared-state misuse detection and explicit errors.
+- [x] Hazard/race regression tests.
+- [x] Package docs for concurrency contract.
 
 ### `ws3-sparse-backend`
 
@@ -250,7 +250,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 ### Highest-Priority Findings
 
 - [ ] `quantum.Gate` misleading for multi-qubit usage.
-- [ ] Fragile `ExecuteAllParallel` caller contract.
+- [x] Fragile `ExecuteAllParallel` caller contract.
 - [ ] Sparse backend not drop-in for general circuits.
 - [ ] Normalization diagnostics wrong after rollback.
 
@@ -264,14 +264,14 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 ### Test Coverage Gaps
 
 - [ ] Missing negative-path tests for `DeutschJozsa` and `Grover`.
-- [ ] Missing shared-state misuse tests for parallel execution.
+- [x] Missing shared-state misuse tests for parallel execution.
 - [ ] Missing direct tests for `FormatBlochVector` and `BlochCSV`.
 
 ## Suggested PR Sequence
 
 - [x] PR1: Phase 0 decision docs + non-breaking guardrails.
 - [ ] PR2: `ws1-api-core` correctness/API contract updates.
-- [ ] PR3: `ws2-concurrency` enforcement + tests.
+- [x] PR3: `ws2-concurrency` enforcement + tests.
 - [ ] PR4: `ws3-sparse-backend` capability implementation + tests.
 - [ ] PR5: `ws4-algorithms` scalability + negative-path tests.
 - [ ] PR6: `ws5-cli-docs-tests` UX/docs/test fixes.
