@@ -362,3 +362,16 @@ func (s *State) ensureScratch() []complex128 {
 	}
 	return s.scratch
 }
+
+// SupportsGateQubits returns whether this backend can apply gates
+// operating on the specified number of qubits.
+// The dense backend supports all gate sizes (memory permitting).
+func (s *State) SupportsGateQubits(qubitCount int) bool {
+	return qubitCount >= 1
+}
+
+// MaxGateQubits returns the maximum number of qubits a gate can operate on.
+// Returns 0 to indicate no limit (dense backend supports all gate sizes).
+func (s *State) MaxGateQubits() int {
+	return 0
+}

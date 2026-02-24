@@ -8,9 +8,31 @@ import (
 
 	"github.com/pjbaur/quantum/circuit"
 	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/internal/sparsestate"
 	"github.com/pjbaur/quantum/quantum"
 	"github.com/pjbaur/quantum/state"
 )
+
+// mockThreeQubitGate is a test gate that operates on 3 qubits.
+type mockThreeQubitGate struct{}
+
+func newMockThreeQubitGate() *mockThreeQubitGate {
+	return &mockThreeQubitGate{}
+}
+
+func (g *mockThreeQubitGate) Name() string {
+	return "Mock3Qubit"
+}
+
+func (g *mockThreeQubitGate) Matrix() [][]complex128 {
+	// 8x8 identity matrix (3-qubit gate)
+	matrix := make([][]complex128, 8)
+	for i := range matrix {
+		matrix[i] = make([]complex128, 8)
+		matrix[i][i] = 1
+	}
+	return matrix
+}
 
 func TestNewCircuitInvalidQubits(t *testing.T) {
 	_, err := circuit.New(0)
@@ -226,4 +248,129 @@ func ExampleCircuit_nonAdjacentCNOT() {
 
 	s := state.New(3)
 	_ = c.Execute(s)
+}
+
+func TestExecuteWithSparseBackendCapabilityCheck(t *testing.T) {
+	// Test that sparse backend rejects 3-qubit gates during circuit execution
+	c, err := circuit.New(3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Add a 3-qubit gate
+	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+		t.Fatalf("unexpected error adding gate: %v", err)
+	}
+
+	// Sparse backend should fail with UnsupportedOperationError
+	sparse := sparsestate.New(3)
+	err = c.Execute(sparse)
+	if err == nil {
+		t.Fatal("expected error for 3-qubit gate on sparse backend")
+	}
+
+	var unsupportedErr *quantum.UnsupportedOperationError
+	if !errors.As(err, &unsupportedErr) {
+		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	}
+}
+
+func TestExecuteWithDenseBackendCapabilityCheck(t *testing.T) {
+	// Test that dense backend accepts all gate sizes
+	c, err := circuit.New(3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Add a 3-qubit gate
+	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+		t.Fatalf("unexpected error adding gate: %v", err)
+	}
+
+	// Dense backend should succeed
+	dense := state.New(3)
+	err = c.Execute(dense)
+	if err != nil {
+		t.Fatalf("unexpected error on dense backend: %v", err)
+	}
+}
+
+func TestCheckBackendCapabilities(t *testing.T) {
+	// Test explicit capability checking
+	c, err := circuit.New(3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+		t.Fatalf("unexpected error adding gate: %v", err)
+	}
+
+	// Check sparse backend - should fail
+	sparse := sparsestate.New(3)
+	err = c.CheckBackendCapabilities(sparse)
+	if err == nil {
+		t.Fatal("expected error checking sparse backend capabilities")
+	}
+
+	var unsupportedErr *quantum.UnsupportedOperationError
+	if !errors.As(err, &unsupportedErr) {
+		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	}
+
+	// Check dense backend - should succeed
+	dense := state.New(3)
+	err = c.CheckBackendCapabilities(dense)
+	if err != nil {
+		t.Fatalf("unexpected error checking dense backend capabilities: %v", err)
+	}
+}
+
+func TestCheckBackendCapabilitiesNil(t *testing.T) {
+	c, err := circuit.New(1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	err = c.CheckBackendCapabilities(nil)
+	if err == nil {
+		t.Fatal("expected error for nil capabilities")
+	}
+}
+
+func TestCircuitWithMixedGatesCapabilityCheck(t *testing.T) {
+	// Test circuit with mix of 1, 2, and 3-qubit gates
+	c, err := circuit.New(3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	if err := c.AddGate(gates.NewHadamard(), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Sparse should fail on the 3-qubit gate
+	sparse := sparsestate.New(3)
+	err = c.Execute(sparse)
+	if err == nil {
+		t.Fatal("expected error for 3-qubit gate on sparse backend")
+	}
+
+	var unsupportedErr *quantum.UnsupportedOperationError
+	if !errors.As(err, &unsupportedErr) {
+		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	}
+
+	// Dense should succeed
+	dense := state.New(3)
+	err = c.Execute(dense)
+	if err != nil {
+		t.Fatalf("unexpected error on dense backend: %v", err)
+	}
 }

@@ -258,3 +258,38 @@ func assertNormalized(t *testing.T, qs quantum.QuantumState) {
 		t.Fatalf("expected normalized state, probability sum = %v", sum)
 	}
 }
+
+func TestDenseBackendCapabilities(t *testing.T) {
+	s := state.New(3)
+
+	// Test SupportsGateQubits - dense backend supports all gate sizes
+	if !s.SupportsGateQubits(1) {
+		t.Error("expected dense backend to support 1-qubit gates")
+	}
+	if !s.SupportsGateQubits(2) {
+		t.Error("expected dense backend to support 2-qubit gates")
+	}
+	if !s.SupportsGateQubits(3) {
+		t.Error("expected dense backend to support 3-qubit gates")
+	}
+	if !s.SupportsGateQubits(4) {
+		t.Error("expected dense backend to support 4-qubit gates")
+	}
+	if s.SupportsGateQubits(0) {
+		t.Error("expected dense backend to NOT support 0-qubit gates")
+	}
+	if s.SupportsGateQubits(-1) {
+		t.Error("expected dense backend to NOT support negative qubit counts")
+	}
+
+	// Test MaxGateQubits - 0 means no limit
+	if max := s.MaxGateQubits(); max != 0 {
+		t.Errorf("expected MaxGateQubits=0 (no limit), got %d", max)
+	}
+}
+
+func TestDenseGateInterfaceAssertion(t *testing.T) {
+	// Verify State implements both QuantumState and BackendCapabilities
+	var _ quantum.QuantumState = state.New(1)
+	var _ quantum.BackendCapabilities = state.New(1)
+}
