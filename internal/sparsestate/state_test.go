@@ -13,6 +13,27 @@ import (
 
 const tolerance = 1e-10
 
+// mockThreeQubitGate is a test gate that operates on 3 qubits.
+type mockThreeQubitGate struct{}
+
+func newMockThreeQubitGate() *mockThreeQubitGate {
+	return &mockThreeQubitGate{}
+}
+
+func (g *mockThreeQubitGate) Name() string {
+	return "Mock3Qubit"
+}
+
+func (g *mockThreeQubitGate) Matrix() [][]complex128 {
+	// 8x8 identity matrix (3-qubit gate)
+	matrix := make([][]complex128, 8)
+	for i := range matrix {
+		matrix[i] = make([]complex128, 8)
+		matrix[i][i] = 1
+	}
+	return matrix
+}
+
 func TestSparseSingleQubitMatchesDense(t *testing.T) {
 	tests := []struct {
 		name      string
@@ -242,4 +263,59 @@ func assertStatesMatch(t *testing.T, dense quantum.QuantumState, sparse quantum.
 			t.Fatalf("probability mismatch at %d: dense=%v sparse=%v", i, denseProb, sparseProb)
 		}
 	}
+}
+
+func TestSparseBackendCapabilities(t *testing.T) {
+	sparse := New(3)
+
+	// Test SupportsGateQubits
+	if !sparse.SupportsGateQubits(1) {
+		t.Error("expected sparse backend to support 1-qubit gates")
+	}
+	if !sparse.SupportsGateQubits(2) {
+		t.Error("expected sparse backend to support 2-qubit gates")
+	}
+	if sparse.SupportsGateQubits(3) {
+		t.Error("expected sparse backend to NOT support 3-qubit gates")
+	}
+	if sparse.SupportsGateQubits(4) {
+		t.Error("expected sparse backend to NOT support 4-qubit gates")
+	}
+	if sparse.SupportsGateQubits(0) {
+		t.Error("expected sparse backend to NOT support 0-qubit gates")
+	}
+
+	// Test MaxGateQubits
+	if max := sparse.MaxGateQubits(); max != 2 {
+		t.Errorf("expected MaxGateQubits=2, got %d", max)
+	}
+}
+
+func TestSparseUnsupportedGateError(t *testing.T) {
+	sparse := New(3)
+	gate := newMockThreeQubitGate()
+
+	err := sparse.ApplyGate(gate, 0, 1, 2)
+	if err == nil {
+		t.Fatal("expected error for 3-qubit gate on sparse backend")
+	}
+
+	var unsupportedErr *quantum.UnsupportedOperationError
+	if !errors.As(err, &unsupportedErr) {
+		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	}
+
+	// Verify error message contains useful information
+	if unsupportedErr.Backend != "sparse" {
+		t.Errorf("expected Backend='sparse', got '%s'", unsupportedErr.Backend)
+	}
+	if unsupportedErr.Alternative == "" {
+		t.Error("expected Alternative to be non-empty")
+	}
+}
+
+func TestSparseGateInterfaceAssertion(t *testing.T) {
+	// Verify State implements both QuantumState and BackendCapabilities
+	var _ quantum.QuantumState = New(1)
+	var _ quantum.BackendCapabilities = New(1)
 }

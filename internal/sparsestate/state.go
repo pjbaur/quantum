@@ -111,10 +111,11 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 		return s.applyTwoQubitGate(gate, targets)
 	}
 
-	return &quantum.InvalidGateApplicationError{
-		Gate:        gate.Name(),
-		RequiredLen: requiredQubits,
-		ActualLen:   len(targets),
+	// 3+ qubit gates are not supported by the sparse backend
+	return &quantum.UnsupportedOperationError{
+		Operation:   fmt.Sprintf("%d-qubit gate application", requiredQubits),
+		Backend:     "sparse",
+		Alternative: "dense state backend (state.State)",
 	}
 }
 
@@ -345,4 +346,17 @@ func (s *State) setAmplitudeUnsafe(basisState int, value complex128) {
 
 func isNearZero(value complex128) bool {
 	return cmplx.Abs(value) <= pruneEpsilon
+}
+
+// SupportsGateQubits returns whether this backend can apply gates
+// operating on the specified number of qubits.
+// The sparse backend supports 1- and 2-qubit gates only.
+func (s *State) SupportsGateQubits(qubitCount int) bool {
+	return qubitCount >= 1 && qubitCount <= 2
+}
+
+// MaxGateQubits returns the maximum number of qubits a gate can operate on.
+// The sparse backend supports at most 2-qubit gates.
+func (s *State) MaxGateQubits() int {
+	return 2
 }

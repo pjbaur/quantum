@@ -128,6 +128,7 @@ func (c *Circuit) Compose(other *Circuit) (*Circuit, error) {
 }
 
 // Execute applies the circuit's operations to the provided quantum state.
+// If the state implements BackendCapabilities, it checks compatibility first.
 func (c *Circuit) Execute(state quantum.QuantumState) error {
 	if c == nil {
 		return errors.New("circuit is nil")
@@ -142,6 +143,13 @@ func (c *Circuit) Execute(state quantum.QuantumState) error {
 		}
 	}
 
+	// Check backend capabilities before execution if supported
+	if caps, ok := state.(quantum.BackendCapabilities); ok {
+		if err := c.checkCapabilities(caps); err != nil {
+			return err
+		}
+	}
+
 	for _, operation := range c.operations {
 		if err := state.ApplyGate(operation.Gate, operation.Targets...); err != nil {
 			return err
@@ -149,6 +157,38 @@ func (c *Circuit) Execute(state quantum.QuantumState) error {
 	}
 
 	return nil
+}
+
+// checkCapabilities verifies that all operations in the circuit can be
+// executed by a backend with the given capabilities.
+func (c *Circuit) checkCapabilities(caps quantum.BackendCapabilities) error {
+	for _, operation := range c.operations {
+		required, err := gateQubitCount(operation.Gate)
+		if err != nil {
+			return err
+		}
+		if !caps.SupportsGateQubits(required) {
+			return &quantum.UnsupportedOperationError{
+				Operation:   fmt.Sprintf("%d-qubit gate (%s)", required, operation.Gate.Name()),
+				Backend:     "current backend",
+				Alternative: "dense state backend (state.State)",
+			}
+		}
+	}
+	return nil
+}
+
+// CheckBackendCapabilities checks whether a backend with the given capabilities
+// can execute this circuit. This allows early detection of compatibility issues
+// before execution begins.
+func (c *Circuit) CheckBackendCapabilities(caps quantum.BackendCapabilities) error {
+	if c == nil {
+		return errors.New("circuit is nil")
+	}
+	if caps == nil {
+		return errors.New("capabilities is nil")
+	}
+	return c.checkCapabilities(caps)
 }
 
 func gateQubitCount(gate quantum.Gate) (int, error) {

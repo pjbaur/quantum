@@ -106,13 +106,13 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Return explicit, actionable error messages on shared-state misuse.
 - [x] Add fast-path behavior for valid independent states with minimal overhead.
 
-### 1.3 Sparse backend compatibility guarantees (`ws3-sparse-backend`)
+### 1.3 Sparse backend compatibility guarantees (`ws3-sparse-backend`) ✅ COMPLETE
 
-- [ ] Implement chosen sparse strategy from Phase 0:
-- [ ] If generic support: add k-qubit gate application path and validation.
-- [ ] If explicit limits: add capability interface/checks and fail early during planning/execution.
-- [ ] Ensure circuit execution path does not silently proceed into unsupported sparse operations.
-- [ ] Add backend capability documentation and examples.
+- [x] Implement chosen sparse strategy from Phase 0:
+- [x] If generic support: add k-qubit gate application path and validation.
+- [x] If explicit limits: add capability interface/checks and fail early during planning/execution.
+- [x] Ensure circuit execution path does not silently proceed into unsupported sparse operations.
+- [x] Add backend capability documentation and examples.
 
 ### 1.4 Correct normalization diagnostics and rollback reporting (`ws1-api-core` + `ws3-sparse-backend`) ✅ COMPLETE
 
@@ -212,10 +212,10 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### `ws3-sparse-backend`
 
-- [ ] Sparse capability strategy implementation (generic support or explicit contract).
-- [ ] Early failure hooks for unsupported gates.
-- [ ] Normalization diagnostics fix (sparse side).
-- [ ] Sparse backend docs/tests aligned with selected capability model.
+- [x] Sparse capability strategy implementation (generic support or explicit contract).
+- [x] Early failure hooks for unsupported gates.
+- [x] Normalization diagnostics fix (sparse side).
+- [x] Sparse backend docs/tests aligned with selected capability model.
 
 ### `ws4-algorithms`
 
@@ -251,8 +251,8 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 - [ ] `quantum.Gate` misleading for multi-qubit usage.
 - [x] Fragile `ExecuteAllParallel` caller contract.
-- [ ] Sparse backend not drop-in for general circuits.
-- [ ] Normalization diagnostics wrong after rollback.
+- [x] Sparse backend not drop-in for general circuits.
+- [x] Normalization diagnostics wrong after rollback.
 
 ### Medium-Priority Findings
 
@@ -272,7 +272,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] PR1: Phase 0 decision docs + non-breaking guardrails.
 - [ ] PR2: `ws1-api-core` correctness/API contract updates.
 - [x] PR3: `ws2-concurrency` enforcement + tests.
-- [ ] PR4: `ws3-sparse-backend` capability implementation + tests.
+- [x] PR4: `ws3-sparse-backend` capability implementation + tests.
 - [ ] PR5: `ws4-algorithms` scalability + negative-path tests.
 - [ ] PR6: `ws5-cli-docs-tests` UX/docs/test fixes.
 - [ ] PR7: `ws6-integration` final merge, verification, and closure report.
