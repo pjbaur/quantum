@@ -121,11 +121,11 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Ensure error payloads and messages are consistent across dense/sparse implementations.
 - [x] Add precise tests asserting attempted-vs-post-rollback sums.
 
-### 1.5 Constructor invalid-input consistency (`ws1-api-core` + `ws3-sparse-backend`)
+### 1.5 Constructor invalid-input consistency (`ws1-api-core` + `ws3-sparse-backend`) ✅ COMPLETE
 
-- [ ] Align `state.New`, sparse `New`, and `circuit.New` behavior for invalid qubit counts.
-- [ ] Add consistent error type/message semantics across constructors.
-- [ ] Update call sites and tests to match the standardized behavior.
+- [x] Align `state.New`, sparse `New`, and `circuit.New` behavior for invalid qubit counts.
+- [x] Add consistent error type/message semantics across constructors.
+- [x] Update call sites and tests to match the standardized behavior.
 
 ## Phase 2: Medium-Priority Maintainability and UX
 

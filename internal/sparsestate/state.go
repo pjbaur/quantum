@@ -21,15 +21,19 @@ type State struct {
 
 // New creates a new sparse quantum state with the specified number of qubits.
 // All qubits are initialized to |0⟩.
-func New(numQubits int) *State {
+// Returns InvalidQubitCountError if numQubits <= 0.
+func New(numQubits int) (*State, error) {
 	if numQubits <= 0 {
-		numQubits = 1
+		return nil, &quantum.InvalidQubitCountError{
+			Requested: numQubits,
+			Reason:    "must be positive",
+		}
 	}
 
 	return &State{
 		numQubits:  numQubits,
 		amplitudes: map[int]complex128{0: 1},
-	}
+	}, nil
 }
 
 // NumQubits returns the number of qubits in the state.

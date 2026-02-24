@@ -8,8 +8,14 @@ import (
 )
 
 func TestDecomposeSwapMatchesSwapGate(t *testing.T) {
-	swapState := state.New(2)
-	decomposedState := state.New(2)
+	swapState, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	decomposedState, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 
 	if err := swapState.ApplyGate(NewHadamard(), 0); err != nil {
 		t.Fatalf("apply hadamard: %v", err)

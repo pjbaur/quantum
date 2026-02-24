@@ -27,13 +27,17 @@ func BellStateCreationDemo() {
 	fmt.Println("\n=== Bell State Creation Demonstration ===")
 
 	// Create a quantum state with 2 qubits (|00⟩ initially)
-	s := state.New(2)
+	s, err := state.New(2)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	fmt.Println("Initial state: |00⟩")
 	printState(s)
 
 	// Apply Hadamard to the first qubit
 	h := gates.NewHadamard()
-	err := s.ApplyGate(h, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error applying Hadamard gate: %v\n", err)
 		return
@@ -83,11 +87,15 @@ func BellCorrelationDemo() {
 
 	for i := 0; i < trials; i++ {
 		// Create a new Bell state each time
-		s := state.New(2)
+		s, err := state.New(2)
+		if err != nil {
+			fmt.Printf("Error creating state in trial %d: %v\n", i, err)
+			continue
+		}
 
 		// Apply Hadamard to first qubit
 		h := gates.NewHadamard()
-		err := s.ApplyGate(h, 0)
+		err = s.ApplyGate(h, 0)
 		if err != nil {
 			fmt.Printf("Error in trial %d: %v\n", i, err)
 			continue
@@ -132,11 +140,15 @@ func QuantumTeleportationDemo() {
 
 	// Step 1: Create the qubit state to teleport
 	// We'll create a random state to make it interesting
-	sourceState := state.New(1)
+	sourceState, err := state.New(1)
+	if err != nil {
+		fmt.Printf("Error creating source state: %v\n", err)
+		return
+	}
 	h := gates.NewHadamard()
 
 	// Create a superposition state
-	err := sourceState.ApplyGate(h, 0)
+	err = sourceState.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error preparing source state: %v\n", err)
 		return
@@ -153,7 +165,11 @@ func QuantumTeleportationDemo() {
 
 	// Step 2: Create entangled pair (Bell state) between sender and receiver
 	fmt.Println("\n2. Creating entangled pair between sender and receiver:")
-	entangledPair := state.New(2)
+	entangledPair, err := state.New(2)
+	if err != nil {
+		fmt.Printf("Error creating entangled pair: %v\n", err)
+		return
+	}
 	cnot := gates.NewCNOT()
 
 	err = entangledPair.ApplyGate(h, 0)
@@ -187,7 +203,11 @@ func QuantumTeleportationDemo() {
 	// Step 5: Receiver applies corrections based on classical bits
 	fmt.Println("\n5. Receiver applies corrections based on classical bits")
 
-	receiverState := state.New(1)
+	receiverState, err := state.New(1)
+	if err != nil {
+		fmt.Printf("Error creating receiver state: %v\n", err)
+		return
+	}
 	x := gates.NewPauliX()
 	z := gates.NewPauliZ()
 

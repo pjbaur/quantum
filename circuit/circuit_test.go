@@ -17,6 +17,14 @@ func TestNewCircuitInvalidQubits(t *testing.T) {
 	if err == nil {
 		t.Fatalf("expected error for invalid qubit count")
 	}
+
+	var targetErr *quantum.InvalidQubitCountError
+	if !errors.As(err, &targetErr) {
+		t.Fatalf("expected InvalidQubitCountError, got %T", err)
+	}
+	if targetErr.Requested != 0 {
+		t.Fatalf("expected Requested=0, got %d", targetErr.Requested)
+	}
 }
 
 func TestAddGateTargetValidation(t *testing.T) {
@@ -63,7 +71,10 @@ func TestExecuteAppliesOperations(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	if err := c.Execute(s); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -121,7 +132,10 @@ func TestExecuteMultiQubitCircuits(t *testing.T) {
 				t.Fatalf("setup failed: %v", err)
 			}
 
-			s := state.New(tt.numQubits)
+			s, err := state.New(tt.numQubits)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
 			if err := c.Execute(s); err != nil {
 				t.Fatalf("unexpected error: %v", err)
 			}
@@ -163,7 +177,10 @@ func TestComposeAndAppend(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	if err := composed.Execute(s); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -174,7 +191,10 @@ func TestComposeAndAppend(t *testing.T) {
 	if err := c1.Append(c2); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	s = state.New(1)
+	s, err = state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	if err := c1.Execute(s); err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
@@ -189,7 +209,10 @@ func TestExecuteQubitMismatch(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	err = c.Execute(s)
 	if err == nil {
 		t.Fatalf("expected error for mismatched qubit count")
@@ -206,7 +229,7 @@ func ExampleCircuit() {
 	_ = c.AddGate(gates.NewHadamard(), 0)
 	_ = c.AddGate(gates.NewPauliX(), 0)
 
-	s := state.New(1)
+	s, _ := state.New(1)
 	_ = c.Execute(s)
 }
 
@@ -215,7 +238,7 @@ func ExampleCircuit_bellState() {
 	_ = c.AddGate(gates.NewHadamard(), 0)
 	_ = c.AddGate(gates.NewCNOT(), 0, 1)
 
-	s := state.New(2)
+	s, _ := state.New(2)
 	_ = c.Execute(s)
 }
 
@@ -224,6 +247,6 @@ func ExampleCircuit_nonAdjacentCNOT() {
 	_ = c.AddGate(gates.NewHadamard(), 0)
 	_ = c.AddGate(gates.NewCNOT(), 0, 2)
 
-	s := state.New(3)
+	s, _ := state.New(3)
 	_ = c.Execute(s)
 }

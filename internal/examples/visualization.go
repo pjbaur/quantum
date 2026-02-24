@@ -14,7 +14,11 @@ func StateViewDemo() {
 	fmt.Println("\nState View Demonstration")
 	fmt.Println("-------------------------")
 
-	s := state.New(2)
+	s, err := state.New(2)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
 		fmt.Printf("Hadamard error: %v\n", err)
 		return
@@ -35,7 +39,11 @@ func BlochVectorDemo() {
 	fmt.Println("---------------------------")
 
 	// Use state-vector-first API to apply gates
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
 		fmt.Printf("Hadamard error: %v\n", err)
 		return

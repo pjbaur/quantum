@@ -17,7 +17,10 @@ func BenchmarkCircuitExecute(b *testing.B) {
 	b.ReportAllocs()
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
-		qState := state.New(10)
+		qState, err := state.New(10)
+		if err != nil {
+			b.Fatal(err)
+		}
 		if err := circuit.Execute(qState); err != nil {
 			b.Fatal(err)
 		}
@@ -44,7 +47,7 @@ func BenchmarkCircuitExecuteBatch(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := range executions {
-			executions[j].State = state.New(10)
+			executions[j].State, _ = state.New(10)
 		}
 		if err := ExecuteAll(executions); err != nil {
 			b.Fatal(err)
@@ -74,7 +77,7 @@ func BenchmarkCircuitExecuteBatchParallel(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		for j := range executions {
-			executions[j].State = state.New(10)
+			executions[j].State, _ = state.New(10)
 		}
 		if err := ExecuteAllParallel(executions, opts); err != nil {
 			b.Fatal(err)

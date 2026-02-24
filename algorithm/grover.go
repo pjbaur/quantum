@@ -26,7 +26,10 @@ func Grover(numQubits int, marked []int) (*state.State, error) {
 	}
 
 	hGate := gates.NewHadamard()
-	search := state.New(numQubits)
+	search, err := state.New(numQubits)
+	if err != nil {
+		return nil, err
+	}
 	for i := 0; i < numQubits; i++ {
 		if err := search.ApplyGate(hGate, i); err != nil {
 			return nil, err

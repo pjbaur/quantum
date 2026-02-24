@@ -19,10 +19,15 @@ func TestExecuteAllAppliesCircuits(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	states := []*state.State{
-		state.New(1),
-		state.New(1),
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
 	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	states := []*state.State{s1, s2}
 	executions := []circuit.Execution{
 		{Circuit: c, State: states[0]},
 		{Circuit: c, State: states[1]},
@@ -48,11 +53,19 @@ func TestExecuteAllParallelAppliesCircuits(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	states := []*state.State{
-		state.New(1),
-		state.New(1),
-		state.New(1),
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
 	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s3, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	states := []*state.State{s1, s2, s3}
 	executions := []circuit.Execution{
 		{Circuit: c, State: states[0]},
 		{Circuit: c, State: states[1]},
@@ -72,12 +85,15 @@ func TestExecuteAllParallelAppliesCircuits(t *testing.T) {
 }
 
 func TestExecuteAllParallelReportsError(t *testing.T) {
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	executions := []circuit.Execution{
 		{Circuit: nil, State: s},
 	}
 
-	err := circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 2})
+	err = circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 2})
 	if err == nil {
 		t.Fatalf("expected error")
 	}

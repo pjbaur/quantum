@@ -21,11 +21,15 @@ type State struct {
 	outputs    []complex128
 }
 
-// New creates a new quantum state with the specified number of qubits
-// All qubits are initialized to |0⟩
-func New(numQubits int) *State {
+// New creates a new quantum state with the specified number of qubits.
+// All qubits are initialized to |0⟩.
+// Returns InvalidQubitCountError if numQubits <= 0.
+func New(numQubits int) (*State, error) {
 	if numQubits <= 0 {
-		numQubits = 1
+		return nil, &quantum.InvalidQubitCountError{
+			Requested: numQubits,
+			Reason:    "must be positive",
+		}
 	}
 
 	// Allocate 2^n amplitudes
@@ -38,7 +42,7 @@ func New(numQubits int) *State {
 	return &State{
 		numQubits:  numQubits,
 		amplitudes: amplitudes,
-	}
+	}, nil
 }
 
 // NumQubits returns the number of qubits in the state

@@ -46,8 +46,14 @@ func TestSparseSingleQubitMatchesDense(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dense := state.New(tt.numQubits)
-			sparse := New(tt.numQubits)
+			dense, err := state.New(tt.numQubits)
+			if err != nil {
+				t.Fatalf("dense state.New failed: %v", err)
+			}
+			sparse, err := New(tt.numQubits)
+			if err != nil {
+				t.Fatalf("sparse New failed: %v", err)
+			}
 
 			if tt.setup != nil {
 				if err := tt.setup(dense); err != nil {
@@ -71,8 +77,14 @@ func TestSparseSingleQubitMatchesDense(t *testing.T) {
 }
 
 func TestSparseCNOTMatchesDense(t *testing.T) {
-	dense := state.New(3)
-	sparse := New(3)
+	dense, err := state.New(3)
+	if err != nil {
+		t.Fatalf("dense state.New failed: %v", err)
+	}
+	sparse, err := New(3)
+	if err != nil {
+		t.Fatalf("sparse New failed: %v", err)
+	}
 
 	if err := dense.ApplyGate(gates.NewHadamard(), 1); err != nil {
 		t.Fatalf("dense ApplyGate failed: %v", err)
@@ -92,8 +104,14 @@ func TestSparseCNOTMatchesDense(t *testing.T) {
 }
 
 func TestSparseSwapMatchesDense(t *testing.T) {
-	dense := state.New(2)
-	sparse := New(2)
+	dense, err := state.New(2)
+	if err != nil {
+		t.Fatalf("dense state.New failed: %v", err)
+	}
+	sparse, err := New(2)
+	if err != nil {
+		t.Fatalf("sparse New failed: %v", err)
+	}
 
 	if err := dense.ApplyGate(gates.NewPauliX(), 0); err != nil {
 		t.Fatalf("dense ApplyGate failed: %v", err)
@@ -187,8 +205,14 @@ func TestSparseTwoQubitTargetOrderingMatchesDense(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			dense := state.New(tt.numQubits)
-			sparse := New(tt.numQubits)
+			dense, err := state.New(tt.numQubits)
+			if err != nil {
+				t.Fatalf("dense state.New failed: %v", err)
+			}
+			sparse, err := New(tt.numQubits)
+			if err != nil {
+				t.Fatalf("sparse New failed: %v", err)
+			}
 
 			if tt.setup != nil {
 				if err := tt.setup(dense); err != nil {
@@ -212,7 +236,10 @@ func TestSparseTwoQubitTargetOrderingMatchesDense(t *testing.T) {
 }
 
 func TestSparseSetAmplitudeNormalization(t *testing.T) {
-	sparse := New(2)
+	sparse, err := New(2)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
 
 	if err := sparse.SetAmplitude(0, complex(0.25, 0)); err == nil {
 		t.Fatalf("expected normalization error, got nil")
@@ -241,5 +268,56 @@ func assertStatesMatch(t *testing.T, dense quantum.QuantumState, sparse quantum.
 		if math.Abs(denseProb-sparseProb) > tolerance {
 			t.Fatalf("probability mismatch at %d: dense=%v sparse=%v", i, denseProb, sparseProb)
 		}
+	}
+}
+
+func TestNewInvalidQubitCount(t *testing.T) {
+	tests := []struct {
+		name      string
+		numQubits int
+		errCheck  func(error) bool
+	}{
+		{
+			name:      "zero qubits",
+			numQubits: 0,
+			errCheck: func(err error) bool {
+				var targetErr *quantum.InvalidQubitCountError
+				return errors.As(err, &targetErr) &&
+					targetErr.Requested == 0 &&
+					targetErr.Reason == "must be positive"
+			},
+		},
+		{
+			name:      "negative qubits",
+			numQubits: -1,
+			errCheck: func(err error) bool {
+				var targetErr *quantum.InvalidQubitCountError
+				return errors.As(err, &targetErr) &&
+					targetErr.Requested == -1 &&
+					targetErr.Reason == "must be positive"
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := New(tt.numQubits)
+			if err == nil {
+				t.Fatalf("expected error for %d qubits, got nil", tt.numQubits)
+			}
+			if !tt.errCheck(err) {
+				t.Fatalf("unexpected error: %T: %v", err, err)
+			}
+		})
+	}
+}
+
+func TestNewValidQubitCount(t *testing.T) {
+	s, err := New(3)
+	if err != nil {
+		t.Fatalf("expected no error for 3 qubits, got: %v", err)
+	}
+	if s.NumQubits() != 3 {
+		t.Fatalf("expected 3 qubits, got %d", s.NumQubits())
 	}
 }

@@ -9,7 +9,7 @@ import (
 )
 
 func BenchmarkApplySingleQubitGate(b *testing.B) {
-	state := New(12)
+	state, _ := New(12)
 	gate := gates.NewHadamard()
 
 	b.ReportAllocs()
@@ -22,7 +22,7 @@ func BenchmarkApplySingleQubitGate(b *testing.B) {
 }
 
 func BenchmarkApplyMultiQubitGate(b *testing.B) {
-	state := New(12)
+	state, _ := New(12)
 	gate := gates.NewCNOT()
 
 	b.ReportAllocs()
@@ -63,7 +63,7 @@ func (g *denseTwoQubitGate) Matrix() [][]complex128 {
 }
 
 func BenchmarkApplyGenericTwoQubitGate(b *testing.B) {
-	state := New(12)
+	state, _ := New(12)
 	gate := newDenseTwoQubitGate()
 
 	b.ReportAllocs()
@@ -82,7 +82,7 @@ func BenchmarkMeasure(b *testing.B) {
 	b.ResetTimer()
 	for i := 0; i < b.N; i++ {
 		b.StopTimer()
-		state := New(12)
+		state, _ := New(12)
 		if err := state.ApplyGate(gate, 0); err != nil {
 			b.Fatal(err)
 		}
@@ -94,7 +94,7 @@ func BenchmarkMeasure(b *testing.B) {
 }
 
 func BenchmarkClone(b *testing.B) {
-	state := New(12)
+	state, _ := New(12)
 
 	b.ReportAllocs()
 	b.ResetTimer()

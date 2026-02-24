@@ -9,7 +9,10 @@ import (
 )
 
 func TestFormatStateViewIncludesHeaderAndEntry(t *testing.T) {
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	opts := visualization.StateViewOptions{
 		MinProbability: 0.1,
 		Precision:      2,

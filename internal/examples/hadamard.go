@@ -15,12 +15,16 @@ func HadamardSingleQubitDemo() {
 	fmt.Println("\n=== Hadamard Gate Demonstration ===")
 
 	// Create a new 1-qubit state in |0⟩ state
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	fmt.Printf("Initial state: |0⟩ (α=%v, β=%v)\n", s.Amplitude(0), s.Amplitude(1))
 
 	// Create and apply Hadamard gate using state-vector-first API
 	h := gates.NewHadamard()
-	err := s.ApplyGate(h, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error applying Hadamard gate: %v\n", err)
 		return
@@ -46,7 +50,11 @@ func HadamardMultipleQubitsDemo() {
 
 	for i := 0; i < trials; i++ {
 		// Create a new quantum state with n qubits
-		s := state.New(nQubits)
+		s, err := state.New(nQubits)
+		if err != nil {
+			fmt.Printf("Error creating state: %v\n", err)
+			return
+		}
 		h := gates.NewHadamard()
 
 		fmt.Printf("\nTrial %d:\n", i+1)
@@ -95,7 +103,11 @@ func HadamardProbabilityDistribution() {
 	fmt.Printf("Running %d trials with %d qubits\n", trials, nQubits)
 
 	for i := 0; i < trials; i++ {
-		s := state.New(nQubits)
+		s, err := state.New(nQubits)
+		if err != nil {
+			fmt.Printf("Error creating state: %v\n", err)
+			return
+		}
 		h := gates.NewHadamard()
 
 		// Apply Hadamard to all qubits
@@ -149,7 +161,12 @@ func GenerateRandomNumber(maxNumber int) int {
 	}
 
 	// Create quantum state
-	s := state.New(nQubits)
+	s, err := state.New(nQubits)
+	if err != nil {
+		// In case of error, fall back to classic random
+		fmt.Printf("Error creating state: %v\n", err)
+		return rand.Intn(maxNumber)
+	}
 	h := gates.NewHadamard()
 
 	// Apply Hadamard to all qubits to create superposition
