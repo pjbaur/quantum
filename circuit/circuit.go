@@ -22,9 +22,13 @@ type Circuit struct {
 }
 
 // New creates a circuit for the specified number of qubits.
+// Returns InvalidQubitCountError if numQubits <= 0.
 func New(numQubits int) (*Circuit, error) {
 	if numQubits <= 0 {
-		return nil, fmt.Errorf("numQubits must be positive")
+		return nil, &quantum.InvalidQubitCountError{
+			Requested: numQubits,
+			Reason:    "must be positive",
+		}
 	}
 
 	return &Circuit{

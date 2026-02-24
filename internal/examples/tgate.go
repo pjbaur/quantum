@@ -15,9 +15,13 @@ func TGateSingleQubitDemo() {
 	fmt.Println("\n=== T Gate Demonstration ===")
 
 	// Create a 1-qubit state and apply Hadamard to create superposition
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	h := gates.NewHadamard()
-	err := s.ApplyGate(h, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error applying Hadamard gate: %v\n", err)
 		return
@@ -58,9 +62,13 @@ func TGatePhaseRotationDemo() {
 	fmt.Println("\n=== T Gate Phase Rotation Demonstration ===")
 
 	// Create a 1-qubit state and apply Hadamard to create superposition
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	h := gates.NewHadamard()
-	err := s.ApplyGate(h, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error creating superposition: %v\n", err)
 		return
@@ -105,7 +113,11 @@ func TGateMultiQubitDemo() {
 	fmt.Println("\n=== T Gate in Multi-Qubit System ===")
 
 	// Create a 2-qubit system
-	s := state.New(2)
+	s, err := state.New(2)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	h := gates.NewHadamard()
 	t := gates.NewT()
 
@@ -122,9 +134,9 @@ func TGateMultiQubitDemo() {
 	printState(s)
 
 	// Apply T gate to first qubit
-	err := s.ApplyGate(t, 0)
-	if err != nil {
-		fmt.Printf("Error applying T gate: %v\n", err)
+	tErr := s.ApplyGate(t, 0)
+	if tErr != nil {
+		fmt.Printf("Error applying T gate: %v\n", tErr)
 		return
 	}
 
@@ -132,9 +144,9 @@ func TGateMultiQubitDemo() {
 	printState(s)
 
 	// Apply T gate to second qubit
-	err = s.ApplyGate(t, 1)
-	if err != nil {
-		fmt.Printf("Error applying T gate: %v\n", err)
+	tErr = s.ApplyGate(t, 1)
+	if tErr != nil {
+		fmt.Printf("Error applying T gate: %v\n", tErr)
 		return
 	}
 
@@ -160,15 +172,23 @@ func TGateVsHadamardDemo() {
 	fmt.Println("\n=== T Gate vs. Hadamard Comparison ===")
 
 	// Initialize two 1-qubit states
-	s1 := state.New(1) // For T gate demo
-	s2 := state.New(1) // For Hadamard demo
+	s1, err := state.New(1) // For T gate demo
+	if err != nil {
+		fmt.Printf("Error creating state s1: %v\n", err)
+		return
+	}
+	s2, err := state.New(1) // For Hadamard demo
+	if err != nil {
+		fmt.Printf("Error creating state s2: %v\n", err)
+		return
+	}
 
 	// Create gates
 	h := gates.NewHadamard()
 	t := gates.NewT()
 
 	// Apply Hadamard to both states first
-	err := s1.ApplyGate(h, 0)
+	err = s1.ApplyGate(h, 0)
 	if err != nil {
 		fmt.Printf("Error applying Hadamard to s1: %v\n", err)
 		return

@@ -56,7 +56,10 @@ func DeutschJozsa(numInputQubits int, oracle Oracle) (*state.State, error) {
 		}
 	}
 
-	finalState := state.New(totalQubits)
+	finalState, err := state.New(totalQubits)
+	if err != nil {
+		return nil, err
+	}
 	if err := c.Execute(finalState); err != nil {
 		return nil, err
 	}

@@ -242,8 +242,11 @@ func TestGateHadamard(t *testing.T) {
 	}
 
 	// Test Hadamard on |0⟩ (should give |+⟩)
-	s := state.New(1)
-	err := s.ApplyGate(h, 0)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying H to |0⟩: %v", err)
 	}
@@ -257,7 +260,10 @@ func TestGateHadamard(t *testing.T) {
 	}
 
 	// Test Hadamard on |1⟩ (should give |-⟩)
-	s = state.New(1)
+	s, err = state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	// Use X gate to flip to |1⟩
 	s.ApplyGate(x, 0)
 	err = s.ApplyGate(h, 0)
@@ -274,7 +280,10 @@ func TestGateHadamard(t *testing.T) {
 	}
 
 	// Test Hadamard twice (should return to original state)
-	s = state.New(1) // |0⟩
+	s, err = state.New(1) // |0⟩
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	_ = s.ApplyGate(h, 0)  // |+⟩
 	_ = s.ApplyGate(h, 0)  // should be |0⟩ again
 
@@ -294,8 +303,11 @@ func TestGatePauliX(t *testing.T) {
 	}
 
 	// Test X on |0⟩ (should give |1⟩)
-	s := state.New(1)
-	err := s.ApplyGate(x, 0)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	err = s.ApplyGate(x, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying X to |0⟩: %v", err)
 	}
@@ -305,7 +317,10 @@ func TestGatePauliX(t *testing.T) {
 	}
 
 	// Test X on |1⟩ (should give |0⟩)
-	s = state.New(1)
+	s, err = state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	s.ApplyGate(x, 0) // Now |1⟩
 	err = s.ApplyGate(x, 0)
 	if err != nil {
@@ -317,7 +332,10 @@ func TestGatePauliX(t *testing.T) {
 	}
 
 	// Test X gate on superposition |+⟩
-	s = state.New(1)
+	s, err = state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	s.ApplyGate(h, 0) // Create |+⟩
 	err = s.ApplyGate(x, 0)
 	if err != nil {
@@ -342,8 +360,11 @@ func TestGateT(t *testing.T) {
 	}
 
 	// Test T on |0⟩ (should remain |0⟩)
-	s := state.New(1)
-	err := s.ApplyGate(tGate, 0)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	err = s.ApplyGate(tGate, 0)
 	if err != nil {
 		t.Errorf("Unexpected error applying T to |0⟩: %v", err)
 	}
@@ -353,7 +374,10 @@ func TestGateT(t *testing.T) {
 	}
 
 	// Test T on |1⟩ (should add phase e^(iπ/4))
-	s = state.New(1)
+	s, err = state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	s.ApplyGate(x, 0) // Flip to |1⟩
 	err = s.ApplyGate(tGate, 0)
 	if err != nil {
@@ -366,7 +390,10 @@ func TestGateT(t *testing.T) {
 	}
 
 	// Test 8 applications of T (should return to original state)
-	s = state.New(1)
+	s, err = state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	s.ApplyGate(x, 0) // Flip to |1⟩
 	for i := 0; i < 8; i++ {
 		err = s.ApplyGate(tGate, 0)
@@ -385,7 +412,10 @@ func TestGateT(t *testing.T) {
 // TestQuantumState tests basic quantum state functionality
 func TestQuantumState(t *testing.T) {
 	// Create a 2-qubit system
-	s := state.New(2)
+	s, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 
 	// Check initial state is |00⟩
 	if s.NumQubits() != 2 {
@@ -417,11 +447,14 @@ func TestQuantumState(t *testing.T) {
 // TestQuantumStateGateApplication tests applying gates to a quantum state
 func TestQuantumStateGateApplication(t *testing.T) {
 	// Create a 2-qubit system
-	s := state.New(2)
+	s, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 
 	// Apply Hadamard to first qubit (least significant bit)
 	h := gates.NewHadamard()
-	err := s.ApplyGate(h, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		t.Errorf("Error applying Hadamard to qubit 0: %v", err)
 	}
@@ -483,11 +516,14 @@ func TestQuantumStateGateApplication(t *testing.T) {
 // TestBellState tests creating and measuring a Bell state
 func TestBellState(t *testing.T) {
 	// Create a 2-qubit system
-	s := state.New(2)
+	s, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 
 	// Apply Hadamard to first qubit
 	h := gates.NewHadamard()
-	err := s.ApplyGate(h, 0)
+	err = s.ApplyGate(h, 0)
 	if err != nil {
 		t.Errorf("Error applying Hadamard to qubit 0: %v", err)
 	}
@@ -536,8 +572,11 @@ func TestBellState(t *testing.T) {
 // TestInvalidOperations tests error handling for invalid operations
 func TestInvalidOperations(t *testing.T) {
 	// Test out-of-bounds measurement
-	s := state.New(2)
-	_, err := s.Measure(2)
+	s, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	_, err = s.Measure(2)
 	if err == nil {
 		t.Error("Expected error when measuring out-of-bounds qubit, got nil")
 	}
@@ -569,7 +608,7 @@ func TestInvalidOperations(t *testing.T) {
 // Example_hadamardApply demonstrates using the Hadamard gate on a state
 func Example_hadamardApply() {
 	// Create a new 1-qubit state in |0⟩ state
-	s := state.New(1)
+	s, _ := state.New(1)
 
 	// Apply Hadamard gate using state-vector-first API
 	h := gates.NewHadamard()
@@ -579,7 +618,7 @@ func Example_hadamardApply() {
 // ExampleBellState demonstrates creating a Bell state
 func Example_bellState() {
 	// Create a 2-qubit state
-	s := state.New(2)
+	s, _ := state.New(2)
 
 	// Apply Hadamard to first qubit
 	h := gates.NewHadamard()

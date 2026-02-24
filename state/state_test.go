@@ -40,7 +40,10 @@ func TestApplyGateCNOTControlBehavior(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var qs quantum.QuantumState = state.New(2)
+			qs, err := state.New(2)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
 			if err := tt.setup(qs); err != nil {
 				t.Fatalf("setup failed: %v", err)
 			}
@@ -56,7 +59,10 @@ func TestApplyGateCNOTControlBehavior(t *testing.T) {
 }
 
 func TestApplyGateSwap(t *testing.T) {
-	var qs quantum.QuantumState = state.New(2)
+	qs, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	if err := qs.ApplyGate(gates.NewPauliX(), 0); err != nil {
 		t.Fatalf("ApplyGate(PauliX) returned error: %v", err)
 	}
@@ -138,7 +144,10 @@ func TestApplyGateBellStates(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var qs quantum.QuantumState = state.New(2)
+			qs, err := state.New(2)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
 			if err := qs.ApplyGate(gates.NewHadamard(), 0); err != nil {
 				t.Fatalf("ApplyGate(Hadamard) returned error: %v", err)
 			}
@@ -198,8 +207,11 @@ func TestApplyGateErrors(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			var qs quantum.QuantumState = state.New(2)
-			err := qs.ApplyGate(tt.gate, tt.targets...)
+			qs, err := state.New(2)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
+			err = qs.ApplyGate(tt.gate, tt.targets...)
 			if err == nil {
 				t.Fatalf("expected error, got nil")
 			}
@@ -260,7 +272,10 @@ func assertNormalized(t *testing.T, qs quantum.QuantumState) {
 }
 
 func TestDenseBackendCapabilities(t *testing.T) {
-	s := state.New(3)
+	s, err := state.New(3)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 
 	// Test SupportsGateQubits - dense backend supports all gate sizes
 	if !s.SupportsGateQubits(1) {
@@ -290,6 +305,61 @@ func TestDenseBackendCapabilities(t *testing.T) {
 
 func TestDenseGateInterfaceAssertion(t *testing.T) {
 	// Verify State implements both QuantumState and BackendCapabilities
-	var _ quantum.QuantumState = state.New(1)
-	var _ quantum.BackendCapabilities = state.New(1)
+	s1, _ := state.New(1)
+	var _ quantum.QuantumState = s1
+	var _ quantum.BackendCapabilities = s1
+}
+
+func TestNewInvalidQubitCount(t *testing.T) {
+	tests := []struct {
+		name       string
+		numQubits  int
+		errCheck   func(error) bool
+		errMessage string
+	}{
+		{
+			name:      "zero qubits",
+			numQubits: 0,
+			errCheck: func(err error) bool {
+				var targetErr *quantum.InvalidQubitCountError
+				return errors.As(err, &targetErr) &&
+					targetErr.Requested == 0 &&
+					targetErr.Reason == "must be positive"
+			},
+			errMessage: "should return InvalidQubitCountError for 0 qubits",
+		},
+		{
+			name:      "negative qubits",
+			numQubits: -1,
+			errCheck: func(err error) bool {
+				var targetErr *quantum.InvalidQubitCountError
+				return errors.As(err, &targetErr) &&
+					targetErr.Requested == -1 &&
+					targetErr.Reason == "must be positive"
+			},
+			errMessage: "should return InvalidQubitCountError for -1 qubits",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := state.New(tt.numQubits)
+			if err == nil {
+				t.Fatalf("expected error for %d qubits, got nil", tt.numQubits)
+			}
+			if !tt.errCheck(err) {
+				t.Fatalf("%s, got: %T: %v", tt.errMessage, err, err)
+			}
+		})
+	}
+}
+
+func TestNewValidQubitCount(t *testing.T) {
+	s, err := state.New(3)
+	if err != nil {
+		t.Fatalf("expected no error for 3 qubits, got: %v", err)
+	}
+	if s.NumQubits() != 3 {
+		t.Fatalf("expected 3 qubits, got %d", s.NumQubits())
+	}
 }

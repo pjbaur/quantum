@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"math/rand"
 	"os"
-	"strconv"
 	"time"
 
 	"github.com/pjbaur/quantum/internal/examples"
@@ -15,7 +14,7 @@ func usage() {
 	out := flag.CommandLine.Output()
 	fmt.Fprintln(out, "Quantum Computing in Go")
 	fmt.Fprintln(out, "======================")
-	fmt.Fprintln(out, "Usage: quantum [options] <demo> [param]")
+	fmt.Fprintln(out, "Usage: quantum [options] <demo>")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Options:")
 	flag.PrintDefaults()
@@ -29,10 +28,10 @@ func usage() {
 	fmt.Fprintln(out, "  visual    - Visualization demonstrations")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Examples:")
-	fmt.Fprintln(out, "  go run ./cmd/quantum hadamard       - Run Hadamard gate examples")
-	fmt.Fprintln(out, "  go run ./cmd/quantum -demo bell     - Run Bell state examples")
-	fmt.Fprintln(out, "  go run ./cmd/quantum visual         - Run visualization examples")
-	fmt.Fprintln(out, "  go run ./cmd/quantum all 3          - Run all examples with param")
+	fmt.Fprintln(out, "  quantum hadamard       - Run Hadamard gate examples")
+	fmt.Fprintln(out, "  quantum -demo bell     - Run Bell state examples")
+	fmt.Fprintln(out, "  quantum visual         - Run visualization examples")
+	fmt.Fprintln(out, "  quantum all            - Run all examples")
 }
 
 func runDemos(demoType string) error {
@@ -81,13 +80,11 @@ func runDemos(demoType string) error {
 }
 
 func main() {
-	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, all)")
-	paramFlag := flag.Int("param", 0, "Optional numeric parameter for demos")
+	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, visual, all)")
 	flag.Usage = usage
 	flag.Parse()
 
 	demoType := *demoFlag
-	param := *paramFlag
 	args := flag.Args()
 
 	if demoType != "" && len(args) > 0 {
@@ -102,25 +99,9 @@ func main() {
 			os.Exit(2)
 		}
 		demoType = args[0]
-		args = args[1:]
 	}
 
-	if len(args) > 0 {
-		if *paramFlag != 0 {
-			fmt.Fprintln(os.Stderr, "param provided both as flag and positional argument")
-			flag.Usage()
-			os.Exit(2)
-		}
-		parsedParam, err := strconv.Atoi(args[0])
-		if err != nil {
-			fmt.Fprintf(os.Stderr, "invalid parameter: %s\n", args[0])
-			os.Exit(2)
-		}
-		param = parsedParam
-		args = args[1:]
-	}
-
-	if len(args) > 0 {
+	if len(args) > 1 {
 		fmt.Fprintln(os.Stderr, "too many arguments")
 		flag.Usage()
 		os.Exit(2)
@@ -134,9 +115,6 @@ func main() {
 	fmt.Println("*              QUANTUM COMPUTING IN GO                 *")
 	fmt.Println("*            Quantum Circuit Simulator                 *")
 	fmt.Println("********************************************************")
-
-	// Placeholder for using param if needed
-	_ = param
 
 	// Run the selected demonstrations
 	if err := runDemos(demoType); err != nil {

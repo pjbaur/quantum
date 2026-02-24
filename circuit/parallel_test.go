@@ -21,10 +21,15 @@ func TestExecuteAllAppliesCircuits(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	states := []*state.State{
-		state.New(1),
-		state.New(1),
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
 	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	states := []*state.State{s1, s2}
 	executions := []circuit.Execution{
 		{Circuit: c, State: states[0]},
 		{Circuit: c, State: states[1]},
@@ -50,11 +55,19 @@ func TestExecuteAllParallelAppliesCircuits(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	states := []*state.State{
-		state.New(1),
-		state.New(1),
-		state.New(1),
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
 	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s3, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	states := []*state.State{s1, s2, s3}
 	executions := []circuit.Execution{
 		{Circuit: c, State: states[0]},
 		{Circuit: c, State: states[1]},
@@ -74,12 +87,15 @@ func TestExecuteAllParallelAppliesCircuits(t *testing.T) {
 }
 
 func TestExecuteAllParallelReportsError(t *testing.T) {
-	s := state.New(1)
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	executions := []circuit.Execution{
 		{Circuit: nil, State: s},
 	}
 
-	err := circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 2})
+	err = circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 2})
 	if err == nil {
 		t.Fatalf("expected error")
 	}
@@ -98,7 +114,10 @@ func TestExecuteAllParallelDetectsSharedState(t *testing.T) {
 	}
 
 	// Create a single state and reuse it (this is the bug we're detecting)
-	sharedState := state.New(1)
+	sharedState, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	executions := []circuit.Execution{
 		{Circuit: c, State: sharedState},
 		{Circuit: c, State: sharedState}, // Same state pointer!
@@ -136,10 +155,21 @@ func TestExecuteAllParallelDetectsSharedStateLater(t *testing.T) {
 	}
 
 	// Create states where first and third share the same pointer
-	sharedState := state.New(1)
+	sharedState, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	executions := []circuit.Execution{
-		{Circuit: c, State: state.New(1)},
-		{Circuit: c, State: state.New(1)},
+		{Circuit: c, State: s1},
+		{Circuit: c, State: s2},
 		{Circuit: c, State: sharedState},
 		{Circuit: c, State: sharedState}, // Duplicate of index 2
 	}
@@ -194,10 +224,22 @@ func TestExecuteAllParallelAllowsSharedCircuit(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s3, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	executions := []circuit.Execution{
-		{Circuit: c, State: state.New(1)}, // Same circuit
-		{Circuit: c, State: state.New(1)}, // Same circuit
-		{Circuit: c, State: state.New(1)}, // Same circuit
+		{Circuit: c, State: s1}, // Same circuit
+		{Circuit: c, State: s2}, // Same circuit
+		{Circuit: c, State: s3}, // Same circuit
 	}
 
 	err = circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 2})
@@ -216,7 +258,10 @@ func TestExecuteAllSerialAllowsSharedState(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	sharedState := state.New(1)
+	sharedState, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
 	executions := []circuit.Execution{
 		{Circuit: c, State: sharedState},
 		{Circuit: c, State: sharedState},

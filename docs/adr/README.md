@@ -43,6 +43,8 @@ What becomes easier or harder as a result?
 | 0002 | Concurrency Contract for Parallel Execution | Accepted | 2026-02-21 |
 | 0003 | Sparse Backend Capability Model | Accepted | 2026-02-21 |
 | 0004 | Diagnostics and Constructor Consistency | Accepted | 2026-02-21 |
+| 0005 | Regression Prevention Test Strategy | Accepted | 2026-02-21 |
+| 0006 | CLI Contract and Drift Prevention | Accepted | 2026-02-21 |
 
 ## Process
 
