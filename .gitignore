@@ -1,6 +1,9 @@
 # MacOS system files
 .DS_Store
 
+# Claude stuff
+.claude/
+
 # git internally tracks trees
 .trees/
 
