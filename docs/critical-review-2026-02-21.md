@@ -78,25 +78,25 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 
 | Finding | Status | Resolution |
 |---------|--------|------------|
-| `quantum.Gate` misleading for multi-qubit | ✅ Resolved | Phase 1.1: Gate API cleaned up, legacy single-qubit paths deprecated |
-| Fragile `ExecuteAllParallel` contract | ✅ Resolved | Phase 1.2: Shared-state detection with `SharedStateError` |
-| Sparse backend not drop-in | ✅ Resolved | Phase 1.3: `BackendCapabilities` interface with explicit limits |
-| Normalization diagnostics wrong | ✅ Resolved | Phase 1.4: `NormalizationError` now reports `AttemptedSum` and `CurrentSum` |
+| `quantum.Gate` misleading for multi-qubit | ✅ Resolved | Phase 1.1: Gate API cleaned up, legacy single-qubit paths deprecated ([d183844](https://github.com/pjbaur/quantum/commit/d183844)) |
+| Fragile `ExecuteAllParallel` contract | ✅ Resolved | Phase 1.2: Shared-state detection with `SharedStateError` ([fe19529](https://github.com/pjbaur/quantum/commit/fe19529)) |
+| Sparse backend not drop-in | ✅ Resolved | Phase 1.3: `BackendCapabilities` interface with explicit limits ([d9c31a7](https://github.com/pjbaur/quantum/commit/d9c31a7)) |
+| Normalization diagnostics wrong | ✅ Resolved | Phase 1.4: `NormalizationError` now reports `AttemptedSum` and `CurrentSum` ([d183844](https://github.com/pjbaur/quantum/commit/d183844)) |
 
 ### Medium-Priority Findings
 
 | Finding | Status | Resolution |
 |---------|--------|------------|
-| CLI help/behavior inconsistency | ✅ Resolved | Phase 2.1: `visual` added to help, dead `-param` removed, CLI tests added |
-| Algorithm scalability | ✅ Resolved | Phase 2.2: Direct state-vector transformations replace dense matrix construction |
-| Duplicated gate validation | ✅ Resolved | Phase 2.3: Extracted to `quantum.GateQubitCount` with shared implementation |
-| Constructor inconsistency | ✅ Resolved | Phase 1.5: All constructors return `InvalidQubitCountError` for invalid counts |
+| CLI help/behavior inconsistency | ✅ Resolved | Phase 2.1: `visual` added to help, dead `-param` removed, CLI tests added ([d1f52b2](https://github.com/pjbaur/quantum/commit/d1f52b2)) |
+| Algorithm scalability | ✅ Resolved | Phase 2.2: Direct state-vector transformations replace dense matrix construction ([3f0e581](https://github.com/pjbaur/quantum/commit/3f0e581)) |
+| Duplicated gate validation | ✅ Resolved | Phase 2.3: Extracted to `quantum.GateQubitCount` with shared implementation ([82e754f](https://github.com/pjbaur/quantum/commit/82e754f)) |
+| Constructor inconsistency | ✅ Resolved | Phase 1.5: All constructors return `InvalidQubitCountError` for invalid counts ([d7dde57](https://github.com/pjbaur/quantum/commit/d7dde57)) |
 
 ### Test Coverage Gaps
 
 | Gap | Status | Resolution |
 |-----|--------|------------|
-| Algorithm negative paths | ✅ Resolved | Phase 3.1: Added negative path tests for DeutschJozsa and Grover error cases |
-| Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests |
-| Parallel race-focused tests | ✅ Resolved | Phase 3.2: Added race detection tests for concurrent independent-state executions |
-| Visualization helper tests | ✅ Resolved | Phase 3.3: Added direct tests for `FormatBlochVector` and `BlochCSV` |
+| Algorithm negative paths | ✅ Resolved | Phase 3.1: Added negative path tests for DeutschJozsa and Grover error cases ([c5082c4](https://github.com/pjbaur/quantum/commit/c5082c4)) |
+| Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests ([fe19529](https://github.com/pjbaur/quantum/commit/fe19529)) |
+| Parallel race-focused tests | ✅ Resolved | Phase 3.2: Added race detection tests for concurrent independent-state executions ([3300490](https://github.com/pjbaur/quantum/commit/3300490)) |
+| Visualization helper tests | ✅ Resolved | Phase 3.3: Added direct tests for `FormatBlochVector` and `BlochCSV` ([d80166d](https://github.com/pjbaur/quantum/commit/d80166d)) |
