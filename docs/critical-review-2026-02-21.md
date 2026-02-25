@@ -96,4 +96,4 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 | Algorithm negative paths | ✅ Resolved | Phase 3.1: Added negative path tests for DeutschJozsa and Grover error cases |
 | Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests |
 | Parallel race-focused tests | ✅ Resolved | Phase 3.2: Added race detection tests for concurrent independent-state executions |
-| Visualization helper tests | 🔲 Pending | Phase 3.3: Not yet implemented |
+| Visualization helper tests | ✅ Resolved | Phase 3.3: Added direct tests for `FormatBlochVector` and `BlochCSV` |
