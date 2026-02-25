@@ -158,11 +158,11 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [ ] Add table-driven invalid-input tests for `Grover` error paths.
 - [ ] Assert error type/message specificity, not only generic failure.
 
-### 3.2 Parallel shared-state hazard tests (`ws2-concurrency`)
+### 3.2 Parallel shared-state hazard tests (`ws2-concurrency`) ✅ COMPLETE
 
-- [ ] Add tests that intentionally pass shared state pointers to `ExecuteAllParallel`.
-- [ ] Assert fail-fast behavior (or clone semantics) based on Phase 0 decision.
-- [ ] Add race-focused tests for concurrent independent-state executions.
+- [x] Add tests that intentionally pass shared state pointers to `ExecuteAllParallel`.
+- [x] Assert fail-fast behavior (or clone semantics) based on Phase 0 decision.
+- [x] Add race-focused tests for concurrent independent-state executions.
 
 ### 3.3 Visualization helper direct tests (`ws5-cli-docs-tests`)
 
@@ -209,6 +209,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Shared-state misuse detection and explicit errors.
 - [x] Hazard/race regression tests.
 - [x] Package docs for concurrency contract.
+- [x] Race-focused tests for concurrent independent-state executions (Phase 3.2).
 
 ### `ws3-sparse-backend`
 
@@ -265,6 +266,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 - [ ] Missing negative-path tests for `DeutschJozsa` and `Grover`.
 - [x] Missing shared-state misuse tests for parallel execution.
+- [x] Missing race-focused tests for concurrent independent-state executions.
 - [ ] Missing direct tests for `FormatBlochVector` and `BlochCSV`.
 
 ## Suggested PR Sequence

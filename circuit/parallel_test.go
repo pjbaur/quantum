@@ -272,3 +272,119 @@ func TestExecuteAllSerialAllowsSharedState(t *testing.T) {
 		t.Fatalf("serial execution should allow shared state: %v", err)
 	}
 }
+
+// TestExecuteAllParallelRaceDetection tests that concurrent execution with
+// independent states does not cause data races. Run with `go test -race`.
+func TestExecuteAllParallelRaceDetection(t *testing.T) {
+	// Create a shared circuit (read-only, safe to share)
+	c, err := circuit.New(1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(gates.NewHadamard(), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Create many independent states - this tests concurrent access
+	const numStates = 100
+	executions := make([]circuit.Execution, numStates)
+	for i := 0; i < numStates; i++ {
+		s, err := state.New(1)
+		if err != nil {
+			t.Fatalf("state.New failed: %v", err)
+		}
+		executions[i] = circuit.Execution{Circuit: c, State: s}
+	}
+
+	// Execute with high parallelism to stress-test for races
+	err = circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 10})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify all states were modified correctly
+	for i, exec := range executions {
+		// After Hadamard, probability of measuring |0> should be 0.5
+		prob := exec.State.Probability(0)
+		if math.Abs(prob-0.5) > 1e-10 {
+			t.Fatalf("state %d: probability of |0> = %v, want 0.5", i, prob)
+		}
+	}
+}
+
+// TestExecuteAllParallelConcurrentReads tests that multiple concurrent
+// executions don't cause races when reading circuit data.
+func TestExecuteAllParallelConcurrentReads(t *testing.T) {
+	// Create a more complex circuit to test concurrent reads
+	c, err := circuit.New(2)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(gates.NewHadamard(), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	const numStates = 50
+	executions := make([]circuit.Execution, numStates)
+	for i := 0; i < numStates; i++ {
+		s, err := state.New(2)
+		if err != nil {
+			t.Fatalf("state.New failed: %v", err)
+		}
+		executions[i] = circuit.Execution{Circuit: c, State: s}
+	}
+
+	err = circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 8})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	// Verify Bell state was created in each execution
+	for i, exec := range executions {
+		// For Bell state, probability of measuring |00> should be 0.5
+		prob00 := exec.State.Probability(0)
+		if math.Abs(prob00-0.5) > 1e-10 {
+			t.Fatalf("state %d: probability of |00> = %v, want 0.5", i, prob00)
+		}
+	}
+}
+
+// TestExecuteAllParallelStressTest is designed to trigger potential race
+// conditions when run with `go test -race`.
+func TestExecuteAllParallelStressTest(t *testing.T) {
+	// Create multiple different circuits
+	circuits := make([]*circuit.Circuit, 5)
+	for i := range circuits {
+		c, err := circuit.New(2)
+		if err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := c.AddGate(gates.NewHadamard(), 0); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		if err := c.AddGate(gates.NewPauliX(), 1); err != nil {
+			t.Fatalf("unexpected error: %v", err)
+		}
+		circuits[i] = c
+	}
+
+	// Create executions with independent states
+	const numExecutions = 200
+	executions := make([]circuit.Execution, numExecutions)
+	for i := 0; i < numExecutions; i++ {
+		s, err := state.New(2)
+		if err != nil {
+			t.Fatalf("state.New failed: %v", err)
+		}
+		// Use different circuits to test concurrent circuit reads
+		executions[i] = circuit.Execution{Circuit: circuits[i%len(circuits)], State: s}
+	}
+
+	err := circuit.ExecuteAllParallel(executions, circuit.ParallelOptions{MaxParallelism: 16})
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+}
