@@ -66,3 +66,31 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 - `go test ./...` passed during this review.
 - `go vet ./...` passed during this review.
 - `go test -race ./...` failed in this environment due race-runtime/package-resolution setup issues, so concurrency findings are based on static analysis and API behavior review.
+
+## Resolution Status
+
+### Highest-Priority Findings
+
+| Finding | Status | Resolution |
+|---------|--------|------------|
+| `quantum.Gate` misleading for multi-qubit | ✅ Resolved | Phase 1.1: Gate API cleaned up, legacy single-qubit paths deprecated |
+| Fragile `ExecuteAllParallel` contract | ✅ Resolved | Phase 1.2: Shared-state detection with `SharedStateError` |
+| Sparse backend not drop-in | ✅ Resolved | Phase 1.3: `BackendCapabilities` interface with explicit limits |
+| Normalization diagnostics wrong | ✅ Resolved | Phase 1.4: `NormalizationError` now reports `AttemptedSum` and `CurrentSum` |
+
+### Medium-Priority Findings
+
+| Finding | Status | Resolution |
+|---------|--------|------------|
+| CLI help/behavior inconsistency | ✅ Resolved | Phase 2.1: `visual` added to help, dead `-param` removed, CLI tests added |
+| Algorithm scalability | 🔲 Pending | Phase 2.2: Not yet implemented |
+| Duplicated gate validation | 🔲 Pending | Phase 2.3: Not yet implemented |
+| Constructor inconsistency | ✅ Resolved | Phase 1.5: All constructors return `InvalidQubitCountError` for invalid counts |
+
+### Test Coverage Gaps
+
+| Gap | Status | Resolution |
+|-----|--------|------------|
+| Algorithm negative paths | 🔲 Pending | Phase 3.1: Not yet implemented |
+| Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests |
+| Visualization helper tests | 🔲 Pending | Phase 3.3: Not yet implemented |

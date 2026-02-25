@@ -129,12 +129,12 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ## Phase 2: Medium-Priority Maintainability and UX
 
-### 2.1 CLI help/behavior consistency (`ws5-cli-docs-tests`)
+### 2.1 CLI help/behavior consistency (`ws5-cli-docs-tests`) ✅ COMPLETE
 
-- [ ] Add missing `visual` demo option in `-demo` help text.
-- [ ] Resolve optional parameter drift by either implementing behavior or removing dead parsing.
-- [ ] Add CLI tests or golden help-output assertions to prevent future drift.
-- [ ] Update user-facing docs/examples to match implemented CLI behavior.
+- [x] Add missing `visual` demo option in `-demo` help text.
+- [x] Resolve optional parameter drift by either implementing behavior or removing dead parsing.
+- [x] Add CLI tests or golden help-output assertions to prevent future drift.
+- [x] Update user-facing docs/examples to match implemented CLI behavior.
 
 ### 2.2 Algorithm scalability refactor (`ws4-algorithms`)
 
@@ -226,10 +226,10 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### `ws5-cli-docs-tests`
 
-- [ ] CLI help and behavior alignment.
-- [ ] Dead optional parameter resolution.
+- [x] CLI help and behavior alignment.
+- [x] Dead optional parameter resolution.
 - [ ] Direct visualization helper tests.
-- [ ] Documentation and examples sync pass.
+- [x] Documentation and examples sync pass.
 
 ### `ws6-integration`
 
@@ -256,10 +256,10 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### Medium-Priority Findings
 
-- [ ] CLI help/behavior inconsistency (`visual` + optional parameter).
+- [x] CLI help/behavior inconsistency (`visual` + optional parameter).
 - [ ] Algorithm scalability issues due to dense matrix construction.
 - [ ] Duplicated gate matrix validation logic.
-- [ ] Constructor inconsistency on invalid qubit counts.
+- [x] Constructor inconsistency on invalid qubit counts.
 
 ### Test Coverage Gaps
 
