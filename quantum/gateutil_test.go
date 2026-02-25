@@ -36,7 +36,7 @@ func TestGateQubitCount(t *testing.T) {
 		errContains string
 	}{
 		{
-			name:      "1-qubit gate (2x2)",
+			name: "1-qubit gate (2x2)",
 			gate: &mockGate{
 				name: "X",
 				matrix: [][]complex128{
@@ -48,7 +48,7 @@ func TestGateQubitCount(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "2-qubit gate (4x4)",
+			name: "2-qubit gate (4x4)",
 			gate: &mockGate{
 				name: "CNOT",
 				matrix: [][]complex128{
@@ -62,7 +62,7 @@ func TestGateQubitCount(t *testing.T) {
 			wantErr:   false,
 		},
 		{
-			name:      "3-qubit gate (8x8)",
+			name: "3-qubit gate (8x8)",
 			gate: &mockGate{
 				name:   "Toffoli",
 				matrix: toffoliMatrix(),
