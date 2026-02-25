@@ -42,20 +42,7 @@ func DeutschJozsa(numInputQubits int, oracle Oracle) (*state.State, error) {
 		}
 	}
 
-	oracleGate, err := deutschJozsaOracleGate(numInputQubits, oracle)
-	if err != nil {
-		return nil, err
-	}
-	if err := c.AddGate(oracleGate, descendingTargets(totalQubits)...); err != nil {
-		return nil, err
-	}
-
-	for i := 0; i < numInputQubits; i++ {
-		if err := c.AddGate(hGate, i); err != nil {
-			return nil, err
-		}
-	}
-
+	// Execute circuit to get |+⟩ on all qubits with ancilla in |-⟩ state
 	finalState, err := state.New(totalQubits)
 	if err != nil {
 		return nil, err
@@ -64,31 +51,54 @@ func DeutschJozsa(numInputQubits int, oracle Oracle) (*state.State, error) {
 		return nil, err
 	}
 
+	// Apply oracle directly to state vector (no matrix construction)
+	if err := applyDeutschJozsaOracle(finalState, numInputQubits, oracle); err != nil {
+		return nil, err
+	}
+
+	// Apply Hadamard to input qubits
+	for i := 0; i < numInputQubits; i++ {
+		if err := finalState.ApplyGate(hGate, i); err != nil {
+			return nil, err
+		}
+	}
+
 	return finalState, nil
 }
 
-func deutschJozsaOracleGate(numInputQubits int, oracle Oracle) (*matrixGate, error) {
-	size := 1 << (numInputQubits + 1)
-	matrix := make([][]complex128, size)
-	for i := range matrix {
-		matrix[i] = make([]complex128, size)
-	}
-
+// applyDeutschJozsaOracle applies the oracle directly to the state vector.
+// The oracle maps |x⟩|y⟩ → |x⟩|y ⊕ f(x)⟩.
+// For each input x:
+//   - If f(x) = 0: leave the pair (|x,0⟩, |x,1⟩) unchanged
+//   - If f(x) = 1: swap the pair (|x,0⟩ ↔ |x,1⟩)
+//
+// This is O(2^n) instead of O(4^n) for constructing the full oracle matrix.
+func applyDeutschJozsaOracle(s *state.State, numInputQubits int, oracle Oracle) error {
+	numInputStates := 1 << numInputQubits
 	ancillaBit := 1 << numInputQubits
-	mask := ancillaBit - 1
-	for col := 0; col < size; col++ {
-		input := col & mask
-		value := oracle(input)
-		if value != 0 && value != 1 {
-			return nil, fmt.Errorf("oracle returned %d for input %d", value, input)
-		}
+	totalStates := 1 << (numInputQubits + 1)
 
-		out := col
-		if value == 1 {
-			out = col ^ ancillaBit
-		}
-		matrix[out][col] = 1
+	// Get all amplitudes
+	amps := make([]complex128, totalStates)
+	for i := 0; i < totalStates; i++ {
+		amps[i] = s.Amplitude(i)
 	}
 
-	return newMatrixGate("DeutschJozsaOracle", matrix)
+	// Apply oracle: for each input x, conditionally swap |x,0⟩ and |x,1⟩
+	for x := 0; x < numInputStates; x++ {
+		fx := oracle(x)
+		if fx != 0 && fx != 1 {
+			return fmt.Errorf("oracle returned %d for input %d", fx, x)
+		}
+
+		if fx == 1 {
+			// Swap amplitudes at |x,0⟩ and |x,1⟩
+			idx0 := x              // |x⟩|0⟩
+			idx1 := x | ancillaBit // |x⟩|1⟩
+			amps[idx0], amps[idx1] = amps[idx1], amps[idx0]
+		}
+	}
+
+	// Set all amplitudes at once (single normalization check)
+	return s.SetAmplitudes(amps)
 }

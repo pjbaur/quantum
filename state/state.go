@@ -85,6 +85,32 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 	return nil
 }
 
+// SetAmplitudes sets all amplitudes at once with a single normalization check.
+// This is more efficient than calling SetAmplitude repeatedly when updating
+// multiple amplitudes, as it only validates normalization once at the end.
+// The values slice must have exactly 2^numQubits elements.
+func (s *State) SetAmplitudes(values []complex128) error {
+	if len(values) != len(s.amplitudes) {
+		return fmt.Errorf("values slice length %d does not match state size %d", len(values), len(s.amplitudes))
+	}
+
+	// Check normalization of new values
+	sum := 0.0
+	for _, v := range values {
+		sum += math.Pow(cmplx.Abs(v), 2)
+	}
+	if math.Abs(sum-1.0) > 1e-10 {
+		return &quantum.NormalizationError{
+			AttemptedSum: sum,
+			CurrentSum:   s.probabilitySum(),
+		}
+	}
+
+	// Copy values
+	copy(s.amplitudes, values)
+	return nil
+}
+
 // ApplyGate applies a gate to the specified qubit(s).
 // Qubit indices are little-endian (qubit 0 is the least-significant bit).
 // Gate matrix ordering follows the targets slice, with targets[0] as the
