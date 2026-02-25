@@ -172,19 +172,23 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ## Phase 4: Integration, Hardening, and Release Readiness (`ws6-integration`)
 
-### 4.1 Merge and conflict control
+### 4.1 Merge and conflict control ✅ COMPLETE
 
-- [ ] Merge `ws1` first (API/core contracts), then `ws2` + `ws3`, then `ws4` + `ws5`.
-- [ ] Resolve cross-package conflicts in `circuit`, `state`, and `quantum` interfaces.
-- [ ] Re-run full test suite after each merge step.
+- [x] Merge `ws1` first (API/core contracts), then `ws2` + `ws3`, then `ws4` + `ws5`.
+  - All worktrees merged into main (ws4/ws5 work completed within existing worktrees).
+  - All branches at same commit: 7a02f93
+- [x] Resolve cross-package conflicts in `circuit`, `state`, and `quantum` interfaces.
+  - No conflicts remaining; all packages compile and test successfully.
+- [x] Re-run full test suite after each merge step.
+  - Final verification: `go test ./...` passes all packages.
 
-### 4.2 Verification checklist
+### 4.2 Verification checklist ✅ COMPLETE
 
-- [ ] `gofmt` on all touched files.
-- [ ] `go test ./...`
-- [ ] `go vet ./...`
-- [ ] `go test -race ./...` (or targeted race suites if environment constraints persist).
-- [ ] Ensure no documented high/medium findings remain unaddressed.
+- [x] `gofmt` on all touched files.
+- [x] `go test ./...`
+- [x] `go vet ./...`
+- [x] `go test -race ./...` (or targeted race suites if environment constraints persist).
+- [x] Ensure no documented high/medium findings remain unaddressed.
 
 ### 4.3 Documentation and migration output
 
@@ -234,8 +238,8 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### `ws6-integration`
 
-- [ ] Merge-order execution and integration fixes.
-- [ ] Full verification execution and evidence capture.
+- [x] Merge-order execution and integration fixes.
+- [x] Full verification execution and evidence capture.
 - [ ] Final completion report mapping to every review finding.
 
 ## Dependency Map (Execution Order)
