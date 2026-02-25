@@ -33,8 +33,9 @@ Grover and Deutsch-Jozsa construct full dense matrices (`algorithm/grover.go:86`
 
 ## Test Coverage Gaps
 
-1. Algorithm negative paths are largely untested.
+1. ~~Algorithm negative paths are largely untested.~~ ✅ RESOLVED
 Error cases in `DeutschJozsa` and `Grover` are not covered (`algorithm/deutsch_jozsa.go:19`, `algorithm/grover.go:15`).
+> **Resolution**: Added comprehensive negative path tests covering invalid qubit counts, nil oracles, empty marked sets, and out-of-range marked states. See Phase 3.1.
 
 2. Parallel tests do not validate unsafe shared-state usage.
 Current tests verify successful independent execution (`circuit/parallel_test.go:42`) but do not test shared-state misuse.
@@ -92,6 +93,6 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 
 | Gap | Status | Resolution |
 |-----|--------|------------|
-| Algorithm negative paths | 🔲 Pending | Phase 3.1: Not yet implemented |
+| Algorithm negative paths | ✅ Resolved | Phase 3.1: Added negative path tests for DeutschJozsa and Grover error cases |
 | Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests |
 | Visualization helper tests | 🔲 Pending | Phase 3.3: Not yet implemented |

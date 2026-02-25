@@ -152,11 +152,11 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ## Phase 3: Test Coverage Expansion (Documented Gaps)
 
-### 3.1 Algorithm negative-path tests (`ws4-algorithms`)
+### 3.1 Algorithm negative-path tests (`ws4-algorithms`) ✅ COMPLETE
 
-- [ ] Add table-driven invalid-input tests for `DeutschJozsa` error paths.
-- [ ] Add table-driven invalid-input tests for `Grover` error paths.
-- [ ] Assert error type/message specificity, not only generic failure.
+- [x] Add table-driven invalid-input tests for `DeutschJozsa` error paths.
+- [x] Add table-driven invalid-input tests for `Grover` error paths.
+- [x] Assert error type/message specificity, not only generic failure.
 
 ### 3.2 Parallel shared-state hazard tests (`ws2-concurrency`)
 
@@ -221,7 +221,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 - [x] Grover scalability refactor.
 - [x] Deutsch-Jozsa scalability refactor.
-- [ ] Negative-path coverage for both algorithms.
+- [x] Negative-path coverage for both algorithms.
 - [x] Benchmark evidence and regression checks.
 
 ### `ws5-cli-docs-tests`
@@ -263,7 +263,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### Test Coverage Gaps
 
-- [ ] Missing negative-path tests for `DeutschJozsa` and `Grover`.
+- [x] Missing negative-path tests for `DeutschJozsa` and `Grover`.
 - [x] Missing shared-state misuse tests for parallel execution.
 - [ ] Missing direct tests for `FormatBlochVector` and `BlochCSV`.
 

@@ -77,3 +77,131 @@ func inputRegisterZeroProbability(s interface {
 	ancillaBit := 1 << numInputQubits
 	return s.Probability(0) + s.Probability(ancillaBit)
 }
+
+// Phase 3.1: Negative path tests for DeutschJozsa
+
+func TestDeutschJozsaNegativePaths(t *testing.T) {
+	tests := []struct {
+		name           string
+		numInputQubits int
+		oracle         Oracle
+		wantErr        string
+	}{
+		{
+			name:           "zero qubits",
+			numInputQubits: 0,
+			oracle: func(int) int {
+				return 0
+			},
+			wantErr: "numInputQubits must be positive",
+		},
+		{
+			name:           "negative qubits",
+			numInputQubits: -1,
+			oracle: func(int) int {
+				return 0
+			},
+			wantErr: "numInputQubits must be positive",
+		},
+		{
+			name:           "nil oracle",
+			numInputQubits: 2,
+			oracle:         nil,
+			wantErr:        "oracle must not be nil",
+		},
+		{
+			name:           "oracle returns invalid value 2",
+			numInputQubits: 2,
+			oracle: func(int) int {
+				return 2
+			},
+			wantErr: "oracle returned 2 for input 0",
+		},
+		{
+			name:           "oracle returns invalid negative value",
+			numInputQubits: 2,
+			oracle: func(int) int {
+				return -1
+			},
+			wantErr: "oracle returned -1 for input 0",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := DeutschJozsa(tt.numInputQubits, tt.oracle)
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if err.Error() != tt.wantErr {
+				t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
+
+// Phase 3.1: Negative path tests for Grover
+
+func TestGroverNegativePaths(t *testing.T) {
+	tests := []struct {
+		name      string
+		numQubits int
+		marked    []int
+		wantErr   string
+	}{
+		{
+			name:      "zero qubits",
+			numQubits: 0,
+			marked:    []int{0},
+			wantErr:   "numQubits must be positive",
+		},
+		{
+			name:      "negative qubits",
+			numQubits: -1,
+			marked:    []int{0},
+			wantErr:   "numQubits must be positive",
+		},
+		{
+			name:      "empty marked set",
+			numQubits: 2,
+			marked:    []int{},
+			wantErr:   "marked set must not be empty",
+		},
+		{
+			name:      "nil marked set",
+			numQubits: 2,
+			marked:    nil,
+			wantErr:   "marked set must not be empty",
+		},
+		{
+			name:      "marked state negative",
+			numQubits: 2,
+			marked:    []int{-1},
+			wantErr:   "marked state -1 out of range",
+		},
+		{
+			name:      "marked state exceeds total states",
+			numQubits: 2,
+			marked:    []int{4},
+			wantErr:   "marked state 4 out of range",
+		},
+		{
+			name:      "marked state way out of range",
+			numQubits: 3,
+			marked:    []int{100},
+			wantErr:   "marked state 100 out of range",
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			_, err := Grover(tt.numQubits, tt.marked)
+			if err == nil {
+				t.Fatalf("expected error containing %q, got nil", tt.wantErr)
+			}
+			if err.Error() != tt.wantErr {
+				t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
+			}
+		})
+	}
+}
