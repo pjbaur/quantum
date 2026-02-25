@@ -94,4 +94,5 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 |-----|--------|------------|
 | Algorithm negative paths | 🔲 Pending | Phase 3.1: Not yet implemented |
 | Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests |
+| Parallel race-focused tests | ✅ Resolved | Phase 3.2: Added race detection tests for concurrent independent-state executions |
 | Visualization helper tests | 🔲 Pending | Phase 3.3: Not yet implemented |
