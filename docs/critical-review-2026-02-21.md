@@ -94,4 +94,4 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 |-----|--------|------------|
 | Algorithm negative paths | 🔲 Pending | Phase 3.1: Not yet implemented |
 | Parallel shared-state tests | ✅ Resolved | Phase 1.2: Added shared-state misuse tests |
-| Visualization helper tests | 🔲 Pending | Phase 3.3: Not yet implemented |
+| Visualization helper tests | ✅ Resolved | Phase 3.3: Added direct tests for `FormatBlochVector` and `BlochCSV` |
