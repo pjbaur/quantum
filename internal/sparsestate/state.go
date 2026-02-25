@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/bits"
 	"math/cmplx"
 	"math/rand"
 
@@ -80,7 +79,7 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 
 // ApplyGate applies a gate to the specified qubit(s).
 func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
-	requiredQubits, err := gateQubitCount(gate)
+	requiredQubits, err := quantum.GateQubitCount(gate)
 	if err != nil {
 		return err
 	}
@@ -121,26 +120,6 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 		Backend:     "sparse",
 		Alternative: "dense state backend (state.State)",
 	}
-}
-
-func gateQubitCount(gate quantum.Gate) (int, error) {
-	matrix := gate.Matrix()
-	if len(matrix) == 0 {
-		return 0, fmt.Errorf("gate %s has empty matrix", gate.Name())
-	}
-
-	size := len(matrix)
-	for _, row := range matrix {
-		if len(row) != size {
-			return 0, fmt.Errorf("gate %s matrix must be square", gate.Name())
-		}
-	}
-
-	if size&(size-1) != 0 {
-		return 0, fmt.Errorf("gate %s matrix size %d is not a power of two", gate.Name(), size)
-	}
-
-	return bits.Len(uint(size)) - 1, nil
 }
 
 func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {

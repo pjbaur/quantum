@@ -82,3 +82,17 @@ func (e *UnsupportedOperationError) Error() string {
 	return fmt.Sprintf("%s does not support %s: use %s instead",
 		e.Backend, e.Operation, e.Alternative)
 }
+
+// InvalidGateMatrixError indicates that a gate's matrix representation is invalid.
+type InvalidGateMatrixError struct {
+	GateName string
+	Reason   string
+	Size     int // Matrix size, if applicable
+}
+
+func (e *InvalidGateMatrixError) Error() string {
+	if e.Size > 0 {
+		return fmt.Sprintf("gate %s has invalid matrix: %s (size %d)", e.GateName, e.Reason, e.Size)
+	}
+	return fmt.Sprintf("gate %s has invalid matrix: %s", e.GateName, e.Reason)
+}

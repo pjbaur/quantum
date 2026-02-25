@@ -4,7 +4,6 @@ package circuit
 import (
 	"errors"
 	"fmt"
-	"math/bits"
 
 	"github.com/pjbaur/quantum/quantum"
 )
@@ -53,7 +52,7 @@ func (c *Circuit) AddGate(gate quantum.Gate, targets ...int) error {
 		return errors.New("at least one target is required")
 	}
 
-	required, err := gateQubitCount(gate)
+	required, err := quantum.GateQubitCount(gate)
 	if err != nil {
 		return err
 	}
@@ -167,7 +166,7 @@ func (c *Circuit) Execute(state quantum.QuantumState) error {
 // executed by a backend with the given capabilities.
 func (c *Circuit) checkCapabilities(caps quantum.BackendCapabilities) error {
 	for _, operation := range c.operations {
-		required, err := gateQubitCount(operation.Gate)
+		required, err := quantum.GateQubitCount(operation.Gate)
 		if err != nil {
 			return err
 		}
@@ -193,24 +192,4 @@ func (c *Circuit) CheckBackendCapabilities(caps quantum.BackendCapabilities) err
 		return errors.New("capabilities is nil")
 	}
 	return c.checkCapabilities(caps)
-}
-
-func gateQubitCount(gate quantum.Gate) (int, error) {
-	matrix := gate.Matrix()
-	if len(matrix) == 0 {
-		return 0, fmt.Errorf("gate %s has empty matrix", gate.Name())
-	}
-
-	size := len(matrix)
-	for _, row := range matrix {
-		if len(row) != size {
-			return 0, fmt.Errorf("gate %s matrix must be square", gate.Name())
-		}
-	}
-
-	if size&(size-1) != 0 {
-		return 0, fmt.Errorf("gate %s matrix size %d is not a power of two", gate.Name(), size)
-	}
-
-	return bits.Len(uint(size)) - 1, nil
 }
