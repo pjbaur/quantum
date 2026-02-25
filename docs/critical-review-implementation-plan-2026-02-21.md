@@ -4,20 +4,20 @@ This plan implements all findings and recommendations in `docs/critical-review-2
 
 ## Goals
 
-- [ ] Resolve all highest-priority correctness and API risks.
-- [ ] Resolve all medium-priority maintainability and UX gaps.
-- [ ] Close documented test coverage gaps.
-- [ ] Keep behavior changes deliberate, documented, and reviewable.
+- [x] Resolve all highest-priority correctness and API risks.
+- [x] Resolve all medium-priority maintainability and UX gaps.
+- [x] Close documented test coverage gaps.
+- [x] Keep behavior changes deliberate, documented, and reviewable.
 
 ## Worktree Topology (Parallel Execution)
 
 Use dedicated worktrees so teams can ship independent PRs in parallel with low merge contention.
 
-- [ ] `ws1-api-core`: state-vector-first API, gate interface cleanup, constructor consistency, shared validation helpers.
-- [ ] `ws2-concurrency`: `ExecuteAllParallel` safety guarantees, misuse detection, concurrency tests.
-- [ ] `ws3-sparse-backend`: sparse backend capability strategy and implementation/contract enforcement.
-- [ ] `ws4-algorithms`: Grover + Deutsch-Jozsa scalability refactor and negative-path test coverage.
-- [ ] `ws5-cli-docs-tests`: CLI/help drift fixes, dead parameter resolution, visualization helper tests, docs alignment.
+- [x] `ws1-api-core`: state-vector-first API, gate interface cleanup, constructor consistency, shared validation helpers.
+- [x] `ws2-concurrency`: `ExecuteAllParallel` safety guarantees, misuse detection, concurrency tests.
+- [x] `ws3-sparse-backend`: sparse backend capability strategy and implementation/contract enforcement.
+- [x] `ws4-algorithms`: Grover + Deutsch-Jozsa scalability refactor and negative-path test coverage.
+- [x] `ws5-cli-docs-tests`: CLI/help drift fixes, dead parameter resolution, visualization helper tests, docs alignment.
 - [ ] `ws6-integration`: final integration pass, conflict resolution, cross-package verification, release notes.
 
 ## Phase 0 (Do First): “What To Do Differently” Decisions and Guardrails
@@ -164,11 +164,11 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Assert fail-fast behavior (or clone semantics) based on Phase 0 decision.
 - [x] Add race-focused tests for concurrent independent-state executions.
 
-### 3.3 Visualization helper direct tests (`ws5-cli-docs-tests`)
+### 3.3 Visualization helper direct tests (`ws5-cli-docs-tests`) ✅ COMPLETE
 
-- [ ] Add direct unit tests for `FormatBlochVector`.
-- [ ] Add direct unit tests for `BlochCSV`.
-- [ ] Include formatting edge cases (rounding, sign, delimiter, invalid inputs if applicable).
+- [x] Add direct unit tests for `FormatBlochVector`.
+- [x] Add direct unit tests for `BlochCSV`.
+- [x] Include formatting edge cases (rounding, sign, delimiter, invalid inputs if applicable).
 
 ## Phase 4: Integration, Hardening, and Release Readiness (`ws6-integration`)
 
@@ -197,11 +197,11 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### `ws1-api-core`
 
-- [ ] API decision note + migration strategy.
-- [ ] Gate API cleanup/deprecation implementation.
-- [ ] Constructor consistency implementation.
-- [ ] Shared gate validation helper.
-- [ ] Normalization diagnostics fix (dense side).
+- [x] API decision note + migration strategy.
+- [x] Gate API cleanup/deprecation implementation.
+- [x] Constructor consistency implementation.
+- [x] Shared gate validation helper.
+- [x] Normalization diagnostics fix (dense side).
 
 ### `ws2-concurrency`
 
@@ -229,7 +229,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 - [x] CLI help and behavior alignment.
 - [x] Dead optional parameter resolution.
-- [ ] Direct visualization helper tests.
+- [x] Direct visualization helper tests.
 - [x] Documentation and examples sync pass.
 
 ### `ws6-integration`
@@ -240,17 +240,17 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ## Dependency Map (Execution Order)
 
-- [ ] Phase 0 decisions complete before any breaking API/code-path changes.
-- [ ] `ws1-api-core` must land before `ws4-algorithms` finalization if shared validation API changes.
-- [ ] `ws2-concurrency` and `ws3-sparse-backend` can proceed in parallel after Phase 0 decisions.
-- [ ] `ws5-cli-docs-tests` can run in parallel with `ws2/ws3/ws4`.
-- [ ] `ws6-integration` starts only after all feature worktrees are merged or ready to merge.
+- [x] Phase 0 decisions complete before any breaking API/code-path changes.
+- [x] `ws1-api-core` must land before `ws4-algorithms` finalization if shared validation API changes.
+- [x] `ws2-concurrency` and `ws3-sparse-backend` can proceed in parallel after Phase 0 decisions.
+- [x] `ws5-cli-docs-tests` can run in parallel with `ws2/ws3/ws4`.
+- [x] `ws6-integration` starts only after all feature worktrees are merged or ready to merge.
 
 ## Traceability Checklist: Review Item Coverage
 
 ### Highest-Priority Findings
 
-- [ ] `quantum.Gate` misleading for multi-qubit usage.
+- [x] `quantum.Gate` misleading for multi-qubit usage.
 - [x] Fragile `ExecuteAllParallel` caller contract.
 - [x] Sparse backend not drop-in for general circuits.
 - [x] Normalization diagnostics wrong after rollback.
@@ -267,14 +267,14 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Missing negative-path tests for `DeutschJozsa` and `Grover`.
 - [x] Missing shared-state misuse tests for parallel execution.
 - [x] Missing race-focused tests for concurrent independent-state executions.
-- [ ] Missing direct tests for `FormatBlochVector` and `BlochCSV`.
+- [x] Missing direct tests for `FormatBlochVector` and `BlochCSV`.
 
 ## Suggested PR Sequence
 
 - [x] PR1: Phase 0 decision docs + non-breaking guardrails.
-- [ ] PR2: `ws1-api-core` correctness/API contract updates.
+- [x] PR2: `ws1-api-core` correctness/API contract updates.
 - [x] PR3: `ws2-concurrency` enforcement + tests.
 - [x] PR4: `ws3-sparse-backend` capability implementation + tests.
-- [ ] PR5: `ws4-algorithms` scalability + negative-path tests.
-- [ ] PR6: `ws5-cli-docs-tests` UX/docs/test fixes.
+- [x] PR5: `ws4-algorithms` scalability + negative-path tests.
+- [x] PR6: `ws5-cli-docs-tests` UX/docs/test fixes.
 - [ ] PR7: `ws6-integration` final merge, verification, and closure report.

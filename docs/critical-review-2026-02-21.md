@@ -18,8 +18,9 @@ Both dense and sparse `SetAmplitude` restore old values before returning `Normal
 
 ## Medium-Priority Findings
 
-1. CLI help and behavior are inconsistent.
+1. ~~CLI help and behavior are inconsistent.~~ ✅ RESOLVED
 `visual` is implemented (`cmd/quantum/main.go:48`) but omitted from the `-demo` help string (`cmd/quantum/main.go:84`). The optional parameter is parsed but unused (`cmd/quantum/main.go:138`).
+> **Resolution**: Added `visual` to help text, removed dead `-param` flag, added CLI tests. See Phase 2.1.
 
 2. Algorithm implementation scales poorly.
 Grover and Deutsch-Jozsa construct full dense matrices (`algorithm/grover.go:86`, `algorithm/grover.go:109`, `algorithm/deutsch_jozsa.go:68`), causing avoidable memory/time growth.
@@ -37,11 +38,13 @@ Grover and Deutsch-Jozsa construct full dense matrices (`algorithm/grover.go:86`
 Error cases in `DeutschJozsa` and `Grover` are not covered (`algorithm/deutsch_jozsa.go:19`, `algorithm/grover.go:15`).
 > **Resolution**: Added comprehensive negative path tests covering invalid qubit counts, nil oracles, empty marked sets, and out-of-range marked states. See Phase 3.1.
 
-2. Parallel tests do not validate unsafe shared-state usage.
+2. ~~Parallel tests do not validate unsafe shared-state usage.~~ ✅ RESOLVED
 Current tests verify successful independent execution (`circuit/parallel_test.go:42`) but do not test shared-state misuse.
+> **Resolution**: Added shared-state misuse tests with `SharedStateError` detection. See Phase 1.2.
 
-3. Visualization formatting helpers lack direct tests.
+3. ~~Visualization formatting helpers lack direct tests.~~ ✅ RESOLVED
 `FormatBlochVector` and `BlochCSV` are exported (`visualization/bloch.go:33`) but not directly tested (`visualization/bloch_test.go:11`).
+> **Resolution**: Added direct tests for `FormatBlochVector` and `BlochCSV` covering all output formats and edge cases. See Phase 3.3.
 
 ## What To Do Differently
 
@@ -85,8 +88,8 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 | Finding | Status | Resolution |
 |---------|--------|------------|
 | CLI help/behavior inconsistency | ✅ Resolved | Phase 2.1: `visual` added to help, dead `-param` removed, CLI tests added |
-| Algorithm scalability | 🔲 Pending | Phase 2.2: Not yet implemented |
-| Duplicated gate validation | 🔲 Pending | Phase 2.3: Not yet implemented |
+| Algorithm scalability | ✅ Resolved | Phase 2.2: Direct state-vector transformations replace dense matrix construction |
+| Duplicated gate validation | ✅ Resolved | Phase 2.3: Extracted to `quantum.GateQubitCount` with shared implementation |
 | Constructor inconsistency | ✅ Resolved | Phase 1.5: All constructors return `InvalidQubitCountError` for invalid counts |
 
 ### Test Coverage Gaps
