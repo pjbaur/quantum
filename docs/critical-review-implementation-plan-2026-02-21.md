@@ -143,12 +143,12 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [ ] Preserve algorithm correctness with deterministic output/state assertions.
 - [ ] Add focused benchmarks to compare pre/post memory/time for representative qubit counts.
 
-### 2.3 Shared gate-matrix validation (`ws1-api-core`)
+### 2.3 Shared gate-matrix validation (`ws1-api-core`) ✅ COMPLETE
 
-- [ ] Extract `gateQubitCount` into a single shared location/package.
-- [ ] Migrate `circuit`, dense `state`, and sparse backend to the shared helper.
-- [ ] Remove duplicated implementations and unify error strings.
-- [ ] Add table-driven validation tests that cover all current call sites.
+- [x] Extract `gateQubitCount` into a single shared location/package.
+- [x] Migrate `circuit`, dense `state`, and sparse backend to the shared helper.
+- [x] Remove duplicated implementations and unify error strings.
+- [x] Add table-driven validation tests that cover all current call sites.
 
 ## Phase 3: Test Coverage Expansion (Documented Gaps)
 
@@ -258,8 +258,8 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 - [ ] CLI help/behavior inconsistency (`visual` + optional parameter).
 - [ ] Algorithm scalability issues due to dense matrix construction.
-- [ ] Duplicated gate matrix validation logic.
-- [ ] Constructor inconsistency on invalid qubit counts.
+- [x] Duplicated gate matrix validation logic.
+- [x] Constructor inconsistency on invalid qubit counts.
 
 ### Test Coverage Gaps
 

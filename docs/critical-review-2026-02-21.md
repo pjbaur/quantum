@@ -24,10 +24,11 @@ Both dense and sparse `SetAmplitude` restore old values before returning `Normal
 2. Algorithm implementation scales poorly.
 Grover and Deutsch-Jozsa construct full dense matrices (`algorithm/grover.go:86`, `algorithm/grover.go:109`, `algorithm/deutsch_jozsa.go:68`), causing avoidable memory/time growth.
 
-3. Gate matrix validation is duplicated.
+3. ~~Gate matrix validation is duplicated.~~ ✅ RESOLVED
 `gateQubitCount` exists in three packages (`circuit/circuit.go:154`, `state/state.go:145`, `internal/sparsestate/state.go:116`), increasing drift risk.
+> **Resolution**: Extracted to `quantum.GateQubitCount` with `InvalidGateMatrixError` type. All packages now use the shared implementation. See Phase 2.3.
 
-4. Constructor behavior is inconsistent on invalid qubit counts.
+4. ~~Constructor behavior is inconsistent on invalid qubit counts.~~ ✅ RESOLVED
 `state.New` and sparse `New` silently coerce invalid counts to 1 (`state/state.go:26`, `internal/sparsestate/state.go:24`), while `circuit.New` returns an error (`circuit/circuit.go:25`).
 
 ## Test Coverage Gaps
