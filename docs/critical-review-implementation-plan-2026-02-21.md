@@ -136,12 +136,12 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] Add CLI tests or golden help-output assertions to prevent future drift.
 - [x] Update user-facing docs/examples to match implemented CLI behavior.
 
-### 2.2 Algorithm scalability refactor (`ws4-algorithms`)
+### 2.2 Algorithm scalability refactor (`ws4-algorithms`) ✅ COMPLETE
 
-- [ ] Replace full dense matrix construction in Grover with direct state-vector transformations where possible.
-- [ ] Replace full dense matrix construction in Deutsch-Jozsa with scalable operator application strategy.
-- [ ] Preserve algorithm correctness with deterministic output/state assertions.
-- [ ] Add focused benchmarks to compare pre/post memory/time for representative qubit counts.
+- [x] Replace full dense matrix construction in Grover with direct state-vector transformations where possible.
+- [x] Replace full dense matrix construction in Deutsch-Jozsa with scalable operator application strategy.
+- [x] Preserve algorithm correctness with deterministic output/state assertions.
+- [x] Add focused benchmarks to compare pre/post memory/time for representative qubit counts.
 
 ### 2.3 Shared gate-matrix validation (`ws1-api-core`)
 
@@ -219,10 +219,10 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 
 ### `ws4-algorithms`
 
-- [ ] Grover scalability refactor.
-- [ ] Deutsch-Jozsa scalability refactor.
+- [x] Grover scalability refactor.
+- [x] Deutsch-Jozsa scalability refactor.
 - [ ] Negative-path coverage for both algorithms.
-- [ ] Benchmark evidence and regression checks.
+- [x] Benchmark evidence and regression checks.
 
 ### `ws5-cli-docs-tests`
 
@@ -257,7 +257,7 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 ### Medium-Priority Findings
 
 - [x] CLI help/behavior inconsistency (`visual` + optional parameter).
-- [ ] Algorithm scalability issues due to dense matrix construction.
+- [x] Algorithm scalability issues due to dense matrix construction.
 - [ ] Duplicated gate matrix validation logic.
 - [x] Constructor inconsistency on invalid qubit counts.
 

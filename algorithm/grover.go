@@ -36,24 +36,12 @@ func Grover(numQubits int, marked []int) (*state.State, error) {
 		}
 	}
 
-	oracleGate, err := groverOracleGate(numQubits, markedSet)
-	if err != nil {
-		return nil, err
-	}
-	diffusionGate, err := groverDiffusionGate(numQubits)
-	if err != nil {
-		return nil, err
-	}
-
 	iterations := groverIterations(totalStates, len(markedSet))
-	targets := descendingTargets(numQubits)
 	for i := 0; i < iterations; i++ {
-		if err := search.ApplyGate(oracleGate, targets...); err != nil {
-			return nil, err
-		}
-		if err := search.ApplyGate(diffusionGate, targets...); err != nil {
-			return nil, err
-		}
+		// Apply oracle: flip sign of marked states
+		applyGroverOracle(search, markedSet)
+		// Apply diffusion: inversion about average
+		applyGroverDiffusion(search)
 	}
 
 	return search, nil
@@ -84,46 +72,55 @@ func uniqueMarked(marked []int, totalStates int) ([]int, error) {
 	return unique, nil
 }
 
-func groverOracleGate(numQubits int, marked []int) (*matrixGate, error) {
-	size := 1 << numQubits
-	matrix := make([][]complex128, size)
-	for i := range matrix {
-		matrix[i] = make([]complex128, size)
-	}
+// applyGroverOracle flips the sign of amplitudes at marked basis states.
+// This is O(m + n) where m is the number of marked states and n = 2^numQubits,
+// instead of O(n^2) for constructing the full oracle matrix.
+func applyGroverOracle(s *state.State, marked []int) {
+	n := s.NumQubits()
+	size := 1 << n
 
-	markedSet := make(map[int]struct{}, len(marked))
-	for _, state := range marked {
-		markedSet[state] = struct{}{}
-	}
-
+	// Get all amplitudes
+	amps := make([]complex128, size)
 	for i := 0; i < size; i++ {
-		value := complex(1, 0)
-		if _, ok := markedSet[i]; ok {
-			value = -1
-		}
-		matrix[i][i] = value
+		amps[i] = s.Amplitude(i)
 	}
 
-	return newMatrixGate("GroverOracle", matrix)
+	// Flip sign at marked indices
+	for _, idx := range marked {
+		amps[idx] = -amps[idx]
+	}
+
+	// Set all amplitudes at once (single normalization check)
+	s.SetAmplitudes(amps)
 }
 
-func groverDiffusionGate(numQubits int) (*matrixGate, error) {
-	size := 1 << numQubits
-	matrix := make([][]complex128, size)
-	for i := range matrix {
-		matrix[i] = make([]complex128, size)
+// applyGroverDiffusion applies the inversion-about-average operator.
+// Formula: |ψ⟩ → 2|s⟩⟨s|ψ⟩ - |ψ⟩ where |s⟩ is the uniform superposition.
+// This is computed as: new_amp[i] = 2*mean - old_amp[i]
+// This is O(n) where n = 2^numQubits, instead of O(n^2) for constructing
+// the full diffusion matrix.
+func applyGroverDiffusion(s *state.State) {
+	n := s.NumQubits()
+	size := 1 << n
+
+	// Get all amplitudes
+	amps := make([]complex128, size)
+	for i := 0; i < size; i++ {
+		amps[i] = s.Amplitude(i)
 	}
 
-	twoOverN := 2.0 / float64(size)
-	for row := 0; row < size; row++ {
-		for col := 0; col < size; col++ {
-			value := twoOverN
-			if row == col {
-				value -= 1
-			}
-			matrix[row][col] = complex(value, 0)
-		}
+	// Compute mean of all amplitudes
+	var sum complex128
+	for i := 0; i < size; i++ {
+		sum += amps[i]
+	}
+	mean := sum / complex(float64(size), 0)
+
+	// Apply inversion about average: new_amp = 2*mean - old_amp
+	for i := 0; i < size; i++ {
+		amps[i] = 2*mean - amps[i]
 	}
 
-	return newMatrixGate("GroverDiffusion", matrix)
+	// Set all amplitudes at once (single normalization check)
+	s.SetAmplitudes(amps)
 }

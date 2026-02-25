@@ -284,8 +284,8 @@ func TestGateHadamard(t *testing.T) {
 	if err != nil {
 		t.Fatalf("state.New failed: %v", err)
 	}
-	_ = s.ApplyGate(h, 0)  // |+⟩
-	_ = s.ApplyGate(h, 0)  // should be |0⟩ again
+	_ = s.ApplyGate(h, 0) // |+⟩
+	_ = s.ApplyGate(h, 0) // should be |0⟩ again
 
 	if cmplx.Abs(s.Amplitude(0)-1.0) > 1e-10 || cmplx.Abs(s.Amplitude(1)) > 1e-10 {
 		t.Errorf("H²|0⟩ should be |0⟩. Got α=%v, β=%v", s.Amplitude(0), s.Amplitude(1))
