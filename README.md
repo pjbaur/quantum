@@ -110,7 +110,7 @@ Run all tests with:
 go test ./...
 ```
 
-Tests live in [`quantum/quantum_test.go`](quantum/quantum_test.go), [`state/state_test.go`](state/state_test.go), and [`circuit/circuit_test.go`](circuit/circuit_test.go), covering qubit operations, gates, measurement, circuits, and multi-qubit states.
+Tests live in [`qubit/qubit_test.go`](qubit/qubit_test.go), [`quantum/quantum_test.go`](quantum/quantum_test.go), [`state/state_test.go`](state/state_test.go), and [`circuit/circuit_test.go`](circuit/circuit_test.go), covering qubit operations, gates, measurement, circuits, and multi-qubit states.
 
 ## Benchmarking
 ```bash
