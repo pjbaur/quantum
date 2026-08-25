@@ -42,8 +42,11 @@ func GateCatalogDemo() {
 	for _, name := range registry.Names() {
 		gate, ok := registry.Lookup(name)
 		if !ok {
+			// names come from Names() on this same registry, so a miss here is
+			// impossible by construction; skip defensively rather than truncate
+			// the rest of the catalog.
 			fmt.Printf("Error: gate %q missing from registry\n", name)
-			return
+			continue
 		}
 		fmt.Printf("\n%s:\n", name)
 		printGateMatrix(gate.Matrix())
@@ -54,7 +57,7 @@ func GateCatalogDemo() {
 func SwapDecompositionDemo() {
 	fmt.Println("\n=== SWAP Decomposition Demonstration ===")
 	fmt.Println("SWAP(a,b) = CNOT(a,b) · CNOT(b,a) · CNOT(a,b)")
-	fmt.Println("Prepare T·H on qubit 0 two ways and compare amplitudes.")
+	fmt.Println("Apply the swap two ways to identical states and compare amplitudes.")
 
 	direct, err := state.New(2)
 	if err != nil {
@@ -67,7 +70,9 @@ func SwapDecompositionDemo() {
 		return
 	}
 
-	// Identical non-trivial preparation on both states: H then T on qubit 0.
+	// Identical non-trivial preparation on both states: H then T on qubit 0,
+	// H then S on qubit 1. Both qubits must leave |0⟩ so the comparison can
+	// actually falsify a wrong decomposition.
 	for _, s := range []*state.State{direct, decomposed} {
 		if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
 			fmt.Printf("Error applying Hadamard gate: %v\n", err)
@@ -75,6 +80,14 @@ func SwapDecompositionDemo() {
 		}
 		if err := s.ApplyGate(gates.NewT(), 0); err != nil {
 			fmt.Printf("Error applying T gate: %v\n", err)
+			return
+		}
+		if err := s.ApplyGate(gates.NewHadamard(), 1); err != nil {
+			fmt.Printf("Error applying Hadamard gate: %v\n", err)
+			return
+		}
+		if err := s.ApplyGate(gates.NewS(), 1); err != nil {
+			fmt.Printf("Error applying S gate: %v\n", err)
 			return
 		}
 	}
@@ -90,7 +103,7 @@ func SwapDecompositionDemo() {
 		}
 	}
 
-	fmt.Println("\nbasis  |  SWAP gate           |  CNOT decomposition")
+	fmt.Println("\nbasis  |     SWAP gate     |  CNOT decomposition")
 	maxDiff := 0.0
 	for basis := 0; basis < 4; basis++ {
 		a := direct.Amplitude(basis)

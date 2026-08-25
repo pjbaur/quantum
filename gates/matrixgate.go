@@ -19,17 +19,15 @@ func NewMatrixGate(name string, matrix [][]complex128) (*MatrixGate, error) {
 	if name == "" {
 		return nil, errors.New("gate name must not be empty")
 	}
-	size := len(matrix)
+	size, err := squareSize(matrix)
+	if err != nil {
+		return nil, err
+	}
 	if size < 2 {
 		return nil, errors.New("matrix must be at least 2x2")
 	}
 	if size&(size-1) != 0 {
 		return nil, fmt.Errorf("matrix size %d is not a power of two", size)
-	}
-	for _, row := range matrix {
-		if len(row) != size {
-			return nil, errors.New("matrix must be square")
-		}
 	}
 
 	return &MatrixGate{

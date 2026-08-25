@@ -21,6 +21,7 @@ func TestNewMatrixGateValidation(t *testing.T) {
 		{"nil matrix", "G", nil, true},
 		{"1x1 matrix", "G", [][]complex128{{1}}, true},
 		{"non-square", "G", [][]complex128{{1, 0}, {0}}, true},
+		{"ragged, second row longer", "G", [][]complex128{{1, 0}, {0, 1, 0}}, true},
 		{"non power of two", "G", [][]complex128{
 			{1, 0, 0}, {0, 1, 0}, {0, 0, 1},
 		}, true},

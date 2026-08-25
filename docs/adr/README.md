@@ -45,6 +45,7 @@ What becomes easier or harder as a result?
 | 0004 | Diagnostics and Constructor Consistency | Accepted | 2026-02-21 |
 | 0005 | Regression Prevention Test Strategy | Accepted | 2026-02-21 |
 | 0006 | CLI Contract and Drift Prevention | Accepted | 2026-02-21 |
+| - | [Data-driven gates (design spec, supersedes concrete gate types)](../superpowers/specs/2026-08-25-data-driven-gates-design.md) | Accepted | 2026-08-25 |
 
 ## Process
 

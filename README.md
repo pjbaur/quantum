@@ -115,7 +115,7 @@ Run all tests with:
 go test ./...
 ```
 
-Tests live in [`qubit/qubit_test.go`](qubit/qubit_test.go), [`quantum/quantum_test.go`](quantum/quantum_test.go), [`state/state_test.go`](state/state_test.go), and [`circuit/circuit_test.go`](circuit/circuit_test.go), covering qubit operations, gates, measurement, circuits, and multi-qubit states.
+Tests live in [`qubit/qubit_test.go`](qubit/qubit_test.go), [`quantum/quantum_test.go`](quantum/quantum_test.go), [`state/state_test.go`](state/state_test.go), [`circuit/circuit_test.go`](circuit/circuit_test.go), and [`gates/`](gates/) (`gates_test.go`, `matrixgate_test.go`, `matrix_test.go`, `registry_test.go`, `decompose_test.go`), covering qubit operations, gates and gate validation, the built-in gate registry, SWAP decomposition, measurement, circuits, and multi-qubit states.
 
 ## Benchmarking
 ```bash
