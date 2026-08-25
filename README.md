@@ -78,7 +78,7 @@ fmt.Println(visualization.BlochCSV(vector, 4))
 
 - [`cmd/quantum/main.go`](cmd/quantum/main.go): Entry point and CLI for running demonstrations.
 - [`circuit/`](circuit/): Circuit abstraction for sequencing gate operations.
-- [`gates/gates.go`](gates/gates.go): Definitions of quantum gates (H, X, Y, Z, S, T, CNOT, SWAP, etc).
+- [`gates/`](gates/): Data-driven gate definitions (H, X, Y, Z, S, T, CNOT, SWAP), `MatrixGate` for custom gates, the built-in registry, and SWAP decomposition.
 - [`quantum/`](quantum/): Core interfaces and error types shared across packages.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
@@ -92,7 +92,7 @@ fmt.Println(visualization.BlochCSV(vector, 4))
   - [`noise.go`](internal/examples/noise.go): Noise channels on the density-matrix backend.
   - [`gates.go`](internal/examples/gates.go): Gate catalog and SWAP decomposition demonstration.
 - [`internal/density/`](internal/density/): Density-matrix backend for mixed states and noise channels (dephasing, amplitude damping, depolarizing).
-- Measurement helpers currently live on `state.State` and `qubit.Qubit`; a dedicated `measurement` package is TODO.
+- Measurement helpers live on `state.State` and `qubit.Qubit`.
 
 ### Parallel Circuit Execution
 

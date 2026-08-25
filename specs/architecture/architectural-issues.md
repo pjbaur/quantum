@@ -65,6 +65,7 @@ Tracked findings from quality/architecture assessments. See
 
 **Skill:** code-quality-assessment
 **Category:** RECOMMENDATION (P1)
+**Status:** Resolved (2026-08-25) — data-driven route per the issue's recommendation: `matrixGate` promoted to exported `gates.MatrixGate` (validated constructor, deep-copying `Matrix()`, `NumQubits()`); the eight concrete gate structs replaced by canonical matrix tables behind unchanged constructor names (golden tests lock exact values); `gates.Builtin()`/`Registry.Names()` added and consumed, with `DecomposeSwap`, by the new `gates` CLI demo; `algorithm/algorithm.go` (incl. `descendingTargets` and the v1 `Apply`) deleted; empty `measurement/` directory removed and README TODO dropped. Design: `docs/superpowers/specs/2026-08-25-data-driven-gates-design.md`.
 
 **Issue:** staticcheck U1000 ×6 in `algorithm/algorithm.go` (`matrixGate`, `newMatrixGate`, three methods, `descendingTargets`); `gates.Registry` and `gates.DecomposeSwap` have zero consumers; empty `measurement/` directory persists against a README TODO.
 
