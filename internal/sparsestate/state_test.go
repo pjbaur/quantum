@@ -490,6 +490,57 @@ func TestSparseMeasureUsesInjectedRandSource(t *testing.T) {
 	}
 }
 
+// TestSparseMeasureZeroProbabilityBranch drives Measure into the outcome
+// that carries no probability, mirroring the dense backend's test. The |1⟩
+// amplitude is small enough that this backend prunes it outright, so the
+// state passes the normalization check while prob0 lands just short of 1 —
+// close enough that the largest draw rand.Float64 can return selects outcome
+// 1 anyway. Without the guard the collapse divides by that branch's zero
+// normalization factor, leaving the state empty instead of normalized.
+func TestSparseMeasureZeroProbabilityBranch(t *testing.T) {
+	s, err := New(1)
+	if err != nil {
+		t.Fatalf("New(1) failed: %v", err)
+	}
+	if err := s.SetAmplitude(0, complex(1-1e-16, 0)); err != nil {
+		t.Fatalf("SetAmplitude(0) failed: %v", err)
+	}
+	// Pruned on the way in, which is precisely what empties the |1⟩ branch.
+	if err := s.SetAmplitude(1, complex(1e-200, 0)); err != nil {
+		t.Fatalf("SetAmplitude(1) failed: %v", err)
+	}
+	s.SetRandSource(&stubRandSource{values: []float64{math.Nextafter(1, 0)}})
+
+	got, err := s.Measure(0)
+	if err != nil {
+		t.Fatalf("Measure failed: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("Measure = %d, want 0 (the only outcome holding probability)", got)
+	}
+
+	for i := 0; i < 2; i++ {
+		if amp := s.Amplitude(i); cmplx.IsNaN(amp) || cmplx.IsInf(amp) {
+			t.Errorf("amplitude %d after collapse = %v, want a finite value", i, amp)
+		}
+	}
+	if sum := s.probabilitySum(); math.Abs(sum-1.0) > tolerance {
+		t.Errorf("probability sum after collapse = %v, want 1.0", sum)
+	}
+}
+
+// TestSparseMeasureEmptyStateErrors covers the guard's other arm: when
+// neither outcome holds probability there is nothing to collapse onto, so
+// Measure reports the broken invariant instead of producing a NaN state.
+// Only reachable by building a state that bypasses the normalization check.
+func TestSparseMeasureEmptyStateErrors(t *testing.T) {
+	s := &State{numQubits: 1, amplitudes: map[int]complex128{}}
+
+	if _, err := s.Measure(0); err == nil {
+		t.Fatal("Measure on an empty state returned no error, want one")
+	}
+}
+
 // TestSeededMeasurementDenseSparseEquivalence verifies that identically
 // seeded sources drive identical measurement outcomes on both backends.
 func TestSeededMeasurementDenseSparseEquivalence(t *testing.T) {

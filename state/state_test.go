@@ -448,3 +448,38 @@ func TestCloneInheritsRandSource(t *testing.T) {
 		t.Errorf("clone consumed draw 0.3: Measure = %d, want 0", got)
 	}
 }
+
+// TestMeasureZeroProbabilityBranch drives Measure into the outcome that
+// carries no probability. The |1⟩ amplitude is small enough that squaring it
+// underflows to exactly zero, so the state passes the normalization check
+// while prob0 lands just short of 1 — close enough that the largest draw
+// rand.Float64 can return selects outcome 1 anyway. Without the guard the
+// collapse divides by that branch's zero normalization factor and leaves
+// every amplitude NaN or infinite.
+func TestMeasureZeroProbabilityBranch(t *testing.T) {
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New(1) failed: %v", err)
+	}
+	if err := s.SetAmplitudes([]complex128{complex(1-1e-16, 0), complex(1e-200, 0)}); err != nil {
+		t.Fatalf("SetAmplitudes failed: %v", err)
+	}
+	s.SetRandSource(&stubRandSource{values: []float64{math.Nextafter(1, 0)}})
+
+	got, err := s.Measure(0)
+	if err != nil {
+		t.Fatalf("Measure failed: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("Measure = %d, want 0 (the only outcome holding probability)", got)
+	}
+
+	for i := 0; i < 2; i++ {
+		if amp := s.Amplitude(i); cmplx.IsNaN(amp) || cmplx.IsInf(amp) {
+			t.Errorf("amplitude %d after collapse = %v, want a finite value", i, amp)
+		}
+	}
+	if sum := s.Probability(0) + s.Probability(1); math.Abs(sum-1.0) > tolerance {
+		t.Errorf("probability sum after collapse = %v, want 1.0", sum)
+	}
+}

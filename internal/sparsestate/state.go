@@ -12,6 +12,16 @@ import (
 
 const pruneEpsilon = 1e-12
 
+// minBranchProbability is the probability below which a measurement branch
+// is treated as empty rather than collapsed onto. It is far below any
+// probability an honest draw can single out: selecting a branch this faint
+// needs prob0 to sit within 1e-24 of 1, but float64 resolves values near 1
+// only to ~1e-16, so no legitimate outcome is suppressed by the floor. It is
+// pruneEpsilon squared, the probability of the faintest amplitude this
+// backend keeps, and the dense backend uses the same floor so both treat the
+// same faint branches as carrying no amplitude.
+const minBranchProbability = pruneEpsilon * pruneEpsilon
+
 // State is a sparse quantum state representation that stores only non-zero amplitudes.
 type State struct {
 	numQubits  int
@@ -297,11 +307,13 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		}
 	}
 
-	prob0 := 0.0
+	prob0, prob1 := 0.0, 0.0
 	mask := 1 << qubitIndex
 	for index, amplitude := range s.amplitudes {
 		if index&mask == 0 {
 			prob0 += quantum.Probability(amplitude)
+		} else {
+			prob1 += quantum.Probability(amplitude)
 		}
 	}
 
@@ -310,19 +322,34 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		result = 1
 	}
 
+	// The draw can land on a branch that holds no probability at all.
+	// Round-off in prob0 leaves a sliver of the [0,1) draw range pointing
+	// at an outcome the state has nothing in, and amplitudes small enough
+	// to square to zero are pruned from the map entirely. Collapsing there
+	// would divide by a zero normalization factor, leaving every surviving
+	// amplitude infinite (or the state empty), so measure the other outcome
+	// instead: it holds essentially all of the probability, which is what
+	// the draw would have selected had prob0 been exact. Both branches empty
+	// means the state is not normalized and there is nothing to collapse onto.
+	branchProb, otherProb := prob0, prob1
+	if result == 1 {
+		branchProb, otherProb = prob1, prob0
+	}
+	if branchProb < minBranchProbability {
+		if otherProb < minBranchProbability {
+			return 0, fmt.Errorf("measuring qubit %d: neither outcome has any probability (sum %g); state is not normalized",
+				qubitIndex, prob0+prob1)
+		}
+		result, branchProb = 1-result, otherProb
+	}
+
 	newAmplitudes := make(map[int]complex128, len(s.amplitudes))
-	normalizationFactor := 0.0
+	normalizationFactor := complex(math.Sqrt(branchProb), 0)
 	for index, amplitude := range s.amplitudes {
 		isBitSet := index&mask != 0
 		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
-			newAmplitudes[index] = amplitude
-			normalizationFactor += quantum.Probability(amplitude)
+			newAmplitudes[index] = amplitude / normalizationFactor
 		}
-	}
-
-	normalizationFactor = math.Sqrt(normalizationFactor)
-	for index, amplitude := range newAmplitudes {
-		newAmplitudes[index] = amplitude / complex(normalizationFactor, 0)
 	}
 
 	s.amplitudes = newAmplitudes
