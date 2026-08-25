@@ -58,6 +58,8 @@ go run ./cmd/quantum algorithm  # Run Deutsch-Jozsa and Grover demonstrations
 go run ./cmd/quantum visual     # Run visualization demonstrations
 go run ./cmd/quantum noise      # Run noise channel demonstrations (density matrices)
 go run ./cmd/quantum gates      # Run gate catalog and decomposition demonstrations
+go run ./cmd/quantum gate       # List the gates in the built-in registry
+go run ./cmd/quantum gate CNOT  # Print one registered gate's qubit count and matrix
 go run ./cmd/quantum all        # Run all demonstrations sequentially
 ```
 

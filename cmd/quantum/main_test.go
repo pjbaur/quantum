@@ -23,6 +23,7 @@ func TestCLIHelpOutputDemos(t *testing.T) {
 		{"noise demo", "noise"},
 		{"gates demo", "gates"},
 		{"all demo", "all"},
+		{"gate command", "Look up one built-in gate by name"},
 	}
 
 	// Get help output
@@ -201,6 +202,104 @@ func TestCLIGatesDemoRuns(t *testing.T) {
 		if !strings.Contains(output, want) {
 			t.Errorf("gates demo output missing %q, got:\n%s", want, output)
 		}
+	}
+}
+
+// TestCLIGateLookup verifies that "quantum gate <name>" reports the gate found
+// in the built-in registry, for both a one-qubit and a two-qubit gate.
+func TestCLIGateLookup(t *testing.T) {
+	tests := []struct {
+		name     string
+		gate     string
+		expected []string
+	}{
+		{
+			name:     "one-qubit gate",
+			gate:     "Hadamard",
+			expected: []string{"Gate: Hadamard", "Qubits: 1", "0.707+0.000i", "-0.707+0.000i"},
+		},
+		{
+			name:     "two-qubit gate",
+			gate:     "CNOT",
+			expected: []string{"Gate: CNOT", "Qubits: 2", "1.000+0.000i"},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			cmd := exec.Command("go", "run", "./cmd/quantum", "gate", tt.gate)
+			var stdout, stderr bytes.Buffer
+			cmd.Stdout = &stdout
+			cmd.Stderr = &stderr
+
+			if err := cmd.Run(); err != nil {
+				t.Fatalf("gate lookup failed.\nStdout: %s\nStderr: %s", stdout.String(), stderr.String())
+			}
+
+			output := stdout.String()
+			for _, want := range tt.expected {
+				if !strings.Contains(output, want) {
+					t.Errorf("gate output missing %q, got:\n%s", want, output)
+				}
+			}
+		})
+	}
+}
+
+// TestCLIGateUnknownName verifies that an unregistered gate name fails and that
+// the error lists the names the registry does hold.
+func TestCLIGateUnknownName(t *testing.T) {
+	cmd := exec.Command("go", "run", "./cmd/quantum", "gate", "NotAGate")
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Fatalf("expected error for unknown gate, but command succeeded.\nOutput:\n%s", string(output))
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "unknown gate: NotAGate") {
+		t.Errorf("expected 'unknown gate' error message, got:\n%s", outputStr)
+	}
+	for _, want := range []string{"Hadamard", "CNOT", "SWAP"} {
+		if !strings.Contains(outputStr, want) {
+			t.Errorf("error message missing registered gate %q, got:\n%s", want, outputStr)
+		}
+	}
+}
+
+// TestCLIGateListsNames verifies that "quantum gate" without a name lists every
+// gate in the built-in registry.
+func TestCLIGateListsNames(t *testing.T) {
+	cmd := exec.Command("go", "run", "./cmd/quantum", "gate")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("gate listing failed.\nStdout: %s\nStderr: %s", stdout.String(), stderr.String())
+	}
+
+	output := stdout.String()
+	for _, want := range []string{"CNOT", "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "SWAP", "T"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("gate listing missing %q, got:\n%s", want, output)
+		}
+	}
+}
+
+// TestCLIGateTooManyArguments verifies that the gate command still accepts only
+// a single gate name.
+func TestCLIGateTooManyArguments(t *testing.T) {
+	cmd := exec.Command("go", "run", "./cmd/quantum", "gate", "Hadamard", "PauliX")
+	output, err := cmd.CombinedOutput()
+
+	if err == nil {
+		t.Fatalf("expected error for too many arguments, but command succeeded.\nOutput:\n%s", string(output))
+	}
+
+	outputStr := string(output)
+	if !strings.Contains(outputStr, "too many arguments") {
+		t.Errorf("expected 'too many arguments' error message, got:\n%s", outputStr)
 	}
 }
 
