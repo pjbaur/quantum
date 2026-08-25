@@ -21,6 +21,7 @@ func TestCLIHelpOutputDemos(t *testing.T) {
 		{"algorithm demo", "algorithm"},
 		{"visual demo", "visual"},
 		{"noise demo", "noise"},
+		{"gates demo", "gates"},
 		{"all demo", "all"},
 	}
 
@@ -52,7 +53,7 @@ func TestCLIHelpOutputFlagDescription(t *testing.T) {
 	helpText := string(output)
 
 	// The -demo flag should list all available demos
-	expectedDemos := []string{"hadamard", "tgate", "bell", "algorithm", "visual", "noise", "all"}
+	expectedDemos := []string{"hadamard", "tgate", "bell", "algorithm", "visual", "noise", "gates", "all"}
 	for _, demo := range expectedDemos {
 		if !strings.Contains(helpText, demo) {
 			t.Errorf("-demo flag description missing %q in help output.\nHelp output:\n%s", demo, helpText)
@@ -173,6 +174,32 @@ func TestCLINoiseDemoRuns(t *testing.T) {
 	for _, want := range []string{"Dephasing", "Amplitude Damping", "Depolarizing", "purity"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("noise demo output missing %q, got:\n%s", want, output)
+		}
+	}
+}
+
+// TestCLIGatesDemoRuns verifies the gates demo executes successfully.
+func TestCLIGatesDemoRuns(t *testing.T) {
+	// Skip in short mode since this runs the actual demo
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	cmd := exec.Command("go", "run", "./cmd/quantum", "gates")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		t.Fatalf("gates demo failed to run.\nStdout: %s\nStderr: %s", stdout.String(), stderr.String())
+	}
+
+	// Verify some expected output content
+	output := stdout.String()
+	for _, want := range []string{"Hadamard", "CNOT", "SWAP", "decomposition", "match"} {
+		if !strings.Contains(output, want) {
+			t.Errorf("gates demo output missing %q, got:\n%s", want, output)
 		}
 	}
 }
