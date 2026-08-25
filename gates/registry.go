@@ -3,6 +3,7 @@ package gates
 import (
 	"errors"
 	"fmt"
+	"sort"
 
 	"github.com/pjbaur/quantum/quantum"
 )
@@ -47,4 +48,34 @@ func (r *Registry) Lookup(name string) (quantum.Gate, bool) {
 	}
 	gate, ok := r.gates[name]
 	return gate, ok
+}
+
+// Names returns the sorted names of all registered gates.
+func (r *Registry) Names() []string {
+	if r == nil || len(r.gates) == 0 {
+		return nil
+	}
+	names := make([]string, 0, len(r.gates))
+	for name := range r.gates {
+		names = append(names, name)
+	}
+	sort.Strings(names)
+	return names
+}
+
+// Builtin returns a new Registry preloaded with every built-in gate.
+// Each call returns a fresh registry, so callers may extend their copy
+// without affecting others.
+func Builtin() *Registry {
+	registry := NewRegistry()
+	builtins := []*MatrixGate{
+		NewHadamard(), NewPauliX(), NewPauliY(), NewPauliZ(),
+		NewS(), NewT(), NewCNOT(), NewSwap(),
+	}
+	for _, gate := range builtins {
+		if err := registry.Register(gate); err != nil {
+			panic(fmt.Sprintf("builtin registry: %v", err))
+		}
+	}
+	return registry
 }
