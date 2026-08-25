@@ -174,6 +174,53 @@ func (g *denseTwoQubitGate) Matrix() [][]complex128 {
 	return g.matrix
 }
 
+// impostorCNOTGate is named "CNOT" but carries a CZ matrix. The sparse
+// backend must dispatch on the matrix content, not the gate name.
+type impostorCNOTGate struct{}
+
+func (g *impostorCNOTGate) Name() string {
+	return "CNOT"
+}
+
+func (g *impostorCNOTGate) Matrix() [][]complex128 {
+	return [][]complex128{
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, -1},
+	}
+}
+
+func TestSparseGateNamedCNOTUsesItsMatrix(t *testing.T) {
+	dense, err := state.New(2)
+	if err != nil {
+		t.Fatalf("dense state.New failed: %v", err)
+	}
+	sparse, err := New(2)
+	if err != nil {
+		t.Fatalf("sparse New failed: %v", err)
+	}
+
+	// Prepare (|00⟩+|01⟩+|10⟩+|11⟩)/2 so CZ and CNOT semantics diverge.
+	for _, qs := range []quantum.QuantumState{dense, sparse} {
+		for i := 0; i < 2; i++ {
+			if err := qs.ApplyGate(gates.NewHadamard(), i); err != nil {
+				t.Fatalf("ApplyGate Hadamard failed: %v", err)
+			}
+		}
+	}
+
+	impostor := &impostorCNOTGate{}
+	if err := dense.ApplyGate(impostor, 0, 1); err != nil {
+		t.Fatalf("dense ApplyGate failed: %v", err)
+	}
+	if err := sparse.ApplyGate(impostor, 0, 1); err != nil {
+		t.Fatalf("sparse ApplyGate failed: %v", err)
+	}
+
+	assertStatesMatch(t, dense, sparse)
+}
+
 func TestSparseTwoQubitTargetOrderingMatchesDense(t *testing.T) {
 	tests := []struct {
 		name      string

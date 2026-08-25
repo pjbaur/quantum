@@ -159,10 +159,6 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 }
 
 func (s *State) applyTwoQubitGate(gate quantum.Gate, targets []int) error {
-	if gate.Name() == "CNOT" {
-		return s.applyCNOT(targets[0], targets[1])
-	}
-
 	matrix := gate.Matrix()
 	if len(matrix) != 4 || len(matrix[0]) != 4 {
 		return &quantum.InvalidGateApplicationError{
@@ -170,6 +166,10 @@ func (s *State) applyTwoQubitGate(gate quantum.Gate, targets []int) error {
 			RequiredLen: 4,
 			ActualLen:   len(matrix),
 		}
+	}
+
+	if isCanonicalCNOT(matrix) {
+		return s.applyCNOT(targets[0], targets[1])
 	}
 
 	comboMasks, targetMask := buildComboMasks(targets)
@@ -223,6 +223,33 @@ func (s *State) applyCNOT(control, target int) error {
 
 	s.amplitudes = newAmplitudes
 	return nil
+}
+
+var canonicalCNOT = [4][4]complex128{
+	{1, 0, 0, 0},
+	{0, 1, 0, 0},
+	{0, 0, 0, 1},
+	{0, 0, 1, 0},
+}
+
+// isCanonicalCNOT reports whether matrix is exactly the standard CNOT matrix.
+// The CNOT fast path is selected by matrix content rather than gate name, so
+// a user-defined gate named "CNOT" with different semantics is not hijacked.
+func isCanonicalCNOT(matrix [][]complex128) bool {
+	if len(matrix) != 4 {
+		return false
+	}
+	for row := range matrix {
+		if len(matrix[row]) != 4 {
+			return false
+		}
+		for col, value := range matrix[row] {
+			if value != canonicalCNOT[row][col] {
+				return false
+			}
+		}
+	}
+	return true
 }
 
 func buildComboMasks(targets []int) ([]int, int) {
