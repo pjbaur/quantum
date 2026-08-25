@@ -54,7 +54,7 @@ func GateCatalogDemo() {
 func SwapDecompositionDemo() {
 	fmt.Println("\n=== SWAP Decomposition Demonstration ===")
 	fmt.Println("SWAP(a,b) = CNOT(a,b) · CNOT(b,a) · CNOT(a,b)")
-	fmt.Println("Prepare (H⊗T)|00⟩ two ways and compare amplitudes.")
+	fmt.Println("Prepare T·H on qubit 0 two ways and compare amplitudes.")
 
 	direct, err := state.New(2)
 	if err != nil {
@@ -67,13 +67,13 @@ func SwapDecompositionDemo() {
 		return
 	}
 
-	// Identical non-trivial preparation on both states.
+	// Identical non-trivial preparation on both states: H then T on qubit 0.
 	for _, s := range []*state.State{direct, decomposed} {
 		if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
 			fmt.Printf("Error applying Hadamard gate: %v\n", err)
 			return
 		}
-		if err := s.ApplyGate(gates.NewT(), 1); err != nil {
+		if err := s.ApplyGate(gates.NewT(), 0); err != nil {
 			fmt.Printf("Error applying T gate: %v\n", err)
 			return
 		}
