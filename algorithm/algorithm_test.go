@@ -3,6 +3,9 @@ package algorithm
 import (
 	"math"
 	"testing"
+
+	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/state"
 )
 
 func TestDeutschJozsaOutputDistribution(t *testing.T) {
@@ -137,6 +140,28 @@ func TestDeutschJozsaNegativePaths(t *testing.T) {
 				t.Fatalf("expected error %q, got %q", tt.wantErr, err.Error())
 			}
 		})
+	}
+}
+
+// applyGroverOracle and applyGroverDiffusion must surface SetAmplitudes
+// failures instead of silently discarding them (mirrors applyDeutschJozsaOracle).
+func TestGroverHelpersReturnSetAmplitudesErrors(t *testing.T) {
+	s, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New: %v", err)
+	}
+	hGate := gates.NewHadamard()
+	for i := 0; i < 2; i++ {
+		if err := s.ApplyGate(hGate, i); err != nil {
+			t.Fatalf("ApplyGate: %v", err)
+		}
+	}
+
+	if err := applyGroverOracle(s, []int{3}); err != nil {
+		t.Fatalf("applyGroverOracle on normalized state: %v", err)
+	}
+	if err := applyGroverDiffusion(s); err != nil {
+		t.Fatalf("applyGroverDiffusion on normalized state: %v", err)
 	}
 }
 

@@ -39,9 +39,13 @@ func Grover(numQubits int, marked []int) (*state.State, error) {
 	iterations := groverIterations(totalStates, len(markedSet))
 	for i := 0; i < iterations; i++ {
 		// Apply oracle: flip sign of marked states
-		applyGroverOracle(search, markedSet)
+		if err := applyGroverOracle(search, markedSet); err != nil {
+			return nil, err
+		}
 		// Apply diffusion: inversion about average
-		applyGroverDiffusion(search)
+		if err := applyGroverDiffusion(search); err != nil {
+			return nil, err
+		}
 	}
 
 	return search, nil
@@ -75,7 +79,7 @@ func uniqueMarked(marked []int, totalStates int) ([]int, error) {
 // applyGroverOracle flips the sign of amplitudes at marked basis states.
 // This is O(m + n) where m is the number of marked states and n = 2^numQubits,
 // instead of O(n^2) for constructing the full oracle matrix.
-func applyGroverOracle(s *state.State, marked []int) {
+func applyGroverOracle(s *state.State, marked []int) error {
 	n := s.NumQubits()
 	size := 1 << n
 
@@ -91,7 +95,7 @@ func applyGroverOracle(s *state.State, marked []int) {
 	}
 
 	// Set all amplitudes at once (single normalization check)
-	s.SetAmplitudes(amps)
+	return s.SetAmplitudes(amps)
 }
 
 // applyGroverDiffusion applies the inversion-about-average operator.
@@ -99,7 +103,7 @@ func applyGroverOracle(s *state.State, marked []int) {
 // This is computed as: new_amp[i] = 2*mean - old_amp[i]
 // This is O(n) where n = 2^numQubits, instead of O(n^2) for constructing
 // the full diffusion matrix.
-func applyGroverDiffusion(s *state.State) {
+func applyGroverDiffusion(s *state.State) error {
 	n := s.NumQubits()
 	size := 1 << n
 
@@ -122,5 +126,5 @@ func applyGroverDiffusion(s *state.State) {
 	}
 
 	// Set all amplitudes at once (single normalization check)
-	s.SetAmplitudes(amps)
+	return s.SetAmplitudes(amps)
 }
