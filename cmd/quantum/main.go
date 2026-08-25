@@ -26,6 +26,7 @@ func usage() {
 	fmt.Fprintln(out, "  bell      - Bell state demonstrations")
 	fmt.Fprintln(out, "  algorithm - Algorithm demonstrations (Deutsch-Jozsa, Grover)")
 	fmt.Fprintln(out, "  visual    - Visualization demonstrations")
+	fmt.Fprintln(out, "  noise     - Noise channel demonstrations (density matrices)")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Examples:")
 	fmt.Fprintln(out, "  quantum hadamard       - Run Hadamard gate examples")
@@ -46,6 +47,8 @@ func runDemos(demoType string) error {
 		examples.RunAllAlgorithmDemos()
 	case "visual":
 		examples.RunAllVisualizationDemos()
+	case "noise":
+		examples.RunAllNoiseDemos()
 	case "all":
 		fmt.Println("\n========================================================")
 		fmt.Println("             QUANTUM COMPUTING IN GO")
@@ -69,6 +72,10 @@ func runDemos(demoType string) error {
 		fmt.Scanln()
 
 		examples.RunAllVisualizationDemos()
+		fmt.Println("\nPress Enter to continue to noise channel demonstrations...")
+		fmt.Scanln()
+
+		examples.RunAllNoiseDemos()
 
 		fmt.Println("\n========================================================")
 		fmt.Println("             ALL DEMONSTRATIONS COMPLETED")
@@ -80,7 +87,7 @@ func runDemos(demoType string) error {
 }
 
 func main() {
-	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, visual, all)")
+	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, visual, noise, all)")
 	flag.Usage = usage
 	flag.Parse()
 

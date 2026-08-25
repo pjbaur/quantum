@@ -21,9 +21,13 @@ type Matrix struct {
 }
 
 // New creates a density matrix initialized to |00...0⟩⟨00...0|.
-func New(numQubits int) *Matrix {
+// Returns InvalidQubitCountError if numQubits <= 0.
+func New(numQubits int) (*Matrix, error) {
 	if numQubits <= 0 {
-		numQubits = 1
+		return nil, &quantum.InvalidQubitCountError{
+			Requested: numQubits,
+			Reason:    "must be positive",
+		}
 	}
 
 	dim := 1 << numQubits
@@ -34,7 +38,7 @@ func New(numQubits int) *Matrix {
 		numQubits: numQubits,
 		dim:       dim,
 		data:      data,
-	}
+	}, nil
 }
 
 // NumQubits returns the number of qubits represented by the matrix.
@@ -57,6 +61,44 @@ func (m *Matrix) Trace() float64 {
 		sum += m.data[i*m.dim+i]
 	}
 	return real(sum)
+}
+
+// Purity returns Tr(ρ²), which is 1 for pure states and 1/2ⁿ for the
+// maximally mixed state.
+func (m *Matrix) Purity() float64 {
+	sum := 0.0
+	for _, v := range m.data {
+		sum += real(v)*real(v) + imag(v)*imag(v)
+	}
+	return sum
+}
+
+// ReducedBlochVector traces out all qubits except target and returns the
+// Bloch vector (x, y, z) of the reduced single-qubit state. For mixed
+// states the vector lies inside the unit sphere.
+func (m *Matrix) ReducedBlochVector(target int) (x, y, z float64, err error) {
+	if target < 0 || target >= m.numQubits {
+		return 0, 0, 0, &quantum.QubitsOutOfRangeError{
+			Index:    target,
+			MaxIndex: m.numQubits - 1,
+		}
+	}
+
+	low := (1 << target) - 1
+	var r00, r01, r11 complex128
+	for k := 0; k < m.dim/2; k++ {
+		base := ((k &^ low) << 1) | (k & low)
+		i0 := base
+		i1 := base | (1 << target)
+		r00 += m.data[i0*m.dim+i0]
+		r01 += m.data[i0*m.dim+i1]
+		r11 += m.data[i1*m.dim+i1]
+	}
+
+	x = 2 * real(r01)
+	y = -2 * imag(r01)
+	z = real(r00 - r11)
+	return x, y, z, nil
 }
 
 // ApplySingleQubitGate applies a single-qubit unitary to the specified target.

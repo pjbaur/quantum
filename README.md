@@ -55,6 +55,7 @@ go run ./cmd/quantum tgate      # Run T-gate demonstrations
 go run ./cmd/quantum bell       # Run Bell state demonstrations
 go run ./cmd/quantum algorithm  # Run Deutsch-Jozsa and Grover demonstrations
 go run ./cmd/quantum visual     # Run visualization demonstrations
+go run ./cmd/quantum noise      # Run noise channel demonstrations (density matrices)
 go run ./cmd/quantum all        # Run all demonstrations sequentially
 ```
 
@@ -87,6 +88,8 @@ fmt.Println(visualization.BlochCSV(vector, 4))
   - [`bell.go`](internal/examples/bell.go): Bell states, entanglement, and teleportation.
   - [`algorithm.go`](internal/examples/algorithm.go): Deutsch-Jozsa and Grover algorithms.
   - [`visualization.go`](internal/examples/visualization.go): State table and Bloch vector outputs.
+  - [`noise.go`](internal/examples/noise.go): Noise channels on the density-matrix backend.
+- [`internal/density/`](internal/density/): Density-matrix backend for mixed states and noise channels (dephasing, amplitude damping, depolarizing).
 - Measurement helpers currently live on `state.State` and `qubit.Qubit`; a dedicated `measurement` package is TODO.
 
 ### Parallel Circuit Execution
