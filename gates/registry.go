@@ -66,11 +66,17 @@ func (r *Registry) Names() []string {
 // Builtin returns a new Registry preloaded with every built-in gate.
 // Each call returns a fresh registry, so callers may extend their copy
 // without affecting others.
+//
+// Only gates with a fixed matrix live here. The parameterized constructors
+// (NewRx, NewRy, NewRz, NewPhase) and NewControlled describe a family of
+// gates rather than one gate, so there is no single instance to register
+// under their name; callers build the member they want and register it in
+// their own copy of the registry if they need lookup by name.
 func Builtin() *Registry {
 	registry := NewRegistry()
 	builtins := []*MatrixGate{
 		NewHadamard(), NewPauliX(), NewPauliY(), NewPauliZ(),
-		NewS(), NewT(), NewCNOT(), NewSwap(),
+		NewS(), NewT(), NewCNOT(), NewSwap(), NewToffoli(),
 	}
 	for _, gate := range builtins {
 		if err := registry.Register(gate); err != nil {

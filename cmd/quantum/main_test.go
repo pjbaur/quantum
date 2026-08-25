@@ -205,6 +205,48 @@ func TestCLIGatesDemoRuns(t *testing.T) {
 	}
 }
 
+// TestCLIAlgorithmDemoRuns verifies the algorithm demo executes successfully,
+// and that its gate-built Grover diffusion still agrees with the algorithm
+// package's fast path. The demo prints a verdict line per comparison and
+// swallows its own errors, so both the verdict and the absence of an error
+// report are asserted here rather than left as prose nobody reads.
+func TestCLIAlgorithmDemoRuns(t *testing.T) {
+	// Skip in short mode since this runs the actual demo
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	cmd := exec.Command("go", "run", "./cmd/quantum", "algorithm")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+	err := cmd.Run()
+
+	if err != nil {
+		t.Fatalf("algorithm demo failed to run.\nStdout: %s\nStderr: %s", stdout.String(), stderr.String())
+	}
+
+	output := stdout.String()
+	want := []string{
+		"Deutsch-Jozsa",
+		"Grover Demonstration",
+		"Grover Diffusion as a Gate Sequence",
+		"algorithm.Grover",
+		"Amplitudes match",
+	}
+	for _, expected := range want {
+		if !strings.Contains(output, expected) {
+			t.Errorf("algorithm demo output missing %q, got:\n%s", expected, output)
+		}
+	}
+	if strings.Contains(output, "DO NOT match") {
+		t.Errorf("gate circuit disagreed with the algorithm's fast path, got:\n%s", output)
+	}
+	if strings.Contains(output, "Error") {
+		t.Errorf("algorithm demo reported an error, got:\n%s", output)
+	}
+}
+
 // TestCLIGateLookup verifies that "quantum gate <name>" reports the gate found
 // in the built-in registry, for both a one-qubit and a two-qubit gate.
 func TestCLIGateLookup(t *testing.T) {
@@ -280,7 +322,7 @@ func TestCLIGateListsNames(t *testing.T) {
 	}
 
 	output := stdout.String()
-	for _, want := range []string{"CNOT", "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "SWAP", "T"} {
+	for _, want := range []string{"CNOT", "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "SWAP", "T", "Toffoli"} {
 		if !strings.Contains(output, want) {
 			t.Errorf("gate listing missing %q, got:\n%s", want, output)
 		}

@@ -30,7 +30,7 @@ func TestRegistryRejectsDuplicate(t *testing.T) {
 
 func TestBuiltinRegistryContents(t *testing.T) {
 	registry := Builtin()
-	want := []string{"CNOT", "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "SWAP", "T"}
+	want := []string{"CNOT", "Hadamard", "PauliX", "PauliY", "PauliZ", "S", "SWAP", "T", "Toffoli"}
 
 	names := registry.Names()
 	if len(names) != len(want) {

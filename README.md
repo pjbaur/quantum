@@ -5,7 +5,8 @@ This project provides a basic simulation of quantum computing concepts using the
 ## Features
 
 - Single- and multi-qubit simulation with a shared `quantum` interface layer
-- Hadamard, Pauli (X, Y, Z), S, T, CNOT, and SWAP gates
+- Hadamard, Pauli (X, Y, Z), S, T, CNOT, SWAP, and Toffoli gates
+- Parameterized gates: `Rx`/`Ry`/`Rz` rotations, `Phase`, and a controlled-U construction that turns any gate into its controlled form
 - Measurement and probability calculations for qubits and quantum states
 - Reproducible measurements: inject a seeded source with `SetRandSource` (defaults to `math/rand`'s global source)
 - Circuit abstraction for sequencing gate operations
@@ -81,7 +82,7 @@ fmt.Println(visualization.BlochCSV(vector, 4))
 
 - [`cmd/quantum/main.go`](cmd/quantum/main.go): Entry point and CLI for running demonstrations.
 - [`circuit/`](circuit/): Circuit abstraction for sequencing gate operations.
-- [`gates/`](gates/): Data-driven gate definitions (H, X, Y, Z, S, T, CNOT, SWAP), `MatrixGate` for custom gates, the built-in registry, and SWAP decomposition.
+- [`gates/`](gates/): Data-driven gate definitions (H, X, Y, Z, S, T, CNOT, SWAP, Toffoli), the parameterized `Rx`/`Ry`/`Rz`/`Phase` constructors, `NewControlled` for controlled-U, `MatrixGate` for custom gates, the built-in registry, and SWAP decomposition.
 - [`quantum/`](quantum/): Core interfaces and error types shared across packages.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.
@@ -90,7 +91,7 @@ fmt.Println(visualization.BlochCSV(vector, 4))
   - [`hadamard.go`](internal/examples/hadamard.go): Hadamard gate and superposition.
   - [`tgate.go`](internal/examples/tgate.go): T-gate and phase operations.
   - [`bell.go`](internal/examples/bell.go): Bell states, entanglement, and teleportation.
-  - [`algorithm.go`](internal/examples/algorithm.go): Deutsch-Jozsa and Grover algorithms.
+  - [`algorithm.go`](internal/examples/algorithm.go): Deutsch-Jozsa and Grover algorithms, plus Grover's diffusion operator built from gates and compared against the algorithm's fast path.
   - [`visualization.go`](internal/examples/visualization.go): State table and Bloch vector outputs.
   - [`noise.go`](internal/examples/noise.go): Noise channels on the density-matrix backend.
   - [`gates.go`](internal/examples/gates.go): Gate catalog and SWAP decomposition demonstration.

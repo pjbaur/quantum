@@ -141,6 +141,46 @@ func TestApplyGateThreeQubitTargetOrdering(t *testing.T) {
 	}
 }
 
+// TestApplyGateBuiltinToffoli runs the registered Toffoli through the dense
+// three-qubit path. TestApplyGateThreeQubitTargetOrdering pins the backend's
+// mapping of targets onto a hand-built Toffoli table; this pins that the gate
+// the library ships uses the same convention, so
+// ApplyGate(Toffoli, c1, c2, target) means what it reads like.
+func TestApplyGateBuiltinToffoli(t *testing.T) {
+	tests := []struct {
+		name      string
+		setup     []int // qubits to flip to |1⟩ before the Toffoli
+		wantIndex int
+	}{
+		{name: "both controls set flips the target", setup: []int{2, 1}, wantIndex: 7},
+		{name: "one control set leaves the target alone", setup: []int{2}, wantIndex: 4},
+		{name: "no control set leaves the target alone", setup: nil, wantIndex: 0},
+		{name: "both controls set unflips a set target", setup: []int{2, 1, 0}, wantIndex: 6},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qs, err := state.New(3)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
+			for _, qubit := range tt.setup {
+				if err := qs.ApplyGate(gates.NewPauliX(), qubit); err != nil {
+					t.Fatalf("ApplyGate(PauliX, %d) returned error: %v", qubit, err)
+				}
+			}
+
+			// Controls first, target last, matching the gate's own basis order.
+			if err := qs.ApplyGate(gates.NewToffoli(), 2, 1, 0); err != nil {
+				t.Fatalf("ApplyGate(Toffoli) returned error: %v", err)
+			}
+
+			assertBasisState(t, qs, tt.wantIndex)
+			assertNormalized(t, qs)
+		})
+	}
+}
+
 func TestApplyGateBellStates(t *testing.T) {
 	invSqrt2 := 1 / math.Sqrt(2)
 	tests := []struct {
