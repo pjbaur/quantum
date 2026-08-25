@@ -39,7 +39,8 @@ var ErrDuplicateTargets = errors.New("targets must be unique")
 func ValidateTargets(targets []int, numQubits int) error {
 	// A bitmask tracks the qubits already seen without allocating, but only
 	// while every index fits in one word: past 64 qubits the shift would
-	// wrap and silently accept a duplicate, so wide registers pay for a map.
+	// yield zero, so bit is zero and a duplicate is silently accepted, and
+	// wide registers pay for a map instead.
 	// A dense state that wide is unallocatable and a sparse one that wide is
 	// exotic, so the allocating path is effectively unreachable.
 	if numQubits <= 64 {

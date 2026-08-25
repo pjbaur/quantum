@@ -149,6 +149,9 @@ Releases are tagged in the v0.x series (current: `v0.2.0`). The "v2" in
 [`docs/deprecation-policy-v2.md`](docs/deprecation-policy-v2.md) names the
 current API generation, not a Go module major version.
 
+[`CHANGELOG.md`](CHANGELOG.md) records what changed in each release, including
+the unreleased work already on `main`.
+
 ## License
 
 MIT — see [LICENSE](LICENSE).
