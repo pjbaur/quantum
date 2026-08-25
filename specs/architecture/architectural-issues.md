@@ -107,6 +107,7 @@ Tracked findings from quality/architecture assessments. See
 
 **Skill:** code-quality-assessment
 **Category:** Cross-cutting
+**Status:** Resolved (2026-08-25) — `quantum.RandomSource` interface (`Float64() float64`, satisfied by `*math/rand.Rand`) + `SetRandSource` on `state.State`, `sparsestate.State`, and `qubit.Qubit`; nil restores the global default so existing behavior is unchanged. `Clone` shares the source, keeping seeded pipelines deterministic (documented as not goroutine-safe — parallel executions need distinct sources). Covered by stub-source exact-outcome tests in all three packages plus `TestSeededMeasurementDenseSparseEquivalence` (identical seeds → identical outcomes across backends). This unblocks the exact `Measure` assertions deferred in the qubit-coverage issue above.
 
 **Issue:** `state.Measure`, `sparsestate.Measure`, and `qubit.Measure` call `rand.Float64()` on the global source; no seam exists to inject a seeded source.
 

@@ -247,3 +247,57 @@ func TestProbabilitiesSumToOne(t *testing.T) {
 		t.Fatalf("|beta| = %v, want 0.8", cmplx.Abs(q.Beta()))
 	}
 }
+
+// stubRandSource returns a fixed sequence of values, cycling.
+type stubRandSource struct {
+	values []float64
+	index  int
+}
+
+func (s *stubRandSource) Float64() float64 {
+	v := s.values[s.index%len(s.values)]
+	s.index++
+	return v
+}
+
+func TestMeasureUsesInjectedRandSource(t *testing.T) {
+	// Measure returns 0 when the draw is < prob0 (0.5 for |+⟩).
+	// prob0 for |+⟩ is 0.5 up to floating point, so draws well away
+	// from the boundary give deterministic outcomes.
+	cases := []struct {
+		draw float64
+		want int
+	}{
+		{0.3, 0},
+		{0.7, 1},
+	}
+	amp := complex(1/math.Sqrt2, 0)
+	for _, tc := range cases {
+		q, err := NewWithValues(amp, amp)
+		if err != nil {
+			t.Fatalf("NewWithValues failed: %v", err)
+		}
+		q.SetRandSource(&stubRandSource{values: []float64{tc.draw}})
+		if got := q.Measure(); got != tc.want {
+			t.Errorf("draw %.1f: Measure = %d, want %d", tc.draw, got, tc.want)
+		}
+	}
+}
+
+func TestCloneInheritsRandSource(t *testing.T) {
+	amp := complex(1/math.Sqrt2, 0)
+	q, err := NewWithValues(amp, amp)
+	if err != nil {
+		t.Fatalf("NewWithValues failed: %v", err)
+	}
+	src := &stubRandSource{values: []float64{0.3, 0.7}}
+	q.SetRandSource(src)
+	clone := q.Clone().(*Qubit)
+
+	if got := q.Measure(); got != 0 {
+		t.Errorf("original consumed draw 0.3: Measure = %d, want 0", got)
+	}
+	if got := clone.Measure(); got != 1 {
+		t.Errorf("clone consumed draw 0.7: Measure = %d, want 1", got)
+	}
+}

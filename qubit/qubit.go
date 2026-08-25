@@ -10,8 +10,23 @@ import (
 
 // Qubit implements the quantum.Qubit interface
 type Qubit struct {
-	alpha complex128
-	beta  complex128
+	alpha      complex128
+	beta       complex128
+	randSource quantum.RandomSource
+}
+
+// SetRandSource sets the randomness source used by Measure, enabling
+// reproducible measurements from a seeded generator. A nil source
+// restores the default (the global math/rand source).
+func (q *Qubit) SetRandSource(src quantum.RandomSource) {
+	q.randSource = src
+}
+
+func (q *Qubit) randFloat64() float64 {
+	if q.randSource != nil {
+		return q.randSource.Float64()
+	}
+	return rand.Float64()
 }
 
 // New creates a new qubit in the |0⟩ state
@@ -74,7 +89,7 @@ func (q *Qubit) Probability1() float64 {
 // Measure collapses the qubit to either |0⟩ or |1⟩
 func (q *Qubit) Measure() int {
 	prob0 := q.Probability0()
-	if rand.Float64() < prob0 {
+	if q.randFloat64() < prob0 {
 		// Collapse to |0⟩
 		q.alpha = 1.0
 		q.beta = 0.0
@@ -87,11 +102,13 @@ func (q *Qubit) Measure() int {
 	}
 }
 
-// Clone creates a copy of this qubit
+// Clone creates a copy of this qubit. The clone shares the original's
+// randomness source (if any), so seeded pipelines stay deterministic.
 func (q *Qubit) Clone() quantum.Qubit {
 	return &Qubit{
-		alpha: q.alpha,
-		beta:  q.beta,
+		alpha:      q.alpha,
+		beta:       q.beta,
+		randSource: q.randSource,
 	}
 }
 

@@ -16,6 +16,21 @@ const pruneEpsilon = 1e-12
 type State struct {
 	numQubits  int
 	amplitudes map[int]complex128
+	randSource quantum.RandomSource
+}
+
+// SetRandSource sets the randomness source used by Measure, enabling
+// reproducible measurements from a seeded generator. A nil source
+// restores the default (the global math/rand source).
+func (s *State) SetRandSource(src quantum.RandomSource) {
+	s.randSource = src
+}
+
+func (s *State) randFloat64() float64 {
+	if s.randSource != nil {
+		return s.randSource.Float64()
+	}
+	return rand.Float64()
 }
 
 // New creates a new sparse quantum state with the specified number of qubits.
@@ -291,7 +306,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 	}
 
 	result := 0
-	if rand.Float64() >= prob0 {
+	if s.randFloat64() >= prob0 {
 		result = 1
 	}
 
@@ -327,9 +342,12 @@ func (s *State) Clone() quantum.QuantumState {
 		amplitudes[index] = amplitude
 	}
 
+	// The clone shares the randomness source (if any), so seeded
+	// pipelines stay deterministic across clones.
 	return &State{
 		numQubits:  s.numQubits,
 		amplitudes: amplitudes,
+		randSource: s.randSource,
 	}
 }
 

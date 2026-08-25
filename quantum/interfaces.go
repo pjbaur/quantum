@@ -39,6 +39,16 @@ type Gate interface {
 	Matrix() [][]complex128
 }
 
+// RandomSource supplies the uniform [0, 1) randomness that measurement
+// consumes. *math/rand.Rand satisfies it, so a seeded generator can be
+// injected for reproducible simulations. Implementations need not be
+// safe for concurrent use; states measured in parallel should each get
+// their own source.
+type RandomSource interface {
+	// Float64 returns a pseudo-random number in [0, 1).
+	Float64() float64
+}
+
 // QubitCounter is implemented by gates that know how many qubits they
 // operate on without exposing their matrix. GateQubitCount uses it to
 // skip matrix inspection (and the copy it implies) for such gates.

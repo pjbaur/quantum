@@ -7,6 +7,7 @@ This project provides a basic simulation of quantum computing concepts using the
 - Single- and multi-qubit simulation with a shared `quantum` interface layer
 - Hadamard, Pauli (X, Y, Z), S, T, CNOT, and SWAP gates
 - Measurement and probability calculations for qubits and quantum states
+- Reproducible measurements: inject a seeded source with `SetRandSource` (defaults to `math/rand`'s global source)
 - Circuit abstraction for sequencing gate operations
 - Parallel batch execution for independent circuit runs with configurable worker limits
 - Demonstrations of superposition, entanglement, and quantum teleportation

@@ -363,3 +363,88 @@ func TestNewValidQubitCount(t *testing.T) {
 		t.Fatalf("expected 3 qubits, got %d", s.NumQubits())
 	}
 }
+
+// stubRandSource returns a fixed sequence of values, cycling.
+type stubRandSource struct {
+	values []float64
+	index  int
+}
+
+func (s *stubRandSource) Float64() float64 {
+	v := s.values[s.index%len(s.values)]
+	s.index++
+	return v
+}
+
+func plusState(t *testing.T) *state.State {
+	t.Helper()
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New(1) failed: %v", err)
+	}
+	amp := complex(1/math.Sqrt2, 0)
+	if err := s.SetAmplitudes([]complex128{amp, amp}); err != nil {
+		t.Fatalf("SetAmplitudes failed: %v", err)
+	}
+	return s
+}
+
+func TestMeasureUsesInjectedRandSource(t *testing.T) {
+	// Measure returns 1 when the draw is >= prob0 (0.5 for |+⟩).
+	// prob0 for |+⟩ is 0.5 up to floating point, so draws well away
+	// from the boundary give deterministic outcomes.
+	cases := []struct {
+		draw float64
+		want int
+	}{
+		{0.7, 1},
+		{0.3, 0},
+	}
+	for _, tc := range cases {
+		s := plusState(t)
+		s.SetRandSource(&stubRandSource{values: []float64{tc.draw}})
+		got, err := s.Measure(0)
+		if err != nil {
+			t.Fatalf("Measure failed: %v", err)
+		}
+		if got != tc.want {
+			t.Errorf("draw %.1f: Measure = %d, want %d", tc.draw, got, tc.want)
+		}
+	}
+}
+
+func TestSetRandSourceNilRestoresDefault(t *testing.T) {
+	s := plusState(t)
+	s.SetRandSource(&stubRandSource{values: []float64{0.7}})
+	s.SetRandSource(nil)
+	got, err := s.Measure(0)
+	if err != nil {
+		t.Fatalf("Measure failed: %v", err)
+	}
+	if got != 0 && got != 1 {
+		t.Errorf("Measure with default source = %d, want 0 or 1", got)
+	}
+}
+
+func TestCloneInheritsRandSource(t *testing.T) {
+	src := &stubRandSource{values: []float64{0.7, 0.3}}
+	s := plusState(t)
+	s.SetRandSource(src)
+	clone := s.Clone()
+
+	got, err := s.Measure(0)
+	if err != nil {
+		t.Fatalf("Measure failed: %v", err)
+	}
+	if got != 1 {
+		t.Errorf("original consumed draw 0.7: Measure = %d, want 1", got)
+	}
+
+	got, err = clone.Measure(0)
+	if err != nil {
+		t.Fatalf("clone Measure failed: %v", err)
+	}
+	if got != 0 {
+		t.Errorf("clone consumed draw 0.3: Measure = %d, want 0", got)
+	}
+}

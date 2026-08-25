@@ -4,6 +4,7 @@ import (
 	"errors"
 	"math"
 	"math/cmplx"
+	"math/rand"
 	"testing"
 
 	"github.com/pjbaur/quantum/gates"
@@ -445,5 +446,87 @@ func TestNewValidQubitCount(t *testing.T) {
 	}
 	if s.NumQubits() != 3 {
 		t.Fatalf("expected 3 qubits, got %d", s.NumQubits())
+	}
+}
+
+// stubRandSource returns a fixed sequence of values, cycling.
+type stubRandSource struct {
+	values []float64
+	index  int
+}
+
+func (s *stubRandSource) Float64() float64 {
+	v := s.values[s.index%len(s.values)]
+	s.index++
+	return v
+}
+
+func TestSparseMeasureUsesInjectedRandSource(t *testing.T) {
+	// Measure returns 1 when the draw is >= prob0 (0.5 for |+⟩).
+	cases := []struct {
+		draw float64
+		want int
+	}{
+		{0.7, 1},
+		{0.3, 0},
+		{0.5, 1},
+	}
+	for _, tc := range cases {
+		s, err := New(1)
+		if err != nil {
+			t.Fatalf("New(1) failed: %v", err)
+		}
+		if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
+			t.Fatalf("ApplyGate failed: %v", err)
+		}
+		s.SetRandSource(&stubRandSource{values: []float64{tc.draw}})
+		got, err := s.Measure(0)
+		if err != nil {
+			t.Fatalf("Measure failed: %v", err)
+		}
+		if got != tc.want {
+			t.Errorf("draw %.1f: Measure = %d, want %d", tc.draw, got, tc.want)
+		}
+	}
+}
+
+// TestSeededMeasurementDenseSparseEquivalence verifies that identically
+// seeded sources drive identical measurement outcomes on both backends.
+func TestSeededMeasurementDenseSparseEquivalence(t *testing.T) {
+	const rounds = 32
+	denseSrc := rand.New(rand.NewSource(1234))
+	sparseSrc := rand.New(rand.NewSource(1234))
+
+	for i := 0; i < rounds; i++ {
+		dense, err := state.New(2)
+		if err != nil {
+			t.Fatalf("state.New failed: %v", err)
+		}
+		sparse, err := New(2)
+		if err != nil {
+			t.Fatalf("New failed: %v", err)
+		}
+		for _, s := range []quantum.QuantumState{dense, sparse} {
+			if err := s.ApplyGate(gates.NewHadamard(), 0); err != nil {
+				t.Fatalf("ApplyGate(H, 0) failed: %v", err)
+			}
+			if err := s.ApplyGate(gates.NewCNOT(), 0, 1); err != nil {
+				t.Fatalf("ApplyGate(CNOT) failed: %v", err)
+			}
+		}
+		dense.SetRandSource(denseSrc)
+		sparse.SetRandSource(sparseSrc)
+
+		denseGot, err := dense.Measure(0)
+		if err != nil {
+			t.Fatalf("dense Measure failed: %v", err)
+		}
+		sparseGot, err := sparse.Measure(0)
+		if err != nil {
+			t.Fatalf("sparse Measure failed: %v", err)
+		}
+		if denseGot != sparseGot {
+			t.Fatalf("round %d: dense measured %d, sparse measured %d with identical seeds", i, denseGot, sparseGot)
+		}
 	}
 }
