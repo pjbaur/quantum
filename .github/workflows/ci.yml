@@ -32,6 +32,10 @@ jobs:
         run: go vet ./...
 
       - name: Staticcheck
+        # Lint once, on the newest Go in the matrix: staticcheck@latest
+        # tracks the current Go release and won't build on older ones
+        # now that setup-go@v6 pins GOTOOLCHAIN=local.
+        if: matrix.go-version == '1.26.x'
         run: |
           go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck ./...
