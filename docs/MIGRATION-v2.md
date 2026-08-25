@@ -2,6 +2,12 @@
 
 This guide documents all breaking changes introduced in v2.0 and provides migration paths for each.
 
+> **Versioning note (2026-08-25):** "v2" in this guide names the current
+> API generation (the state-vector-first API), not a Go module major
+> version. Releases are tagged in the v0.x series (first tag: `v0.2.0`);
+> the module path remains `github.com/pjbaur/quantum` with no `/v2`
+> suffix.
+
 ## Overview
 
 Version 2.0 introduces a **state-vector-first API** that corrects architectural issues with the legacy single-qubit gate application model. The changes ensure:

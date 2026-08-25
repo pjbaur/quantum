@@ -137,6 +137,17 @@ Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
 ### Visualization
 `go run ./cmd/quantum visual`
 
+## Versioning
+
+Releases are tagged in the v0.x series (current: `v0.2.0`). The "v2" in
+[`docs/MIGRATION-v2.md`](docs/MIGRATION-v2.md) and
+[`docs/deprecation-policy-v2.md`](docs/deprecation-policy-v2.md) names the
+current API generation, not a Go module major version.
+
+## License
+
+MIT — see [LICENSE](LICENSE).
+
 ---
 
 For more details on quantum gates and their matrix representations, see [`docs/QUANTUM-HELP.md`](docs/QUANTUM-HELP.md).

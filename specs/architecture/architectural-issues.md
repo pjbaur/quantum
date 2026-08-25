@@ -93,6 +93,7 @@ Tracked findings from quality/architecture assessments. See
 
 **Skill:** code-quality-assessment
 **Category:** RECOMMENDATION (P1)
+**Status:** Resolved (2026-08-25) — MIT LICENSE added (Copyright (c) 2026 Paul Baur); annotated tag `v0.2.0` created (v0.x series chosen over a literal `/v2` module path — the v2 docs describe an API generation, not a module major version; noted in MIGRATION-v2.md and a new README Versioning section). Tag is local until pushed (`git push origin main --tags`).
 
 **Issue:** Public GitHub repo with no LICENSE file; `git tag` is empty while `docs/MIGRATION-v2.md` and `docs/deprecation-policy-v2.md` describe a versioned v2.
 
