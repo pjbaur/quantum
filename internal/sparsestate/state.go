@@ -105,6 +105,54 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 	return nil
 }
 
+// SetAmplitudes sets all amplitudes at once with a single normalization check,
+// satisfying quantum.BulkAmplitudeSetter. The values slice must have exactly
+// 2^numQubits elements, every value must be finite, and the probabilities must
+// sum to 1 within the same 1e-10 tolerance the dense backend applies; the three
+// checks run in that order, so a vector that is wrong in more than one way
+// reports the same failure the dense backend would.
+//
+// The one behavioral difference from the dense backend is this one's storage
+// rule, not its validation: an amplitude at or below pruneEpsilon is dropped
+// rather than stored, so it reads back as exactly zero. The probability such a
+// value carries is at most pruneEpsilon², fourteen orders of magnitude below
+// the normalization tolerance.
+func (s *State) SetAmplitudes(values []complex128) error {
+	size := 1 << s.numQubits
+	if len(values) != size {
+		return fmt.Errorf("values slice length %d does not match state size %d", len(values), size)
+	}
+
+	// Non-finite amplitudes have to be caught here rather than by the sum: a
+	// NaN amplitude makes the sum NaN, and NaN fails every comparison, so the
+	// tolerance test below would let it through as normalized.
+	sum := 0.0
+	for i, v := range values {
+		if !quantum.IsFiniteAmplitude(v) {
+			return &quantum.NonFiniteAmplitudeError{BasisState: i, Value: v}
+		}
+		sum += quantum.Probability(v)
+	}
+	if math.Abs(sum-1.0) > 1e-10 {
+		return &quantum.NormalizationError{
+			AttemptedSum: sum,
+			CurrentSum:   s.probabilitySum(),
+		}
+	}
+
+	// Rebuild rather than overwrite: entries the old vector held and the new
+	// one leaves at zero must not survive as stale map keys.
+	amplitudes := make(map[int]complex128, len(s.amplitudes))
+	for i, v := range values {
+		if isNearZero(v) {
+			continue
+		}
+		amplitudes[i] = v
+	}
+	s.amplitudes = amplitudes
+	return nil
+}
+
 // ApplyGate applies a gate to the specified qubit(s).
 func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 	requiredQubits, err := quantum.GateQubitCount(gate)

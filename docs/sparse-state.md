@@ -31,6 +31,7 @@ The sparse backend has **explicit capability limits** that differ from the dense
 | Measurement | Supported |
 | Cloning | Supported |
 | Amplitude/probability queries | Supported |
+| Bulk amplitude writes (`SetAmplitudes`) | Supported (amplitudes at or below 1e-12 are pruned, not stored) |
 
 ### Capability API
 
@@ -110,6 +111,10 @@ The sparse state backend is implemented in the `internal/sparsestate` package.
 - Single-qubit gates: Generic 2x2 matrix application
 - Two-qubit gates: Generic 4x4 matrix application (CNOT optimized by index permutation)
 - Measurement, cloning, and amplitude/probability queries: Full support
+- Bulk amplitude writes: `SetAmplitudes` satisfies `quantum.BulkAmplitudeSetter`,
+  validating length, finiteness, and normalization in that order exactly as the
+  dense backend does. This is what lets the `algorithm` package run on either
+  backend.
 
 ## References
 

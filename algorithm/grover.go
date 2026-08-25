@@ -6,12 +6,24 @@ import (
 	"math"
 
 	"github.com/pjbaur/quantum/gates"
-	"github.com/pjbaur/quantum/state"
+	"github.com/pjbaur/quantum/quantum"
 )
 
-// Grover executes Grover's search algorithm and returns the final state.
+// Grover executes Grover's search algorithm on s and returns it.
 // The marked slice contains basis states to amplify.
-func Grover(numQubits int, marked []int) (*state.State, error) {
+//
+// The caller chooses the backend by choosing s, which must be a freshly
+// created state in |0…0⟩ with the register the search is over; the algorithm
+// evolves it in place and returns the same state for convenience. The backend
+// must implement quantum.BulkAmplitudeSetter — the oracle and the diffusion
+// step rewrite the whole amplitude vector — and an UnsupportedOperationError
+// says so if it does not.
+func Grover(s quantum.QuantumState, marked []int) (quantum.QuantumState, error) {
+	if s == nil {
+		return nil, errors.New("state must not be nil")
+	}
+
+	numQubits := s.NumQubits()
 	if numQubits <= 0 {
 		return nil, errors.New("numQubits must be positive")
 	}
@@ -25,11 +37,15 @@ func Grover(numQubits int, marked []int) (*state.State, error) {
 		return nil, err
 	}
 
-	hGate := gates.NewHadamard()
-	search, err := state.New(numQubits)
+	search, err := requireBulkState(s)
 	if err != nil {
 		return nil, err
 	}
+	if err := requireGroundState(search); err != nil {
+		return nil, err
+	}
+
+	hGate := gates.NewHadamard()
 	for i := 0; i < numQubits; i++ {
 		if err := search.ApplyGate(hGate, i); err != nil {
 			return nil, err
@@ -79,7 +95,7 @@ func uniqueMarked(marked []int, totalStates int) ([]int, error) {
 // applyGroverOracle flips the sign of amplitudes at marked basis states.
 // This is O(m + n) where m is the number of marked states and n = 2^numQubits,
 // instead of O(n^2) for constructing the full oracle matrix.
-func applyGroverOracle(s *state.State, marked []int) error {
+func applyGroverOracle(s bulkState, marked []int) error {
 	n := s.NumQubits()
 	size := 1 << n
 
@@ -103,7 +119,7 @@ func applyGroverOracle(s *state.State, marked []int) error {
 // This is computed as: new_amp[i] = 2*mean - old_amp[i]
 // This is O(n) where n = 2^numQubits, instead of O(n^2) for constructing
 // the full diffusion matrix.
-func applyGroverDiffusion(s *state.State) error {
+func applyGroverDiffusion(s bulkState) error {
 	n := s.NumQubits()
 	size := 1 << n
 

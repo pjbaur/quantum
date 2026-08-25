@@ -6,24 +6,44 @@ import (
 
 	"github.com/pjbaur/quantum/circuit"
 	"github.com/pjbaur/quantum/gates"
-	"github.com/pjbaur/quantum/state"
+	"github.com/pjbaur/quantum/quantum"
 )
 
 // Oracle defines the boolean function used by Deutsch-Jozsa.
 // It must return 0 or 1 for any input in [0, 2^n).
 type Oracle func(input int) int
 
-// DeutschJozsa executes the Deutsch-Jozsa algorithm and returns the final state.
-// The state includes numInputQubits input qubits and one ancilla qubit.
-func DeutschJozsa(numInputQubits int, oracle Oracle) (*state.State, error) {
+// DeutschJozsa executes the Deutsch-Jozsa algorithm on s and returns it.
+// The state's last qubit is the ancilla, so a state of n qubits queries an
+// oracle over n-1 input qubits.
+//
+// The caller chooses the backend by choosing s, which must be a freshly
+// created state in |0…0⟩; the algorithm evolves it in place and returns the
+// same state for convenience. The backend must implement
+// quantum.BulkAmplitudeSetter — the oracle rewrites the whole amplitude
+// vector — and an UnsupportedOperationError says so if it does not.
+func DeutschJozsa(s quantum.QuantumState, oracle Oracle) (quantum.QuantumState, error) {
+	if s == nil {
+		return nil, errors.New("state must not be nil")
+	}
+
+	totalQubits := s.NumQubits()
+	numInputQubits := totalQubits - 1
 	if numInputQubits <= 0 {
-		return nil, errors.New("numInputQubits must be positive")
+		return nil, fmt.Errorf("state needs at least 2 qubits (one input qubit plus the ancilla), got %d", totalQubits)
 	}
 	if oracle == nil {
 		return nil, errors.New("oracle must not be nil")
 	}
 
-	totalQubits := numInputQubits + 1
+	finalState, err := requireBulkState(s)
+	if err != nil {
+		return nil, err
+	}
+	if err := requireGroundState(finalState); err != nil {
+		return nil, err
+	}
+
 	c, err := circuit.New(totalQubits)
 	if err != nil {
 		return nil, err
@@ -43,10 +63,6 @@ func DeutschJozsa(numInputQubits int, oracle Oracle) (*state.State, error) {
 	}
 
 	// Execute circuit to get |+⟩ on all qubits with ancilla in |-⟩ state
-	finalState, err := state.New(totalQubits)
-	if err != nil {
-		return nil, err
-	}
 	if err := c.Execute(finalState); err != nil {
 		return nil, err
 	}
@@ -73,7 +89,7 @@ func DeutschJozsa(numInputQubits int, oracle Oracle) (*state.State, error) {
 //   - If f(x) = 1: swap the pair (|x,0⟩ ↔ |x,1⟩)
 //
 // This is O(2^n) instead of O(4^n) for constructing the full oracle matrix.
-func applyDeutschJozsaOracle(s *state.State, numInputQubits int, oracle Oracle) error {
+func applyDeutschJozsaOracle(s bulkState, numInputQubits int, oracle Oracle) error {
 	numInputStates := 1 << numInputQubits
 	ancillaBit := 1 << numInputQubits
 	totalStates := 1 << (numInputQubits + 1)

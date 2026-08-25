@@ -4,21 +4,34 @@ import (
 	"fmt"
 
 	"github.com/pjbaur/quantum/algorithm"
+	"github.com/pjbaur/quantum/state"
 )
 
 // DeutschJozsaDemo shows how the algorithm distinguishes constant vs balanced oracles.
 func DeutschJozsaDemo() {
 	fmt.Println("\n=== Deutsch-Jozsa Demonstration ===")
 
+	// Two input qubits plus the ancilla. The algorithm runs on whatever
+	// backend it is handed; the dense one is the general-purpose choice.
+	constantStart, err := state.New(3)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	constantOracle := func(int) int { return 0 }
-	constantState, err := algorithm.DeutschJozsa(2, constantOracle)
+	constantState, err := algorithm.DeutschJozsa(constantStart, constantOracle)
 	if err != nil {
 		fmt.Printf("Error running Deutsch-Jozsa: %v\n", err)
 		return
 	}
 
+	balancedStart, err := state.New(3)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
 	balancedOracle := func(input int) int { return input & 1 }
-	balancedState, err := algorithm.DeutschJozsa(2, balancedOracle)
+	balancedState, err := algorithm.DeutschJozsa(balancedStart, balancedOracle)
 	if err != nil {
 		fmt.Printf("Error running Deutsch-Jozsa: %v\n", err)
 		return
@@ -35,7 +48,12 @@ func DeutschJozsaDemo() {
 func GroverDemo() {
 	fmt.Println("\n=== Grover Demonstration ===")
 
-	searchState, err := algorithm.Grover(3, []int{5})
+	start, err := state.New(3)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
+	searchState, err := algorithm.Grover(start, []int{5})
 	if err != nil {
 		fmt.Printf("Error running Grover: %v\n", err)
 		return

@@ -16,14 +16,15 @@ const (
 	// probability sum of 1.
 	normalizationTolerance = 1e-10
 
-	// boundaryMargin is the band around that tolerance in which the oracles
-	// below assert nothing about acceptance. Two things put the sparse
-	// backend's own sum a hair away from the oracle's: it accumulates in Go
-	// map iteration order, which differs between runs, and it prunes
-	// amplitudes at or below pruneEpsilon, dropping up to pruneEpsilon²
-	// from the sum. Both are many orders of magnitude smaller than this
-	// margin, which is itself a thousandth of the tolerance, so the band
-	// costs almost nothing in strictness.
+	// boundaryMargin is the band around that tolerance in which the
+	// single-amplitude oracle below asserts nothing about acceptance. Two
+	// things put the sparse backend's own sum a hair away from the oracle's:
+	// it accumulates in Go map iteration order, which differs between runs,
+	// and it prunes amplitudes at or below pruneEpsilon, dropping up to
+	// pruneEpsilon² from the sum. Both are many orders of magnitude smaller
+	// than this margin, which is itself a thousandth of the tolerance, so the
+	// band costs almost nothing in strictness. The bulk oracle needs no such
+	// band; FuzzSparseSetAmplitudes says why.
 	boundaryMargin = 1e-13
 
 	// backendAgreement is how far the two backends may differ per basis
@@ -187,10 +188,10 @@ func assertUnchanged(t *testing.T, qs quantum.QuantumState, before []complex128,
 }
 
 // prepareSparse puts the state into a fuzzed product state by applying one
-// 1-qubit unitary per qubit. Preparing with gates rather than amplitude
-// writes is what this backend allows: it has no bulk setter, and writing
-// amplitudes one at a time cannot pass through the unnormalized
-// intermediates a superposition would need.
+// 1-qubit unitary per qubit. Preparing with gates rather than with
+// SetAmplitudes is deliberate: it is the same preparation prepareDense runs on
+// the dense backend, which is what lets the equivalence target below start
+// both backends from a state neither one's bulk writer produced.
 func prepareSparse(t *testing.T, sparse *State, numQubits int, prep []byte) {
 	t.Helper()
 
@@ -231,7 +232,7 @@ func boundaryValue(amps []complex128, basisState int, phase uint8, delta float64
 	return complex(magnitude*math.Cos(angle), magnitude*math.Sin(angle))
 }
 
-// FuzzSparseSetAmplitude drives the sparse backend's only amplitude writer
+// FuzzSparseSetAmplitude drives the sparse backend's single-amplitude writer
 // across its validation boundary, starting from a state a fuzzed layer of
 // unitaries has already put into superposition. The contract has three
 // layers, checked in the order the backend applies them: the basis state
@@ -239,8 +240,8 @@ func boundaryValue(amps []complex128, basisState int, phase uint8, delta float64
 // sum must stay within tolerance — and a write refused at any layer must
 // leave the state exactly as it was.
 //
-// The sparse backend has no SetAmplitudes; the dense backend's bulk writer
-// is fuzzed in package state instead.
+// FuzzSparseSetAmplitudes below covers the bulk writer against the same
+// contract.
 func FuzzSparseSetAmplitude(f *testing.F) {
 	// Phase-only changes to a prepared state, at each width.
 	f.Add(uint8(0), []byte{64, 0, 128, 0}, 0, uint8(0), 0.0, int8(-1))
@@ -349,6 +350,171 @@ func FuzzSparseSetAmplitude(f *testing.F) {
 			}
 			if got := sparse.Amplitude(i); got != other {
 				t.Fatalf("amplitude %d = %v, want %v (an accepted write must touch one amplitude only)", i, got, other)
+			}
+		}
+		assertSparseUsable(t, sparse)
+	})
+}
+
+// fuzzAmplitudes decodes raw into size amplitudes, two bytes each, with
+// components mapped onto roughly [-1, 1]. It mirrors the generator the dense
+// bulk-write target uses, so the two backends' bulk writers are explored over
+// the same space rather than over two spaces that merely look alike.
+func fuzzAmplitudes(raw []byte, size int) []complex128 {
+	amps := make([]complex128, size)
+	for i := range amps {
+		amps[i] = complex(unitComponent(byteAt(raw, 2*i)), unitComponent(byteAt(raw, 2*i+1)))
+	}
+	return amps
+}
+
+// unitComponent centres the byte range on 128 so that an amplitude can come
+// out exactly zero, which is what most basis states of a real state vector
+// hold — and, for this backend, what most of the map does not hold at all.
+func unitComponent(b byte) float64 {
+	return (float64(b) - 128) / 127
+}
+
+// rescaleTo stretches amps so their probabilities sum to 1+delta, which aims
+// the fuzzer at the normalization boundary rather than leaving it to chance.
+// Vectors that cannot be scaled there (all-zero, or already non-finite) are
+// left as they are; the oracle reads the sum back off the result, so a steer
+// that misses costs nothing but coverage.
+func rescaleTo(amps []complex128, delta float64) {
+	sum := 0.0
+	for _, v := range amps {
+		sum += quantum.Probability(v)
+	}
+	target := 1.0 + delta
+	if sum <= 0 || math.IsInf(sum, 0) || target <= 0 || math.IsInf(target, 0) || math.IsNaN(target) {
+		return
+	}
+	factor := complex(math.Sqrt(target/sum), 0)
+	for i := range amps {
+		amps[i] *= factor
+	}
+}
+
+func firstNonFinite(amps []complex128) (int, bool) {
+	for i, v := range amps {
+		if !quantum.IsFiniteAmplitude(v) {
+			return i, true
+		}
+	}
+	return 0, false
+}
+
+// FuzzSparseSetAmplitudes drives this backend's bulk amplitude writer across
+// the same validation boundary the dense target explores, with the same
+// generator and the same oracle: the vector is steered to a probability sum of
+// 1+delta and one entry can be poisoned with NaN or an infinity, so a
+// non-finite amplitude has to be refused outright and everything else accepted
+// exactly when the sum lands within the documented tolerance.
+//
+// Unlike FuzzSparseSetAmplitude, this oracle needs no boundaryMargin. That
+// margin exists because the single-amplitude write is judged against a sum the
+// backend accumulates over its map — in an iteration order that varies, over
+// amplitudes it may have pruned. SetAmplitudes decides on the caller's slice
+// instead, summed in ascending index order before anything is stored, which is
+// bit-for-bit what the oracle computes and what the dense backend computes.
+// Only the readback afterwards has to account for pruning.
+func FuzzSparseSetAmplitudes(f *testing.F) {
+	// Exactly normalized, over each supported width.
+	f.Add(uint8(0), []byte{255, 128}, 0.0, uint8(0), int8(-1))
+	f.Add(uint8(1), []byte{200, 40, 10, 250, 128, 128, 3, 9}, 0.0, uint8(0), int8(-1))
+	f.Add(uint8(2), []byte{255, 0, 0, 255, 128, 129, 7, 200, 60, 61, 62, 63, 1, 2, 3, 4}, 0.0, uint8(0), int8(-1))
+	// Exactly at the tolerance, on both sides.
+	f.Add(uint8(0), []byte{255, 128}, 1e-10, uint8(0), int8(-1))
+	f.Add(uint8(0), []byte{255, 128}, -1e-10, uint8(0), int8(-1))
+	// Just beyond it, on both sides.
+	f.Add(uint8(0), []byte{255, 128}, 1.1e-10, uint8(0), int8(-1))
+	f.Add(uint8(0), []byte{255, 128}, -1.1e-10, uint8(0), int8(-1))
+	// Comfortably outside.
+	f.Add(uint8(1), []byte{200, 40, 10, 250}, 1e-9, uint8(0), int8(-1))
+	f.Add(uint8(1), []byte{200, 40, 10, 250}, 1.0, uint8(0), int8(-1))
+	f.Add(uint8(1), []byte{200, 40, 10, 250}, -0.5, uint8(0), int8(-1))
+	// An all-zero vector: nothing to scale, probability sum 0.
+	f.Add(uint8(0), []byte{128, 128, 128, 128}, 0.0, uint8(0), int8(-1))
+	// A vector holding one amplitude far below the prune threshold, which
+	// this backend must accept and then decline to store.
+	f.Add(uint8(1), []byte{255, 128, 128, 128, 128, 128, 129, 128}, 0.0, uint8(0), int8(-1))
+	// Four bytes past the end of a 1-qubit vector, which put the state into a
+	// superposition first: these are the seeds where "a rejected write leaves
+	// the state alone" has something to say.
+	f.Add(uint8(0), []byte{255, 128, 128, 128, 64, 0, 128, 0}, 0.0, uint8(0), int8(-1))
+	f.Add(uint8(0), []byte{255, 128, 128, 128, 64, 0, 128, 0}, 1.0, uint8(0), int8(-1))
+	f.Add(uint8(0), []byte{255, 128, 128, 128, 64, 0, 128, 0}, 0.0, uint8(1), int8(0))
+	// Non-finite amplitudes in an otherwise normalized vector.
+	f.Add(uint8(0), []byte{255, 128}, 0.0, uint8(0), int8(0))
+	f.Add(uint8(0), []byte{255, 128}, 0.0, uint8(1), int8(1))
+	f.Add(uint8(1), []byte{200, 40, 10, 250}, 0.0, uint8(2), int8(2))
+	f.Add(uint8(1), []byte{200, 40, 10, 250}, 0.0, uint8(3), int8(3))
+	f.Add(uint8(2), []byte{200, 40, 10, 250}, 0.0, uint8(5), int8(4))
+
+	f.Fuzz(func(t *testing.T, qubitsRaw uint8, raw []byte, delta float64, poisonIndex uint8, poisonKind int8) {
+		numQubits := 1 + int(qubitsRaw)%3
+		size := 1 << numQubits
+
+		amps := fuzzAmplitudes(raw, size)
+		rescaleTo(amps, delta)
+		if value, ok := nonFiniteValue(poisonKind); ok {
+			amps[int(poisonIndex)%size] = value
+		}
+
+		sparse, err := New(numQubits)
+		if err != nil {
+			t.Fatalf("New(%d) failed: %v", numQubits, err)
+		}
+		// Whatever bytes the vector did not consume describe a preparation, so
+		// a rejected write has a real superposition to fail to disturb rather
+		// than only |0…0⟩. Bytes past the end read as zero, which is the
+		// identity, so short inputs simply start from the ground state.
+		prepareSparse(t, sparse, numQubits, raw[min(len(raw), 2*size):])
+		before := snapshot(sparse)
+
+		err = sparse.SetAmplitudes(amps)
+
+		if index, found := firstNonFinite(amps); found {
+			var nonFinite *quantum.NonFiniteAmplitudeError
+			if !errors.As(err, &nonFinite) {
+				t.Fatalf("amplitude %d is %v: SetAmplitudes returned %v (%T), want *NonFiniteAmplitudeError",
+					index, amps[index], err, err)
+			}
+			if nonFinite.BasisState != index {
+				t.Fatalf("SetAmplitudes reported basis state %d, want the first offender %d",
+					nonFinite.BasisState, index)
+			}
+			assertUnchanged(t, sparse, before, "after a non-finite rejection")
+			return
+		}
+
+		sum := 0.0
+		for _, v := range amps {
+			sum += quantum.Probability(v)
+		}
+
+		if math.Abs(sum-1.0) > normalizationTolerance {
+			var normErr *quantum.NormalizationError
+			if !errors.As(err, &normErr) {
+				t.Fatalf("probability sum %v is outside the tolerance: SetAmplitudes returned %v (%T), want *NormalizationError",
+					sum, err, err)
+			}
+			assertUnchanged(t, sparse, before, "after a normalization rejection")
+			return
+		}
+
+		if err != nil {
+			t.Fatalf("probability sum %v is within the tolerance: SetAmplitudes failed: %v", sum, err)
+		}
+		for i, want := range amps {
+			// A magnitude at or below the prune threshold is dropped rather
+			// than stored, so it reads back as zero. That is the one place
+			// this backend's bulk write differs from the dense one's.
+			if isNearZero(want) {
+				want = 0
+			}
+			if got := sparse.Amplitude(i); got != want {
+				t.Fatalf("amplitude %d = %v, want %v", i, got, want)
 			}
 		}
 		assertSparseUsable(t, sparse)

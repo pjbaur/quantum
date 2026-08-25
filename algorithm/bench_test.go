@@ -3,7 +3,22 @@ package algorithm
 import (
 	"fmt"
 	"testing"
+
+	"github.com/pjbaur/quantum/state"
 )
+
+// newDenseState is the benchmark's backend. Allocating it inside the timed
+// loop keeps these numbers comparable with the runs from before the algorithms
+// took the state as an argument, when they allocated it themselves.
+func newDenseState(b *testing.B, numQubits int) *state.State {
+	b.Helper()
+
+	s, err := state.New(numQubits)
+	if err != nil {
+		b.Fatalf("state.New(%d) failed: %v", numQubits, err)
+	}
+	return s
+}
 
 func BenchmarkGrover(b *testing.B) {
 	for _, numQubits := range []int{4, 6, 8, 10, 12} {
@@ -11,7 +26,7 @@ func BenchmarkGrover(b *testing.B) {
 			marked := []int{0} // Mark the first basis state
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := Grover(numQubits, marked)
+				_, err := Grover(newDenseState(b, numQubits), marked)
 				if err != nil {
 					b.Fatalf("Grover failed: %v", err)
 				}
@@ -30,7 +45,7 @@ func BenchmarkGroverMultipleMarked(b *testing.B) {
 			}
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := Grover(numQubits, marked)
+				_, err := Grover(newDenseState(b, numQubits), marked)
 				if err != nil {
 					b.Fatalf("Grover failed: %v", err)
 				}
@@ -52,10 +67,13 @@ func BenchmarkDeutschJozsa(b *testing.B) {
 	}
 
 	for _, numQubits := range []int{4, 6, 8, 10, 12} {
+		// numQubits counts the input register; the state adds the ancilla.
+		totalQubits := numQubits + 1
+
 		b.Run(fmt.Sprintf("Qubits=%d/Constant", numQubits), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := DeutschJozsa(numQubits, constantZero)
+				_, err := DeutschJozsa(newDenseState(b, totalQubits), constantZero)
 				if err != nil {
 					b.Fatalf("DeutschJozsa failed: %v", err)
 				}
@@ -65,7 +83,7 @@ func BenchmarkDeutschJozsa(b *testing.B) {
 		b.Run(fmt.Sprintf("Qubits=%d/Balanced", numQubits), func(b *testing.B) {
 			b.ResetTimer()
 			for i := 0; i < b.N; i++ {
-				_, err := DeutschJozsa(numQubits, balancedParity)
+				_, err := DeutschJozsa(newDenseState(b, totalQubits), balancedParity)
 				if err != nil {
 					b.Fatalf("DeutschJozsa failed: %v", err)
 				}

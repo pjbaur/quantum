@@ -104,11 +104,11 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 	return nil
 }
 
-// SetAmplitudes sets all amplitudes at once with a single normalization check.
-// This is more efficient than calling SetAmplitude repeatedly when updating
-// multiple amplitudes, as it only validates normalization once at the end.
-// The values slice must have exactly 2^numQubits elements, and every value
-// must be finite.
+// SetAmplitudes sets all amplitudes at once with a single normalization check,
+// satisfying quantum.BulkAmplitudeSetter. This is more efficient than calling
+// SetAmplitude repeatedly when updating multiple amplitudes, as it only
+// validates normalization once at the end. The values slice must have exactly
+// 2^numQubits elements, and every value must be finite.
 func (s *State) SetAmplitudes(values []complex128) error {
 	if len(values) != len(s.amplitudes) {
 		return fmt.Errorf("values slice length %d does not match state size %d", len(values), len(s.amplitudes))

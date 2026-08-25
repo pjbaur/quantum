@@ -87,6 +87,24 @@ type QuantumState interface {
 	Clone() QuantumState
 }
 
+// BulkAmplitudeSetter is implemented by state backends that can replace the
+// entire amplitude vector in one call, validating it once instead of once per
+// amplitude. That is what lets an algorithm pass through an intermediate
+// vector no sequence of QuantumState.SetAmplitude writes could reach, since
+// each of those has to leave the state normalized on its own.
+//
+// It is an optional capability, kept out of QuantumState so a backend that
+// cannot offer it (a hardware or network-backed state, say) can still be a
+// QuantumState. Callers type-assert and report an UnsupportedOperationError
+// when the assertion fails.
+type BulkAmplitudeSetter interface {
+	// SetAmplitudes replaces every amplitude at once, rejecting the write
+	// unless the vector has exactly 2^NumQubits finite entries whose
+	// probabilities sum to 1 within the backend's tolerance. A rejected
+	// write leaves the state untouched.
+	SetAmplitudes(values []complex128) error
+}
+
 // BackendCapabilities describes what operations a quantum state backend supports.
 type BackendCapabilities interface {
 	// SupportsGateQubits returns whether this backend can apply gates

@@ -13,6 +13,10 @@ import (
 
 const tolerance = 1e-10
 
+// The algorithm package selects a backend by this capability, so losing it
+// here would silently take the dense backend out of that package's reach.
+var _ quantum.BulkAmplitudeSetter = (*state.State)(nil)
+
 func TestApplyGateCNOTControlBehavior(t *testing.T) {
 	tests := []struct {
 		name      string
