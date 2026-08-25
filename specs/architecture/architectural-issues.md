@@ -79,6 +79,7 @@ Tracked findings from quality/architecture assessments. See
 
 **Skill:** code-quality-assessment
 **Category:** Cross-cutting (Pre-Commit & CI Pipeline ★★★☆☆)
+**Status:** Resolved (2026-08-25) — coverage threshold 15% → 40% (actual 44.8%); `go test -race ./...` step added (parallel executor now runs under the detector in CI); staticcheck step added and clean (the two `rand.Seed` SA1019 findings removed along with the calls — global rand self-seeds since Go 1.20); Go bumped from EOL 1.21 to `go 1.25` in go.mod with a CI matrix of 1.25.x/1.26.x; README prerequisite updated.
 
 **Issue:** Coverage threshold 15% vs 43.9% actual; no `-race` in CI despite a parallel executor with race-focused tests; no staticcheck/golangci-lint (8 findings pass CI today); Go pinned to EOL 1.21; deprecated `rand.Seed` at `cmd/quantum/main.go:111` and `internal/examples/hadamard.go:203`.
 

@@ -7,12 +7,15 @@ on:
 jobs:
   test:
     runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        go-version: ['1.25.x', '1.26.x']
     steps:
       - uses: actions/checkout@v4
 
       - uses: actions/setup-go@v5
         with:
-          go-version: '1.21.x'
+          go-version: ${{ matrix.go-version }}
 
       - name: Go fmt
         run: |
@@ -26,13 +29,21 @@ jobs:
       - name: Go vet
         run: go vet ./...
 
+      - name: Staticcheck
+        run: |
+          go install honnef.co/go/tools/cmd/staticcheck@latest
+          staticcheck ./...
+
       - name: Go test
         run: go test ./...
+
+      - name: Go test (race detector)
+        run: go test -race ./...
 
       - name: Coverage
         run: |
           go test ./... -coverprofile=coverage.out
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($3, 1, length($3)-1)}')
           echo "Total coverage: ${total}%"
-          threshold=15.0
+          threshold=40.0
           awk -v total="$total" -v threshold="$threshold" 'BEGIN { if (total + 0 < threshold + 0) { printf("Coverage %.1f%% is below %.1f%%\n", total, threshold); exit 1 } }'

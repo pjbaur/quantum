@@ -18,7 +18,7 @@ This project provides a basic simulation of quantum computing concepts using the
 
 ### Prerequisites
 
-- Go (version 1.21 or later)
+- Go (version 1.25 or later)
 
 ### Installation
 

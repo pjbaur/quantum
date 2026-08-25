@@ -3,7 +3,6 @@ package examples
 import (
 	"fmt"
 	"math/rand"
-	"time"
 
 	"github.com/pjbaur/quantum/gates"
 	"github.com/pjbaur/quantum/state"
@@ -199,9 +198,6 @@ func GenerateRandomNumber(maxNumber int) int {
 
 // RunAllHadamardDemos executes all Hadamard gate demonstrations
 func RunAllHadamardDemos() {
-	// Seed the random number generator
-	rand.Seed(time.Now().UnixNano())
-
 	fmt.Println("=============================================")
 	fmt.Println("    HADAMARD GATE DEMONSTRATIONS")
 	fmt.Println("=============================================")

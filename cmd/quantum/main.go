@@ -3,9 +3,7 @@ package main
 import (
 	"flag"
 	"fmt"
-	"math/rand"
 	"os"
-	"time"
 
 	"github.com/pjbaur/quantum/internal/examples"
 )
@@ -120,9 +118,6 @@ func main() {
 		flag.Usage()
 		os.Exit(2)
 	}
-
-	// Seed the random number generator with current time
-	rand.Seed(time.Now().UnixNano())
 
 	// Display header
 	fmt.Println("\n********************************************************")
