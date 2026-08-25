@@ -26,7 +26,7 @@ func BlochVectorFromQubit(q quantum.Qubit) BlochVector {
 	return BlochVector{
 		X: 2 * real(product),
 		Y: 2 * imag(product),
-		Z: cmplx.Abs(alpha)*cmplx.Abs(alpha) - cmplx.Abs(beta)*cmplx.Abs(beta),
+		Z: quantum.Probability(alpha) - quantum.Probability(beta),
 	}
 }
 

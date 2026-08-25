@@ -2,7 +2,6 @@ package qubit
 
 import (
 	"math"
-	"math/cmplx"
 	"math/rand"
 
 	"github.com/pjbaur/quantum/quantum"
@@ -60,11 +59,11 @@ func (q *Qubit) Beta() complex128 {
 // Set updates the amplitudes of the qubit
 func (q *Qubit) Set(alpha, beta complex128) error {
 	// Calculate probability sum to check normalization
-	probSum := math.Pow(cmplx.Abs(alpha), 2) + math.Pow(cmplx.Abs(beta), 2)
+	probSum := quantum.Probability(alpha) + quantum.Probability(beta)
 
 	// Allow a small floating-point error margin
 	if math.Abs(probSum-1.0) > 1e-6 {
-		currentSum := math.Pow(cmplx.Abs(q.alpha), 2) + math.Pow(cmplx.Abs(q.beta), 2)
+		currentSum := quantum.Probability(q.alpha) + quantum.Probability(q.beta)
 		return &quantum.NormalizationError{
 			AttemptedSum: probSum,
 			CurrentSum:   currentSum,
@@ -78,12 +77,12 @@ func (q *Qubit) Set(alpha, beta complex128) error {
 
 // Probability0 returns the probability of measuring |0⟩
 func (q *Qubit) Probability0() float64 {
-	return math.Pow(cmplx.Abs(q.alpha), 2)
+	return quantum.Probability(q.alpha)
 }
 
 // Probability1 returns the probability of measuring |1⟩
 func (q *Qubit) Probability1() float64 {
-	return math.Pow(cmplx.Abs(q.beta), 2)
+	return quantum.Probability(q.beta)
 }
 
 // Measure collapses the qubit to either |0⟩ or |1⟩
@@ -114,6 +113,6 @@ func (q *Qubit) Clone() quantum.Qubit {
 
 // IsNormalized checks if the qubit is properly normalized
 func (q *Qubit) IsNormalized() bool {
-	sum := math.Pow(cmplx.Abs(q.alpha), 2) + math.Pow(cmplx.Abs(q.beta), 2)
+	sum := quantum.Probability(q.alpha) + quantum.Probability(q.beta)
 	return math.Abs(sum-1.0) <= 1e-10
 }

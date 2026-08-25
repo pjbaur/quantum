@@ -301,7 +301,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 	mask := 1 << qubitIndex
 	for index, amplitude := range s.amplitudes {
 		if index&mask == 0 {
-			prob0 += math.Pow(cmplx.Abs(amplitude), 2)
+			prob0 += quantum.Probability(amplitude)
 		}
 	}
 
@@ -316,7 +316,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		isBitSet := index&mask != 0
 		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
 			newAmplitudes[index] = amplitude
-			normalizationFactor += math.Pow(cmplx.Abs(amplitude), 2)
+			normalizationFactor += quantum.Probability(amplitude)
 		}
 	}
 
@@ -332,7 +332,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 // Probability returns the probability of measuring a specific basis state.
 func (s *State) Probability(basisState int) float64 {
 	amp := s.Amplitude(basisState)
-	return math.Pow(cmplx.Abs(amp), 2)
+	return quantum.Probability(amp)
 }
 
 // Clone creates a copy of this quantum state.
@@ -359,7 +359,7 @@ func (s *State) isNormalized() bool {
 func (s *State) probabilitySum() float64 {
 	sum := 0.0
 	for _, amp := range s.amplitudes {
-		sum += math.Pow(cmplx.Abs(amp), 2)
+		sum += quantum.Probability(amp)
 	}
 	return sum
 }

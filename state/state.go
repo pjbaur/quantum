@@ -4,7 +4,6 @@ import (
 	"errors"
 	"fmt"
 	"math"
-	"math/cmplx"
 	"math/rand"
 
 	"github.com/pjbaur/quantum/quantum"
@@ -111,7 +110,7 @@ func (s *State) SetAmplitudes(values []complex128) error {
 	// Check normalization of new values
 	sum := 0.0
 	for _, v := range values {
-		sum += math.Pow(cmplx.Abs(v), 2)
+		sum += quantum.Probability(v)
 	}
 	if math.Abs(sum-1.0) > 1e-10 {
 		return &quantum.NormalizationError{
@@ -312,7 +311,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 	prob0 := 0.0
 	for i, amplitude := range s.amplitudes {
 		if (i & (1 << qubitIndex)) == 0 {
-			prob0 += math.Pow(cmplx.Abs(amplitude), 2)
+			prob0 += quantum.Probability(amplitude)
 		}
 	}
 
@@ -330,7 +329,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		isBitSet := (i & (1 << qubitIndex)) != 0
 		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
 			newAmplitudes[i] = amplitude
-			normalizationFactor += math.Pow(cmplx.Abs(amplitude), 2)
+			normalizationFactor += quantum.Probability(amplitude)
 		} else {
 			newAmplitudes[i] = 0
 		}
@@ -351,7 +350,7 @@ func (s *State) Probability(basisState int) float64 {
 	if basisState < 0 || basisState >= len(s.amplitudes) {
 		return 0
 	}
-	return math.Pow(cmplx.Abs(s.amplitudes[basisState]), 2)
+	return quantum.Probability(s.amplitudes[basisState])
 }
 
 // Clone creates a copy of this quantum state
@@ -378,7 +377,7 @@ func (s *State) isNormalized() bool {
 func (s *State) probabilitySum() float64 {
 	sum := 0.0
 	for _, amp := range s.amplitudes {
-		sum += math.Pow(cmplx.Abs(amp), 2)
+		sum += quantum.Probability(amp)
 	}
 	return sum
 }
