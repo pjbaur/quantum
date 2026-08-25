@@ -75,6 +75,68 @@ func TestApplyGateSwap(t *testing.T) {
 	assertNormalized(t, qs)
 }
 
+// TestApplyGateThreeQubitTargetOrdering exercises the gate width only this
+// backend supports, with a gate whose result depends on how targets map onto
+// the gate's basis ordering. The rest of the suite reaches three qubits only
+// through an identity matrix, which any consistent (even wrong) mapping
+// satisfies; a Toffoli distinguishes them, because moving the flipped pair to
+// different qubits moves which basis state ends up occupied.
+func TestApplyGateThreeQubitTargetOrdering(t *testing.T) {
+	// Toffoli: the two most significant basis bits control a flip of the
+	// least significant one, so it swaps basis 6 and 7 and fixes the rest.
+	toffoli := make([][]complex128, 8)
+	for row := range toffoli {
+		toffoli[row] = make([]complex128, 8)
+	}
+	for row := 0; row < 6; row++ {
+		toffoli[row][row] = 1
+	}
+	toffoli[6][7], toffoli[7][6] = 1, 1
+
+	gate, err := gates.NewMatrixGate("Toffoli", toffoli)
+	if err != nil {
+		t.Fatalf("NewMatrixGate failed: %v", err)
+	}
+
+	tests := []struct {
+		name      string
+		targets   []int
+		fromIndex int
+		wantIndex int
+	}{
+		// targets[0] is the gate's most significant basis bit, so this
+		// ordering lines the gate's basis up with the register's own:
+		// qubits 2 and 1 control a flip of qubit 0, and |110⟩ becomes |111⟩.
+		{name: "targets high to low", targets: []int{2, 1, 0}, fromIndex: 6, wantIndex: 7},
+		// Reversed, qubits 0 and 1 control a flip of qubit 2 instead, so the
+		// state that moves is the one with those two set: |011⟩ becomes |111⟩.
+		{name: "targets low to high", targets: []int{0, 1, 2}, fromIndex: 3, wantIndex: 7},
+		// A basis state missing a control is left alone either way.
+		{name: "control not set", targets: []int{2, 1, 0}, fromIndex: 4, wantIndex: 4},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			qs, err := state.New(3)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
+			amplitudes := make([]complex128, 8)
+			amplitudes[tt.fromIndex] = 1
+			if err := qs.SetAmplitudes(amplitudes); err != nil {
+				t.Fatalf("SetAmplitudes failed: %v", err)
+			}
+
+			if err := qs.ApplyGate(gate, tt.targets...); err != nil {
+				t.Fatalf("ApplyGate returned error: %v", err)
+			}
+
+			assertBasisState(t, qs, tt.wantIndex)
+			assertNormalized(t, qs)
+		})
+	}
+}
+
 func TestApplyGateBellStates(t *testing.T) {
 	invSqrt2 := 1 / math.Sqrt(2)
 	tests := []struct {

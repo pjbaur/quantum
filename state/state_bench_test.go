@@ -75,6 +75,34 @@ func BenchmarkApplyGenericTwoQubitGate(b *testing.B) {
 	}
 }
 
+// BenchmarkApplyThreeQubitGate exercises the combo-mask path at a width the
+// sparse backend cannot reach, so the dense-only 3+ qubit branch has a
+// timing baseline of its own.
+func BenchmarkApplyThreeQubitGate(b *testing.B) {
+	state, _ := New(12)
+	gate, err := gates.NewMatrixGate("Toffoli", [][]complex128{
+		{1, 0, 0, 0, 0, 0, 0, 0},
+		{0, 1, 0, 0, 0, 0, 0, 0},
+		{0, 0, 1, 0, 0, 0, 0, 0},
+		{0, 0, 0, 1, 0, 0, 0, 0},
+		{0, 0, 0, 0, 1, 0, 0, 0},
+		{0, 0, 0, 0, 0, 1, 0, 0},
+		{0, 0, 0, 0, 0, 0, 0, 1},
+		{0, 0, 0, 0, 0, 0, 1, 0},
+	})
+	if err != nil {
+		b.Fatalf("setup NewMatrixGate failed: %v", err)
+	}
+
+	b.ReportAllocs()
+	b.ResetTimer()
+	for i := 0; i < b.N; i++ {
+		if err := state.ApplyGate(gate, 2, 7, 9); err != nil {
+			b.Fatal(err)
+		}
+	}
+}
+
 func BenchmarkMeasure(b *testing.B) {
 	gate := gates.NewHadamard()
 

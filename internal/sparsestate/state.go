@@ -1,26 +1,20 @@
 package sparsestate
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/cmplx"
 	"math/rand"
 
+	"github.com/pjbaur/quantum/internal/backendmath"
 	"github.com/pjbaur/quantum/quantum"
 )
 
+// pruneEpsilon is the amplitude magnitude at or below which this backend
+// drops a basis state from the map. Its square is the probability of the
+// faintest amplitude the backend keeps, which is where backendmath sets the
+// floor for a measurement branch that holds nothing.
 const pruneEpsilon = 1e-12
-
-// minBranchProbability is the probability below which a measurement branch
-// is treated as empty rather than collapsed onto. It is far below any
-// probability an honest draw can single out: selecting a branch this faint
-// needs prob0 to sit within 1e-24 of 1, but float64 resolves values near 1
-// only to ~1e-16, so no legitimate outcome is suppressed by the floor. It is
-// pruneEpsilon squared, the probability of the faintest amplitude this
-// backend keeps, and the dense backend uses the same floor so both treat the
-// same faint branches as carrying no amplitude.
-const minBranchProbability = pruneEpsilon * pruneEpsilon
 
 // State is a sparse quantum state representation that stores only non-zero amplitudes.
 type State struct {
@@ -126,18 +120,8 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 		}
 	}
 
-	seen := make(map[int]struct{}, len(targets))
-	for _, target := range targets {
-		if target < 0 || target >= s.numQubits {
-			return &quantum.QubitsOutOfRangeError{
-				Index:    target,
-				MaxIndex: s.numQubits - 1,
-			}
-		}
-		if _, exists := seen[target]; exists {
-			return errors.New("targets must be unique")
-		}
-		seen[target] = struct{}{}
+	if err := backendmath.ValidateTargets(targets, s.numQubits); err != nil {
+		return err
 	}
 
 	if requiredQubits == 1 {
@@ -206,7 +190,8 @@ func (s *State) applyTwoQubitGate(gate quantum.Gate, targets []int) error {
 		return s.applyCNOT(targets[0], targets[1])
 	}
 
-	comboMasks, targetMask := buildComboMasks(targets)
+	comboMasks := make([]int, 1<<len(targets))
+	targetMask := backendmath.ComboMasks(comboMasks, targets)
 	bases := make(map[int]struct{}, len(s.amplitudes))
 	for index := range s.amplitudes {
 		bases[index&^targetMask] = struct{}{}
@@ -286,27 +271,6 @@ func isCanonicalCNOT(matrix [][]complex128) bool {
 	return true
 }
 
-func buildComboMasks(targets []int) ([]int, int) {
-	comboMasks := make([]int, 4)
-	targetMask := 0
-	for _, target := range targets {
-		targetMask |= 1 << target
-	}
-
-	for combo := 0; combo < 4; combo++ {
-		mask := 0
-		for i, target := range targets {
-			shift := len(targets) - 1 - i
-			if (combo>>shift)&1 == 1 {
-				mask |= 1 << target
-			}
-		}
-		comboMasks[combo] = mask
-	}
-
-	return comboMasks, targetMask
-}
-
 // Measure measures the specified qubit and collapses the state.
 func (s *State) Measure(qubitIndex int) (int, error) {
 	if qubitIndex < 0 || qubitIndex >= s.numQubits {
@@ -326,43 +290,24 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		}
 	}
 
-	result := 0
-	if s.randFloat64() >= prob0 {
-		result = 1
-	}
-
-	// The draw can land on a branch that holds no probability at all.
-	// Round-off in prob0 leaves a sliver of the [0,1) draw range pointing
-	// at an outcome the state has nothing in, and amplitudes small enough
-	// to square to zero are pruned from the map entirely. Collapsing there
-	// would divide by a zero normalization factor, leaving every surviving
-	// amplitude infinite (or the state empty), so measure the other outcome
-	// instead: it holds essentially all of the probability, which is what
-	// the draw would have selected had prob0 been exact. Both branches empty
-	// means the state is not normalized and there is nothing to collapse onto.
-	branchProb, otherProb := prob0, prob1
-	if result == 1 {
-		branchProb, otherProb = prob1, prob0
-	}
-	if branchProb < minBranchProbability {
-		if otherProb < minBranchProbability {
-			return 0, fmt.Errorf("measuring qubit %d: neither outcome has any probability (sum %g); state is not normalized",
-				qubitIndex, prob0+prob1)
-		}
-		result, branchProb = 1-result, otherProb
+	// The draw can land on a branch holding no probability at all, which
+	// this backend reaches by pruning the faint amplitude away; the guard
+	// inside PlanCollapse is what keeps the collapse below from dividing by
+	// a zero normalization factor and emptying the map.
+	collapse, err := backendmath.PlanCollapse(qubitIndex, s.randFloat64(), prob0, prob1)
+	if err != nil {
+		return 0, err
 	}
 
 	newAmplitudes := make(map[int]complex128, len(s.amplitudes))
-	normalizationFactor := complex(math.Sqrt(branchProb), 0)
 	for index, amplitude := range s.amplitudes {
-		isBitSet := index&mask != 0
-		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
-			newAmplitudes[index] = amplitude / normalizationFactor
+		if collapse.Keeps(index) {
+			newAmplitudes[index] = collapse.Renormalize(amplitude)
 		}
 	}
 
 	s.amplitudes = newAmplitudes
-	return result, nil
+	return collapse.Outcome, nil
 }
 
 // Probability returns the probability of measuring a specific basis state.

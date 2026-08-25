@@ -1,22 +1,13 @@
 package state
 
 import (
-	"errors"
 	"fmt"
 	"math"
 	"math/rand"
 
+	"github.com/pjbaur/quantum/internal/backendmath"
 	"github.com/pjbaur/quantum/quantum"
 )
-
-// minBranchProbability is the probability below which a measurement branch
-// is treated as empty rather than collapsed onto. It is far below any
-// probability an honest draw can single out: selecting a branch this faint
-// needs prob0 to sit within 1e-24 of 1, but float64 resolves values near 1
-// only to ~1e-16, so no legitimate outcome is suppressed by the floor. It
-// matches the square of the sparse backend's prune threshold, so both
-// backends treat the same faint branches as carrying no amplitude.
-const minBranchProbability = 1e-24
 
 // State implements the quantum.QuantumState interface
 type State struct {
@@ -164,36 +155,8 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 		}
 	}
 
-	// Validate target qubits.
-	if s.numQubits <= 64 {
-		var seen uint64
-		for _, target := range targets {
-			if target < 0 || target >= s.numQubits {
-				return &quantum.QubitsOutOfRangeError{
-					Index:    target,
-					MaxIndex: s.numQubits - 1,
-				}
-			}
-			bit := uint64(1) << target
-			if seen&bit != 0 {
-				return errors.New("targets must be unique")
-			}
-			seen |= bit
-		}
-	} else {
-		seen := make(map[int]struct{}, len(targets))
-		for _, target := range targets {
-			if target < 0 || target >= s.numQubits {
-				return &quantum.QubitsOutOfRangeError{
-					Index:    target,
-					MaxIndex: s.numQubits - 1,
-				}
-			}
-			if _, exists := seen[target]; exists {
-				return errors.New("targets must be unique")
-			}
-			seen[target] = struct{}{}
-		}
+	if err := backendmath.ValidateTargets(targets, s.numQubits); err != nil {
+		return err
 	}
 
 	if len(targets) == 1 && requiredQubits == 1 {
@@ -253,13 +216,8 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 // applyMultiQubitGate applies a multi-qubit gate to the specified qubits.
 func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 	matrix := gate.Matrix()
-	targetCount := len(targets)
-	comboCount := 1 << targetCount
 
-	targetMask := 0
-	for _, target := range targets {
-		targetMask |= 1 << target
-	}
+	comboCount := 1 << len(targets)
 
 	comboMasks := s.comboMasks
 	if cap(comboMasks) < comboCount {
@@ -267,16 +225,7 @@ func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 	}
 	comboMasks = comboMasks[:comboCount]
 	s.comboMasks = comboMasks
-	for combo := 0; combo < comboCount; combo++ {
-		mask := 0
-		for i, target := range targets {
-			shift := targetCount - 1 - i
-			if (combo>>shift)&1 == 1 {
-				mask |= 1 << target
-			}
-		}
-		comboMasks[combo] = mask
-	}
+	targetMask := backendmath.ComboMasks(comboMasks, targets)
 
 	inputs := s.inputs
 	if cap(inputs) < comboCount {
@@ -339,48 +288,26 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 		}
 	}
 
-	// Randomly determine the measurement outcome
-	result := 0
-	if s.randFloat64() >= prob0 {
-		result = 1
-	}
-
-	// The draw can land on a branch that holds no probability at all.
-	// Round-off in prob0 leaves a sliver of the [0,1) draw range pointing
-	// at an outcome the state has nothing in, and amplitudes small enough
-	// to square to zero still pass the normalization check. Collapsing
-	// there would divide by a zero normalization factor and fill the state
-	// with NaN, so measure the other outcome instead: it holds essentially
-	// all of the probability, which is what the draw would have selected
-	// had prob0 been exact. Both branches empty means the state is not
-	// normalized and there is nothing to collapse onto.
-	branchProb, otherProb := prob0, prob1
-	if result == 1 {
-		branchProb, otherProb = prob1, prob0
-	}
-	if branchProb < minBranchProbability {
-		if otherProb < minBranchProbability {
-			return 0, fmt.Errorf("measuring qubit %d: neither outcome has any probability (sum %g); state is not normalized",
-				qubitIndex, prob0+prob1)
-		}
-		result, branchProb = 1-result, otherProb
+	// Randomly determine the measurement outcome, guarding against a draw
+	// that lands on a branch holding no probability at all.
+	collapse, err := backendmath.PlanCollapse(qubitIndex, s.randFloat64(), prob0, prob1)
+	if err != nil {
+		return 0, err
 	}
 
 	// Collapse the state onto the measured outcome, normalizing as we go
 	newAmplitudes := s.ensureScratch()
-	normalizationFactor := complex(math.Sqrt(branchProb), 0)
 
 	for i, amplitude := range s.amplitudes {
-		isBitSet := (i & (1 << qubitIndex)) != 0
-		if (result == 1 && isBitSet) || (result == 0 && !isBitSet) {
-			newAmplitudes[i] = amplitude / normalizationFactor
+		if collapse.Keeps(i) {
+			newAmplitudes[i] = collapse.Renormalize(amplitude)
 		} else {
 			newAmplitudes[i] = 0
 		}
 	}
 
 	s.amplitudes, s.scratch = newAmplitudes, s.amplitudes
-	return result, nil
+	return collapse.Outcome, nil
 }
 
 // Probability returns the probability of measuring a specific basis state

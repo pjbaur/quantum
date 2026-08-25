@@ -95,6 +95,7 @@ fmt.Println(visualization.BlochCSV(vector, 4))
   - [`noise.go`](internal/examples/noise.go): Noise channels on the density-matrix backend.
   - [`gates.go`](internal/examples/gates.go): Gate catalog and SWAP decomposition demonstration.
 - [`internal/density/`](internal/density/): Density-matrix backend for mixed states and noise channels (dephasing, amplitude damping, depolarizing).
+- [`internal/backendmath/`](internal/backendmath/): State-vector math shared by the dense and sparse backends: target validation, combo-mask construction, and measurement collapse.
 - Measurement helpers live on `state.State` and `qubit.Qubit`.
 
 ### Parallel Circuit Execution
