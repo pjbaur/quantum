@@ -219,6 +219,13 @@ func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 
 	comboCount := 1 << len(targets)
 
+	// The mask buffer is sized and resliced here and ComboMasks only fills
+	// it, rather than the tidier arrangement of letting ComboMasks size and
+	// return one, because the loops below are sensitive to that shape.
+	// Returning the slice cost them bounds-check elimination on comboMasks,
+	// and reslicing the returned value to win that back still left the
+	// innermost loop counter spilled to the stack: up to +10% on a 3-qubit
+	// gate, measured. Re-benchmark before changing this.
 	comboMasks := s.comboMasks
 	if cap(comboMasks) < comboCount {
 		comboMasks = make([]int, comboCount)

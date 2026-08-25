@@ -89,8 +89,11 @@ func outOfRange(target, numQubits int) error {
 // target bit set (those with base&targetMask == 0) and mixes the
 // 2^len(targets) amplitudes each one anchors.
 //
-// The caller owns the slice so that a backend applying gates in a loop can
-// keep reusing one buffer.
+// The caller owns the slice, which lets a backend applying gates in a loop
+// reuse one buffer. That is not only an allocation question: the dense
+// backend's inner loops keep their bounds checks eliminated only while the
+// slice is shaped in the caller, so returning one from here is not the free
+// simplification it looks like. See state.applyMultiQubitGate.
 func ComboMasks(masks []int, targets []int) (targetMask int) {
 	targetCount := len(targets)
 	comboCount := 1 << targetCount
