@@ -254,3 +254,46 @@ func asInvalidGateMatrixError(err error, target **InvalidGateMatrixError) bool {
 	}
 	return false
 }
+
+// countingGate records Matrix() calls and reports a fixed qubit count.
+type countingGate struct {
+	qubits      int
+	matrixCalls int
+}
+
+func (g *countingGate) Name() string { return "Counting" }
+
+func (g *countingGate) Matrix() [][]complex128 {
+	g.matrixCalls++
+	return [][]complex128{{0, 1}, {1, 0}}
+}
+
+func (g *countingGate) NumQubits() int { return g.qubits }
+
+func TestGateQubitCountUsesQubitCounterWithoutMatrix(t *testing.T) {
+	gate := &countingGate{qubits: 2}
+	count, err := GateQubitCount(gate)
+	if err != nil {
+		t.Fatalf("GateQubitCount failed: %v", err)
+	}
+	if count != 2 {
+		t.Errorf("GateQubitCount = %d, want 2 from NumQubits", count)
+	}
+	if gate.matrixCalls != 0 {
+		t.Errorf("Matrix() called %d times, want 0 (fast path must skip the matrix copy)", gate.matrixCalls)
+	}
+}
+
+func TestGateQubitCountFallsBackOnNonPositiveNumQubits(t *testing.T) {
+	gate := &countingGate{qubits: 0}
+	count, err := GateQubitCount(gate)
+	if err != nil {
+		t.Fatalf("GateQubitCount failed: %v", err)
+	}
+	if count != 1 {
+		t.Errorf("GateQubitCount = %d, want 1 from 2x2 matrix fallback", count)
+	}
+	if gate.matrixCalls == 0 {
+		t.Error("Matrix() never called; non-positive NumQubits must fall back to matrix inspection")
+	}
+}

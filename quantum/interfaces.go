@@ -39,6 +39,15 @@ type Gate interface {
 	Matrix() [][]complex128
 }
 
+// QubitCounter is implemented by gates that know how many qubits they
+// operate on without exposing their matrix. GateQubitCount uses it to
+// skip matrix inspection (and the copy it implies) for such gates.
+type QubitCounter interface {
+	// NumQubits returns the number of qubits the gate operates on.
+	// A non-positive value is ignored and the matrix is inspected instead.
+	NumQubits() int
+}
+
 // QuantumState represents a multi-qubit quantum state
 type QuantumState interface {
 	// NumQubits returns the number of qubits in the state

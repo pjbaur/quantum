@@ -31,6 +31,12 @@ type Gate interface {
 
 ### 2. Removed Gate Methods
 
+> **Note (2026-08-25):** the concrete gate types named below (`HadamardGate`,
+> `PauliXGate`, …) were themselves replaced by the data-driven
+> `gates.MatrixGate`; the constructors (`NewHadamard()`, …) are unchanged.
+> The `gates/gates.go` line references are historical v1 locations. See
+> `docs/superpowers/specs/2026-08-25-data-driven-gates-design.md`.
+
 | Method | Location | Replacement |
 |--------|----------|-------------|
 | `HadamardGate.Apply(q)` | `gates/gates.go:31-40` | `state.ApplyGate(h, target)` |

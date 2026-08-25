@@ -73,3 +73,15 @@ func TestBuiltinGateGoldenValues(t *testing.T) {
 		})
 	}
 }
+
+// TestMustGatePanicsOnInvalidTable documents the built-in-table safety net:
+// an invalid matrix in a built-in definition is a programmer error and must
+// panic at construction rather than produce a half-valid gate.
+func TestMustGatePanicsOnInvalidTable(t *testing.T) {
+	defer func() {
+		if recover() == nil {
+			t.Fatal("mustGate with a 1x1 matrix did not panic")
+		}
+	}()
+	mustGate("Broken", [][]complex128{{1}})
+}

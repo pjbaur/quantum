@@ -13,7 +13,17 @@ import (
 //   - The matrix size is a power of 2 (e.g., 2x2 for 1-qubit, 4x4 for 2-qubit)
 //
 // Returns an InvalidGateMatrixError if validation fails.
+//
+// Gates implementing QubitCounter with a positive NumQubits are trusted
+// and short-circuit the matrix inspection entirely, avoiding the copy
+// that Matrix() implies on every gate application.
 func GateQubitCount(gate Gate) (int, error) {
+	if counter, ok := gate.(QubitCounter); ok {
+		if n := counter.NumQubits(); n > 0 {
+			return n, nil
+		}
+	}
+
 	matrix := gate.Matrix()
 	if len(matrix) == 0 {
 		return 0, &InvalidGateMatrixError{
