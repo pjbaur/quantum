@@ -80,13 +80,19 @@ func (s *State) Amplitude(basisState int) complex128 {
 	return s.amplitudes[basisState]
 }
 
-// SetAmplitude sets the amplitude for a specific basis state
+// SetAmplitude sets the amplitude for a specific basis state.
+// A NaN or infinite value is rejected outright; otherwise the write is
+// rolled back unless the state stays normalized.
 func (s *State) SetAmplitude(basisState int, value complex128) error {
 	if basisState < 0 || basisState >= len(s.amplitudes) {
 		return &quantum.QubitsOutOfRangeError{
 			Index:    basisState,
 			MaxIndex: len(s.amplitudes) - 1,
 		}
+	}
+
+	if !quantum.IsFiniteAmplitude(value) {
+		return &quantum.NonFiniteAmplitudeError{BasisState: basisState, Value: value}
 	}
 
 	// Make the change and check normalization
@@ -110,15 +116,22 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 // SetAmplitudes sets all amplitudes at once with a single normalization check.
 // This is more efficient than calling SetAmplitude repeatedly when updating
 // multiple amplitudes, as it only validates normalization once at the end.
-// The values slice must have exactly 2^numQubits elements.
+// The values slice must have exactly 2^numQubits elements, and every value
+// must be finite.
 func (s *State) SetAmplitudes(values []complex128) error {
 	if len(values) != len(s.amplitudes) {
 		return fmt.Errorf("values slice length %d does not match state size %d", len(values), len(s.amplitudes))
 	}
 
-	// Check normalization of new values
+	// Check normalization of new values. Non-finite amplitudes have to be
+	// caught here rather than by the sum: a NaN amplitude makes the sum NaN,
+	// and NaN fails every comparison, so the tolerance test below would let
+	// it through as normalized.
 	sum := 0.0
-	for _, v := range values {
+	for i, v := range values {
+		if !quantum.IsFiniteAmplitude(v) {
+			return &quantum.NonFiniteAmplitudeError{BasisState: i, Value: v}
+		}
 		sum += quantum.Probability(v)
 	}
 	if math.Abs(sum-1.0) > 1e-10 {

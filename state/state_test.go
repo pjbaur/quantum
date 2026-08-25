@@ -271,6 +271,67 @@ func assertNormalized(t *testing.T, qs quantum.QuantumState) {
 	}
 }
 
+// nonFiniteAmplitudeCases are amplitudes no state may hold. The
+// normalization check cannot catch them on its own: |NaN|² is NaN, and NaN
+// fails every comparison against the tolerance, so a NaN amplitude passes
+// as normalized and poisons everything computed from the state afterwards.
+var nonFiniteAmplitudeCases = []struct {
+	name  string
+	value complex128
+}{
+	{"NaN real part", complex(math.NaN(), 0)},
+	{"NaN imaginary part", complex(0, math.NaN())},
+	{"positive infinity", complex(math.Inf(1), 0)},
+	{"negative infinity", complex(0, math.Inf(-1))},
+	{"infinity and NaN together", complex(math.Inf(1), math.NaN())},
+}
+
+func TestSetAmplitudeRejectsNonFinite(t *testing.T) {
+	for _, tt := range nonFiniteAmplitudeCases {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := state.New(1)
+			if err != nil {
+				t.Fatalf("state.New(1) failed: %v", err)
+			}
+
+			err = s.SetAmplitude(0, tt.value)
+
+			var nonFinite *quantum.NonFiniteAmplitudeError
+			if !errors.As(err, &nonFinite) {
+				t.Fatalf("SetAmplitude(0, %v) = %v (%T), want *NonFiniteAmplitudeError", tt.value, err, err)
+			}
+			if nonFinite.BasisState != 0 {
+				t.Errorf("reported basis state %d, want 0", nonFinite.BasisState)
+			}
+			assertBasisState(t, s, 0)
+		})
+	}
+}
+
+func TestSetAmplitudesRejectsNonFinite(t *testing.T) {
+	for _, tt := range nonFiniteAmplitudeCases {
+		t.Run(tt.name, func(t *testing.T) {
+			s, err := state.New(1)
+			if err != nil {
+				t.Fatalf("state.New(1) failed: %v", err)
+			}
+
+			// The finite half alone carries the whole probability, so only
+			// the poisoned amplitude can be what makes this invalid.
+			err = s.SetAmplitudes([]complex128{1, tt.value})
+
+			var nonFinite *quantum.NonFiniteAmplitudeError
+			if !errors.As(err, &nonFinite) {
+				t.Fatalf("SetAmplitudes with %v = %v (%T), want *NonFiniteAmplitudeError", tt.value, err, err)
+			}
+			if nonFinite.BasisState != 1 {
+				t.Errorf("reported basis state %d, want 1", nonFinite.BasisState)
+			}
+			assertBasisState(t, s, 0)
+		})
+	}
+}
+
 func TestDenseBackendCapabilities(t *testing.T) {
 	s, err := state.New(3)
 	if err != nil {

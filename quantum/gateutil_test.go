@@ -91,6 +91,16 @@ func TestGateQubitCount(t *testing.T) {
 			errContains: "empty matrix",
 		},
 		{
+			name: "1x1 matrix (a gate acting on no qubits)",
+			gate: &mockGate{
+				name:   "Scalar",
+				matrix: [][]complex128{{1}},
+			},
+			wantCount:   0,
+			wantErr:     true,
+			errContains: "at least 2x2",
+		},
+		{
 			name: "non-square matrix (more rows)",
 			gate: &mockGate{
 				name: "NonSquare",

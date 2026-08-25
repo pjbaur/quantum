@@ -314,6 +314,45 @@ func TestSparseSetAmplitudeNormalization(t *testing.T) {
 	}
 }
 
+// TestSparseSetAmplitudeRejectsNonFinite covers the amplitudes the
+// normalization check cannot catch on its own: |NaN|² is NaN, and NaN fails
+// every comparison against the tolerance, so a NaN amplitude would otherwise
+// have to be caught by accident rather than by rule.
+func TestSparseSetAmplitudeRejectsNonFinite(t *testing.T) {
+	tests := []struct {
+		name  string
+		value complex128
+	}{
+		{"NaN real part", complex(math.NaN(), 0)},
+		{"NaN imaginary part", complex(0, math.NaN())},
+		{"positive infinity", complex(math.Inf(1), 0)},
+		{"negative infinity", complex(0, math.Inf(-1))},
+		{"infinity and NaN together", complex(math.Inf(1), math.NaN())},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			sparse, err := New(1)
+			if err != nil {
+				t.Fatalf("New failed: %v", err)
+			}
+
+			err = sparse.SetAmplitude(0, tt.value)
+
+			var nonFinite *quantum.NonFiniteAmplitudeError
+			if !errors.As(err, &nonFinite) {
+				t.Fatalf("SetAmplitude(0, %v) = %v (%T), want *NonFiniteAmplitudeError", tt.value, err, err)
+			}
+			if nonFinite.BasisState != 0 {
+				t.Errorf("reported basis state %d, want 0", nonFinite.BasisState)
+			}
+			if amp := sparse.Amplitude(0); cmplx.Abs(amp-1) > tolerance {
+				t.Errorf("amplitude 0 = %v, want 1 (a rejected write must not touch the state)", amp)
+			}
+		})
+	}
+}
+
 func assertStatesMatch(t *testing.T, dense quantum.QuantumState, sparse quantum.QuantumState) {
 	t.Helper()
 

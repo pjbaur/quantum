@@ -28,6 +28,18 @@ func (e *NormalizationError) Error() string {
 		e.AttemptedSum, e.CurrentSum)
 }
 
+// NonFiniteAmplitudeError indicates that an amplitude is NaN or infinite.
+// Such a value is rejected before the normalization check, which cannot see
+// it: NaN compares false against any tolerance.
+type NonFiniteAmplitudeError struct {
+	BasisState int
+	Value      complex128
+}
+
+func (e *NonFiniteAmplitudeError) Error() string {
+	return fmt.Sprintf("amplitude for basis state %d is not finite: %v", e.BasisState, e.Value)
+}
+
 // InvalidGateApplicationError indicates that a gate cannot be applied in the requested manner
 type InvalidGateApplicationError struct {
 	Gate        string

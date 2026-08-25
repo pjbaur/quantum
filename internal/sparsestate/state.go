@@ -74,12 +74,21 @@ func (s *State) Amplitude(basisState int) complex128 {
 }
 
 // SetAmplitude sets the amplitude for a specific basis state.
+// A NaN or infinite value is rejected outright; otherwise the write is
+// rolled back unless the state stays normalized.
 func (s *State) SetAmplitude(basisState int, value complex128) error {
 	if basisState < 0 || basisState >= (1<<s.numQubits) {
 		return &quantum.QubitsOutOfRangeError{
 			Index:    basisState,
 			MaxIndex: (1 << s.numQubits) - 1,
 		}
+	}
+
+	// A non-finite amplitude has to be caught before the normalization
+	// check, which cannot see it: NaN makes the probability sum NaN, and
+	// NaN fails every comparison against the tolerance.
+	if !quantum.IsFiniteAmplitude(value) {
+		return &quantum.NonFiniteAmplitudeError{BasisState: basisState, Value: value}
 	}
 
 	oldValue, had := s.amplitudes[basisState]
