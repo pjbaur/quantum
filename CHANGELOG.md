@@ -7,7 +7,7 @@ generation rather than a Go module major version.
 
 An "Unreleased" section describes what is on `main` but not yet tagged.
 
-## Unreleased (v0.3.0 planned)
+## v0.3.0 — 2026-08-25
 
 ### Breaking
 

@@ -144,7 +144,7 @@ Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
 
 ## Versioning
 
-Releases are tagged in the v0.x series (current: `v0.2.0`). The "v2" in
+Releases are tagged in the v0.x series (current: `v0.3.0`). The "v2" in
 [`docs/MIGRATION-v2.md`](docs/MIGRATION-v2.md) and
 [`docs/deprecation-policy-v2.md`](docs/deprecation-policy-v2.md) names the
 current API generation, not a Go module major version.
