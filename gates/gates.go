@@ -6,6 +6,14 @@ import (
 	"math"
 )
 
+// invSqrt2 is 1/√2, computed with math.Sqrt at runtime rather than the
+// math.Sqrt2 constant so it stays bit-identical to the per-entry expressions
+// it replaced, which the golden-value tests compare exactly. It is kept as a
+// float64 so negated entries are built as complex(-invSqrt2, 0) with a +0
+// imaginary part — negating a complex128 would flip it to -0, which the CLI
+// output tests observe through Sprintf.
+var invSqrt2 = 1 / math.Sqrt(2)
+
 // mustGate builds a built-in gate and panics if its matrix table is invalid.
 // A panic here is a programmer error in this package, caught by tests.
 func mustGate(name string, matrix [][]complex128) *MatrixGate {
@@ -19,8 +27,8 @@ func mustGate(name string, matrix [][]complex128) *MatrixGate {
 // NewHadamard creates a new Hadamard gate.
 func NewHadamard() *MatrixGate {
 	return mustGate("Hadamard", [][]complex128{
-		{1.0 / complex(math.Sqrt(2), 0), 1.0 / complex(math.Sqrt(2), 0)},
-		{1.0 / complex(math.Sqrt(2), 0), -1.0 / complex(math.Sqrt(2), 0)},
+		{complex(invSqrt2, 0), complex(invSqrt2, 0)},
+		{complex(invSqrt2, 0), complex(-invSqrt2, 0)},
 	})
 }
 
