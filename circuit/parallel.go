@@ -26,10 +26,10 @@ func validateIndependentStates(executions []Execution) error {
 		if exec.State == nil {
 			continue // nil states are caught by executeOne
 		}
-		if !reflect.TypeOf(exec.State).Comparable() {
+		if t := reflect.TypeOf(exec.State); !t.Comparable() {
 			return &quantum.UncomparableStateError{
 				Index:    i,
-				TypeName: reflect.TypeOf(exec.State).String(),
+				TypeName: t.String(),
 			}
 		}
 		if firstIdx, exists := seen[exec.State]; exists {
