@@ -107,7 +107,7 @@ type UncomparableStateError struct {
 func (e *UncomparableStateError) Error() string {
 	return fmt.Sprintf("execution %d: state has uncomparable type %s: "+
 		"QuantumState implementations must use a comparable dynamic type "+
-		"(e.g. a pointer receiver) to support parallel execution", e.Index, e.TypeName)
+		"(e.g. a pointer implementation) to support parallel execution", e.Index, e.TypeName)
 }
 
 // InvalidGateMatrixError indicates that a gate's matrix representation is invalid.

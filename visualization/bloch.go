@@ -39,6 +39,10 @@ func BlochVectorFromQubit(q quantum.Qubit) BlochVector {
 // so the vector lies inside the unit sphere rather than on it: each half of
 // a Bell pair reduces to the origin.
 //
+// This builds a 4ⁿ-element density matrix over all of s, quadratically more
+// than the state vector it was built from, so it is intended for the small
+// states diagnostics and visualization inspect.
+//
 // Returns QubitsOutOfRangeError if target does not name a qubit of s.
 func BlochVectorFromState(s quantum.QuantumState, target int) (BlochVector, error) {
 	if s == nil {

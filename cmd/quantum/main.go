@@ -95,11 +95,15 @@ type pausePrompter struct {
 
 // pause prints the prompt for the upcoming section and waits for a line of
 // input, unless pauses are already disabled. Whatever the user types before
-// the newline is read and discarded, exactly as the original fmt.Scanln()
-// call ignored it — typing something other than a bare Enter has no effect
-// on later pauses. Only a genuine read failure (stdin ending before a
-// newline arrives, e.g. because it closed mid-run) disables all later
-// pauses, rather than repeating the prompt or aborting the remaining demos.
+// the newline is read and discarded, so typing something other than a bare
+// Enter has no effect on later pauses. Unlike the original zero-arg
+// fmt.Scanln() call, which left an unconsumed newline behind after a line
+// with content (making the very next pause fall through instantly),
+// ReadString consumes the whole line including its newline, so each pause
+// always waits for its own line of input. Only a genuine read failure
+// (stdin ending before a newline arrives, e.g. because it closed mid-run)
+// disables all later pauses, rather than repeating the prompt or aborting
+// the remaining demos.
 func (p *pausePrompter) pause(next string) {
 	if p.disabled {
 		return

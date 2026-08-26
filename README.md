@@ -126,6 +126,8 @@ Tests live in [`qubit/qubit_test.go`](qubit/qubit_test.go), [`quantum/quantum_te
 ```bash
 go test ./state -bench Benchmark -benchmem -run '^$'
 
+mkdir -p CHANGES/profiles
+
 go test ./circuit -bench BenchmarkCircuitExecute \
     -benchmem \
     -run '^$' \
