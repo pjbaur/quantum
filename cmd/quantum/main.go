@@ -81,9 +81,45 @@ func runGate(out io.Writer, name string) error {
 	return nil
 }
 
+// pausePrompter drives the "Press Enter to continue..." pauses between
+// sections of the "all" demo. Once disabled (via -no-pause, non-interactive
+// stdin, or a failed Scanln) it becomes a no-op instead of prompting.
+type pausePrompter struct {
+	w        io.Writer
+	disabled bool
+}
+
+// pause prints the prompt for the upcoming section and waits for input,
+// unless pauses are already disabled. A Scanln error (e.g. EOF because
+// stdin closed mid-run) disables all later pauses rather than repeating the
+// prompt or aborting the remaining demos.
+func (p *pausePrompter) pause(next string) {
+	if p.disabled {
+		return
+	}
+	fmt.Fprintf(p.w, "\nPress Enter to continue to %s...\n", next)
+	if _, err := fmt.Scanln(); err != nil {
+		p.disabled = true
+	}
+}
+
+// stdinIsTerminal reports whether stdin looks like an interactive terminal.
+// Piped or redirected input clears ModeCharDevice, so the "all" demo can
+// auto-disable its pauses instead of blocking forever on input that will
+// never arrive.
+func stdinIsTerminal() bool {
+	info, err := os.Stdin.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
+}
+
 // runDemos dispatches a demo word. gateName carries the optional argument of
-// the "gate" command and is empty for every other demo.
-func runDemos(demoType, gateName string) error {
+// the "gate" command and is empty for every other demo. noPause suppresses
+// the interactive pauses in the "all" demo, in addition to the automatic
+// suppression that happens when stdin isn't a terminal.
+func runDemos(demoType, gateName string, noPause bool) error {
 	switch demoType {
 	case "hadamard":
 		examples.RunAllHadamardDemos()
@@ -107,29 +143,25 @@ func runDemos(demoType, gateName string) error {
 		fmt.Println("              ALL DEMONSTRATIONS")
 		fmt.Println("========================================================")
 
+		p := &pausePrompter{w: os.Stdout, disabled: noPause || !stdinIsTerminal()}
+
 		examples.RunAllHadamardDemos()
-		fmt.Println("\nPress Enter to continue to T-gate demonstrations...")
-		fmt.Scanln()
+		p.pause("T-gate demonstrations")
 
 		examples.RunAllTGateDemos()
-		fmt.Println("\nPress Enter to continue to Bell state demonstrations...")
-		fmt.Scanln()
+		p.pause("Bell state demonstrations")
 
 		examples.RunAllBellDemos()
-		fmt.Println("\nPress Enter to continue to algorithm demonstrations...")
-		fmt.Scanln()
+		p.pause("algorithm demonstrations")
 
 		examples.RunAllAlgorithmDemos()
-		fmt.Println("\nPress Enter to continue to visualization demonstrations...")
-		fmt.Scanln()
+		p.pause("visualization demonstrations")
 
 		examples.RunAllVisualizationDemos()
-		fmt.Println("\nPress Enter to continue to noise channel demonstrations...")
-		fmt.Scanln()
+		p.pause("noise channel demonstrations")
 
 		examples.RunAllNoiseDemos()
-		fmt.Println("\nPress Enter to continue to gate catalog demonstrations...")
-		fmt.Scanln()
+		p.pause("gate catalog demonstrations")
 
 		examples.RunAllGatesDemos()
 
@@ -144,6 +176,7 @@ func runDemos(demoType, gateName string) error {
 
 func main() {
 	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, visual, noise, gates, gate, all)")
+	noPauseFlag := flag.Bool("no-pause", false, "Run the \"all\" demo straight through with no interactive pauses (pauses are also auto-disabled when stdin is not a terminal)")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -186,7 +219,7 @@ func main() {
 	fmt.Println("********************************************************")
 
 	// Run the selected demonstrations
-	if err := runDemos(demoType, gateName); err != nil {
+	if err := runDemos(demoType, gateName, *noPauseFlag); err != nil {
 		fmt.Fprintln(os.Stderr, err)
 		flag.Usage()
 		os.Exit(2)

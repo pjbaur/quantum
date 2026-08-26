@@ -345,6 +345,84 @@ func TestCLIGateTooManyArguments(t *testing.T) {
 	}
 }
 
+// TestCLIAllDemoPipedStdinDoesNotHang verifies that "quantum all" with a
+// piped (non-terminal) stdin runs straight through to completion instead of
+// blocking on the "Press Enter to continue..." pauses. This is the ADR-0006
+// regression test for the piped-hang defect: previously, every unguarded
+// fmt.Scanln() in the "all" case would wait forever for input that a pipe
+// never provides.
+func TestCLIAllDemoPipedStdinDoesNotHang(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	cmd := exec.Command("go", "run", "./cmd/quantum", "all")
+	cmd.Stdin = strings.NewReader("") // a pipe, not a terminal
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("quantum all with piped stdin failed.\nStdout: %s\nStderr: %s", stdout.String(), stderr.String())
+	}
+
+	output := stdout.String()
+	for _, want := range []string{
+		"ALL DEMONSTRATIONS",
+		"Hadamard Gate Demonstration",
+		"T Gate vs. Hadamard Comparison",
+		"Bell State Creation Demonstration",
+		"Deutsch-Jozsa Demonstration",
+		"Bloch Vector",
+		"Dephasing Channel Demonstration",
+		"Built-in Gate Catalog",
+		"ALL DEMONSTRATIONS COMPLETED",
+	} {
+		if !strings.Contains(output, want) {
+			t.Errorf("quantum all output missing section banner %q, got:\n%s", want, output)
+		}
+	}
+}
+
+// TestCLIAllDemoNoPauseFlag verifies that -no-pause suppresses the
+// interactive "Press Enter" prompts even though it doesn't affect whether
+// stdin is a terminal.
+func TestCLIAllDemoNoPauseFlag(t *testing.T) {
+	if testing.Short() {
+		t.Skip("skipping in short mode")
+	}
+
+	cmd := exec.Command("go", "run", "./cmd/quantum", "-no-pause", "all")
+	cmd.Stdin = strings.NewReader("")
+	var stdout, stderr bytes.Buffer
+	cmd.Stdout = &stdout
+	cmd.Stderr = &stderr
+
+	if err := cmd.Run(); err != nil {
+		t.Fatalf("quantum -no-pause all failed.\nStdout: %s\nStderr: %s", stdout.String(), stderr.String())
+	}
+
+	output := stdout.String()
+	if strings.Contains(output, "Press Enter") {
+		t.Errorf("-no-pause should suppress \"Press Enter\" prompts, got:\n%s", output)
+	}
+	if !strings.Contains(output, "ALL DEMONSTRATIONS COMPLETED") {
+		t.Errorf("quantum -no-pause all did not complete, got:\n%s", output)
+	}
+}
+
+// TestCLINoPauseFlagDocumented verifies that -no-pause is documented in the
+// help output, alongside the other flags.
+func TestCLINoPauseFlagDocumented(t *testing.T) {
+	cmd := exec.Command("go", "run", "./cmd/quantum", "-h")
+	output, err := cmd.CombinedOutput()
+	_ = err // -h may not return an error, that's fine
+
+	if !strings.Contains(string(output), "no-pause") {
+		t.Errorf("help output missing -no-pause flag, got:\n%s", string(output))
+	}
+}
+
 // TestMain runs setup/teardown for CLI tests.
 func TestMain(m *testing.M) {
 	// Change to repo root so "go run ./cmd/quantum" works
