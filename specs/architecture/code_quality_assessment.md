@@ -300,6 +300,7 @@ An educational quantum-computing simulator in pure Go: dense and sparse state-ve
 - **What**: `CHANGES/profiles/*.pprof` are tracked, and README:132-136 documents a workflow that regenerates them into the tracked path. `git rm --cached`, gitignore the pattern, point the README workflow at an ignored path.
 - **Risk**: Low — no code change.
 - **Impact**: Ends binary churn in version control; profiling docs stop dirtying the tree.
+- **Result (2026-08-26)**: ✅ Done. Both `CHANGES/profiles/*.pprof` binaries `git rm --cached`-ed (files stay on disk), `.gitignore` gained `CHANGES/profiles/*.pprof`, and the README Benchmarking section keeps the same `-cpuprofile`/`-memprofile` workflow paths — now ignored — with a note that profiles are local artifacts, not tracked. Verified: `git check-ignore` positive on both, `git ls-files` shows zero pprof entries. Commit 64f4444.
 
 #### 4.3 Decide the fate of `MaxGateQubits`
 - **What**: Half the `BackendCapabilities` contract is still dead — zero non-test callers (`quantum/interfaces.go:114`). Either consult it in `circuit.checkCapabilities` alongside `SupportsGateQubits`, or deprecate it per the deprecation policy.
