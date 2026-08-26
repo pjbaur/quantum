@@ -34,6 +34,31 @@ func (g *mockThreeQubitGate) Matrix() [][]complex128 {
 	return matrix
 }
 
+// maxQubitsCapBackend wraps a dense state but reports a caller-supplied
+// MaxGateQubits bound while always reporting SupportsGateQubits as true.
+// This isolates the MaxGateQubits half of BackendCapabilities so it can be
+// tested independently of SupportsGateQubits. It also records whether
+// ApplyGate was invoked, so tests can confirm a capability failure is
+// caught before any state mutation is attempted.
+type maxQubitsCapBackend struct {
+	*state.State
+	maxQubits       int
+	applyGateCalled bool
+}
+
+func (b *maxQubitsCapBackend) SupportsGateQubits(qubitCount int) bool {
+	return true
+}
+
+func (b *maxQubitsCapBackend) MaxGateQubits() int {
+	return b.maxQubits
+}
+
+func (b *maxQubitsCapBackend) ApplyGate(gate quantum.Gate, targets ...int) error {
+	b.applyGateCalled = true
+	return b.State.ApplyGate(gate, targets...)
+}
+
 func TestNewCircuitInvalidQubits(t *testing.T) {
 	_, err := circuit.New(0)
 	if err == nil {
@@ -413,5 +438,91 @@ func TestCircuitWithMixedGatesCapabilityCheck(t *testing.T) {
 	err = c.Execute(dense)
 	if err != nil {
 		t.Fatalf("unexpected error on dense backend: %v", err)
+	}
+}
+
+// TestExecuteEnforcesMaxGateQubits verifies that MaxGateQubits is enforced
+// as a hard upper bound on gate width even when SupportsGateQubits reports
+// support for that width, and that a violation is caught before any state
+// mutation is attempted.
+func TestExecuteEnforcesMaxGateQubits(t *testing.T) {
+	tests := []struct {
+		name      string
+		maxQubits int
+		wantErr   bool
+	}{
+		{name: "gate size below max", maxQubits: 4, wantErr: false},
+		{name: "gate size equals max (boundary)", maxQubits: 3, wantErr: false},
+		{name: "gate size exceeds max", maxQubits: 2, wantErr: true},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := circuit.New(3)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+				t.Fatalf("unexpected error adding gate: %v", err)
+			}
+
+			dense, err := state.New(3)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
+			backend := &maxQubitsCapBackend{State: dense, maxQubits: tt.maxQubits}
+
+			err = c.Execute(backend)
+
+			if !tt.wantErr {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				if !backend.applyGateCalled {
+					t.Fatal("expected ApplyGate to be called when gate size is within MaxGateQubits")
+				}
+				return
+			}
+
+			if err == nil {
+				t.Fatal("expected error when gate size exceeds MaxGateQubits")
+			}
+
+			var unsupportedErr *quantum.UnsupportedOperationError
+			if !errors.As(err, &unsupportedErr) {
+				t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+			}
+			if backend.applyGateCalled {
+				t.Fatal("ApplyGate must not be called when the MaxGateQubits check fails (fail fast, no mutation)")
+			}
+		})
+	}
+}
+
+// TestCheckBackendCapabilitiesMaxGateQubits exercises the MaxGateQubits
+// check via CheckBackendCapabilities directly (no state mutation involved).
+func TestCheckBackendCapabilitiesMaxGateQubits(t *testing.T) {
+	c, err := circuit.New(3)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+		t.Fatalf("unexpected error adding gate: %v", err)
+	}
+
+	dense, err := state.New(3)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	backend := &maxQubitsCapBackend{State: dense, maxQubits: 2}
+
+	err = c.CheckBackendCapabilities(backend)
+	if err == nil {
+		t.Fatal("expected error when gate size exceeds MaxGateQubits")
+	}
+
+	var unsupportedErr *quantum.UnsupportedOperationError
+	if !errors.As(err, &unsupportedErr) {
+		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
 	}
 }

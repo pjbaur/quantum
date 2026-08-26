@@ -163,7 +163,11 @@ func (c *Circuit) Execute(state quantum.QuantumState) error {
 }
 
 // checkCapabilities verifies that all operations in the circuit can be
-// executed by a backend with the given capabilities.
+// executed by a backend with the given capabilities. Both halves of
+// BackendCapabilities are enforced: SupportsGateQubits determines which
+// gate widths the backend supports at all, and MaxGateQubits is checked
+// as a hard upper bound on gate width, even for widths SupportsGateQubits
+// reports as supported.
 func (c *Circuit) checkCapabilities(caps quantum.BackendCapabilities) error {
 	for _, operation := range c.operations {
 		required, err := quantum.GateQubitCount(operation.Gate)
@@ -174,6 +178,13 @@ func (c *Circuit) checkCapabilities(caps quantum.BackendCapabilities) error {
 			return &quantum.UnsupportedOperationError{
 				Operation:   fmt.Sprintf("%d-qubit gate (%s)", required, operation.Gate.Name()),
 				Backend:     "current backend",
+				Alternative: "dense state backend (state.State)",
+			}
+		}
+		if maxQubits := caps.MaxGateQubits(); maxQubits > 0 && required > maxQubits {
+			return &quantum.UnsupportedOperationError{
+				Operation:   fmt.Sprintf("%d-qubit gate (%s)", required, operation.Gate.Name()),
+				Backend:     fmt.Sprintf("current backend (max %d qubits per gate)", maxQubits),
 				Alternative: "dense state backend (state.State)",
 			}
 		}
