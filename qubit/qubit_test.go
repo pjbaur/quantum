@@ -185,9 +185,9 @@ func TestMeasureCollapsesState(t *testing.T) {
 }
 
 func TestMeasureRoughDistribution(t *testing.T) {
-	// Coarse statistical check that Measure uses the amplitudes at all.
-	// Bounds are ±6σ wide; deterministic assertions need injectable
-	// randomness first (tracked separately).
+	// Coarse statistical check (±6σ bounds) that the default random source
+	// respects the amplitudes; TestMeasureUsesInjectedRandSource covers the
+	// deterministic path via SetRandSource.
 	const trials = 1000
 	ones := 0
 	for i := 0; i < trials; i++ {
