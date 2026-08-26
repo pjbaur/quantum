@@ -198,9 +198,7 @@ func GenerateRandomNumber(maxNumber int) int {
 
 // RunAllHadamardDemos executes all Hadamard gate demonstrations
 func RunAllHadamardDemos() {
-	fmt.Println("=============================================")
-	fmt.Println("    HADAMARD GATE DEMONSTRATIONS")
-	fmt.Println("=============================================")
+	PrintBanner(45, "    HADAMARD GATE DEMONSTRATIONS")
 
 	// Run each demonstration
 	HadamardSingleQubitDemo()
@@ -216,5 +214,5 @@ func RunAllHadamardDemos() {
 		fmt.Printf("%d ", num)
 	}
 	fmt.Println()
-	fmt.Println("=============================================")
+	PrintRule(45)
 }

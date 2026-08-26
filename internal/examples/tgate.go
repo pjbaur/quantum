@@ -231,14 +231,12 @@ func TGateVsHadamardDemo() {
 
 // RunAllTGateDemos executes all T gate demonstrations
 func RunAllTGateDemos() {
-	fmt.Println("=============================================")
-	fmt.Println("    T GATE DEMONSTRATIONS")
-	fmt.Println("=============================================")
+	PrintBanner(45, "    T GATE DEMONSTRATIONS")
 
 	TGateSingleQubitDemo()
 	TGatePhaseRotationDemo()
 	TGateMultiQubitDemo()
 	TGateVsHadamardDemo()
 
-	fmt.Println("=============================================")
+	PrintRule(45)
 }

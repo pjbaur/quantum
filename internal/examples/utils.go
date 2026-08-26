@@ -2,6 +2,7 @@ package examples
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/pjbaur/quantum/state"
 )
@@ -22,4 +23,23 @@ func printState(s *state.State) {
 				numQubits, i, amplitude, probability*100)
 		}
 	}
+}
+
+// PrintRule prints a single line of width `=` characters, the horizontal
+// rule used to open and close demo section banners.
+func PrintRule(width int) {
+	fmt.Println(strings.Repeat("=", width))
+}
+
+// PrintBanner prints a demo section banner: a rule of the given width, then
+// each of titles on its own line, then a matching closing rule. Each title
+// is printed exactly as passed — including any leading spaces callers use
+// to visually center it — so output stays byte-for-byte identical to the
+// hand-written banners this replaces.
+func PrintBanner(width int, titles ...string) {
+	PrintRule(width)
+	for _, title := range titles {
+		fmt.Println(title)
+	}
+	PrintRule(width)
 }

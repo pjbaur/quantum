@@ -145,10 +145,10 @@ func runDemos(demoType, gateName string, noPause bool) error {
 	case "gate":
 		return runGate(os.Stdout, gateName)
 	case "all":
-		fmt.Println("\n========================================================")
-		fmt.Println("             QUANTUM COMPUTING IN GO")
-		fmt.Println("              ALL DEMONSTRATIONS")
-		fmt.Println("========================================================")
+		fmt.Println()
+		examples.PrintBanner(56,
+			"             QUANTUM COMPUTING IN GO",
+			"              ALL DEMONSTRATIONS")
 
 		p := &pausePrompter{w: os.Stdout, r: bufio.NewReader(os.Stdin), disabled: noPause || !stdinIsTerminal()}
 
@@ -172,9 +172,8 @@ func runDemos(demoType, gateName string, noPause bool) error {
 
 		examples.RunAllGatesDemos()
 
-		fmt.Println("\n========================================================")
-		fmt.Println("             ALL DEMONSTRATIONS COMPLETED")
-		fmt.Println("========================================================")
+		fmt.Println()
+		examples.PrintBanner(56, "             ALL DEMONSTRATIONS COMPLETED")
 	default:
 		return fmt.Errorf("unknown demo: %s", demoType)
 	}

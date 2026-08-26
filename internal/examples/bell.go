@@ -254,13 +254,11 @@ func QuantumTeleportationDemo() {
 
 // RunAllBellDemos executes all Bell state demonstrations
 func RunAllBellDemos() {
-	fmt.Println("=============================================")
-	fmt.Println("    BELL STATE & ENTANGLEMENT DEMONSTRATIONS")
-	fmt.Println("=============================================")
+	PrintBanner(45, "    BELL STATE & ENTANGLEMENT DEMONSTRATIONS")
 
 	BellStateCreationDemo()
 	BellCorrelationDemo()
 	QuantumTeleportationDemo()
 
-	fmt.Println("=============================================")
+	PrintRule(45)
 }
