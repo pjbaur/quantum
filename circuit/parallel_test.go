@@ -29,6 +29,32 @@ func (u uncomparableState) Measure(qubitIndex int) (int, error)                 
 func (u uncomparableState) Probability(basisState int) float64                  { return 0 }
 func (u uncomparableState) Clone() quantum.QuantumState                         { return u }
 
+// deepUncomparableState is, statically, a comparable struct: every declared
+// field type (an interface) is comparable at compile time. But its
+// amplitudes field holds a slice at runtime, so comparing two values of this
+// type still panics — the panic only happens dynamically, once the
+// interface's boxed value is inspected. It exists to verify that
+// validateIndependentStates catches this "deep" case, which a type-level
+// reflect.Type.Comparable() check cannot see but reflect.Value.Comparable()
+// can.
+type deepUncomparableState struct {
+	amplitudes interface{}
+}
+
+func (d deepUncomparableState) NumQubits() int { return 1 }
+func (d deepUncomparableState) Amplitude(basisState int) complex128 {
+	amps, _ := d.amplitudes.([]complex128)
+	if basisState < 0 || basisState >= len(amps) {
+		return 0
+	}
+	return amps[basisState]
+}
+func (d deepUncomparableState) SetAmplitude(basisState int, value complex128) error { return nil }
+func (d deepUncomparableState) ApplyGate(gate quantum.Gate, targets ...int) error   { return nil }
+func (d deepUncomparableState) Measure(qubitIndex int) (int, error)                 { return 0, nil }
+func (d deepUncomparableState) Probability(basisState int) float64                  { return 0 }
+func (d deepUncomparableState) Clone() quantum.QuantumState                         { return d }
+
 func TestExecuteAllParallelValidatesStateComparability(t *testing.T) {
 	c, err := circuit.New(1)
 	if err != nil {
@@ -79,6 +105,25 @@ func TestExecuteAllParallelValidatesStateComparability(t *testing.T) {
 					t.Fatalf("expected index 0, got %d", uncomparableErr.Index)
 				}
 				if !strings.Contains(err.Error(), "uncomparableState") {
+					t.Fatalf("expected error message to name the type, got: %v", err)
+				}
+			},
+		},
+		{
+			name: "deep uncomparable value inside comparable struct returns typed error instead of panicking",
+			executions: []circuit.Execution{
+				{Circuit: c, State: deepUncomparableState{amplitudes: []complex128{1, 0}}},
+				{Circuit: c, State: deepUncomparableState{amplitudes: []complex128{1, 0}}},
+			},
+			checkErr: func(t *testing.T, err error) {
+				var uncomparableErr *quantum.UncomparableStateError
+				if !errors.As(err, &uncomparableErr) {
+					t.Fatalf("expected UncomparableStateError, got %T: %v", err, err)
+				}
+				if uncomparableErr.Index != 0 {
+					t.Fatalf("expected index 0, got %d", uncomparableErr.Index)
+				}
+				if !strings.Contains(err.Error(), "deepUncomparableState") {
 					t.Fatalf("expected error message to name the type, got: %v", err)
 				}
 			},

@@ -502,27 +502,54 @@ func TestExecuteEnforcesMaxGateQubits(t *testing.T) {
 // TestCheckBackendCapabilitiesMaxGateQubits exercises the MaxGateQubits
 // check via CheckBackendCapabilities directly (no state mutation involved).
 func TestCheckBackendCapabilitiesMaxGateQubits(t *testing.T) {
-	c, err := circuit.New(3)
-	if err != nil {
-		t.Fatalf("unexpected error: %v", err)
-	}
-	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
-		t.Fatalf("unexpected error adding gate: %v", err)
-	}
-
-	dense, err := state.New(3)
-	if err != nil {
-		t.Fatalf("state.New failed: %v", err)
-	}
-	backend := &maxQubitsCapBackend{State: dense, maxQubits: 2}
-
-	err = c.CheckBackendCapabilities(backend)
-	if err == nil {
-		t.Fatal("expected error when gate size exceeds MaxGateQubits")
+	tests := []struct {
+		name      string
+		maxQubits int
+		wantErr   bool
+	}{
+		{
+			name:      "gate size exceeds max is rejected",
+			maxQubits: 2,
+			wantErr:   true,
+		},
+		{
+			name:      "gate size equal to max is allowed",
+			maxQubits: 3,
+			wantErr:   false,
+		},
 	}
 
-	var unsupportedErr *quantum.UnsupportedOperationError
-	if !errors.As(err, &unsupportedErr) {
-		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			c, err := circuit.New(3)
+			if err != nil {
+				t.Fatalf("unexpected error: %v", err)
+			}
+			if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
+				t.Fatalf("unexpected error adding gate: %v", err)
+			}
+
+			dense, err := state.New(3)
+			if err != nil {
+				t.Fatalf("state.New failed: %v", err)
+			}
+			backend := &maxQubitsCapBackend{State: dense, maxQubits: tt.maxQubits}
+
+			err = c.CheckBackendCapabilities(backend)
+			if !tt.wantErr {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+				return
+			}
+			if err == nil {
+				t.Fatal("expected error when gate size exceeds MaxGateQubits")
+			}
+
+			var unsupportedErr *quantum.UnsupportedOperationError
+			if !errors.As(err, &unsupportedErr) {
+				t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+			}
+		})
 	}
 }

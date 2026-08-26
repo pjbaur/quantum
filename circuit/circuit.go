@@ -175,21 +175,27 @@ func (c *Circuit) checkCapabilities(caps quantum.BackendCapabilities) error {
 			return err
 		}
 		if !caps.SupportsGateQubits(required) {
-			return &quantum.UnsupportedOperationError{
-				Operation:   fmt.Sprintf("%d-qubit gate (%s)", required, operation.Gate.Name()),
-				Backend:     "current backend",
-				Alternative: "dense state backend (state.State)",
-			}
+			return unsupportedGateError(required, operation.Gate.Name(), "current backend")
 		}
 		if maxQubits := caps.MaxGateQubits(); maxQubits > 0 && required > maxQubits {
-			return &quantum.UnsupportedOperationError{
-				Operation:   fmt.Sprintf("%d-qubit gate (%s)", required, operation.Gate.Name()),
-				Backend:     fmt.Sprintf("current backend (max %d qubits per gate)", maxQubits),
-				Alternative: "dense state backend (state.State)",
-			}
+			return unsupportedGateError(required, operation.Gate.Name(),
+				fmt.Sprintf("current backend (max %d qubits per gate)", maxQubits))
 		}
 	}
 	return nil
+}
+
+// unsupportedGateError builds the UnsupportedOperationError reported when a
+// gate cannot be executed by a backend, whether because the backend doesn't
+// support the gate's qubit width at all or because it exceeds the backend's
+// MaxGateQubits bound. backend describes why, in text specific to which case
+// triggered it.
+func unsupportedGateError(required int, gateName, backend string) *quantum.UnsupportedOperationError {
+	return &quantum.UnsupportedOperationError{
+		Operation:   fmt.Sprintf("%d-qubit gate (%s)", required, gateName),
+		Backend:     backend,
+		Alternative: "dense state backend (state.State)",
+	}
 }
 
 // CheckBackendCapabilities checks whether a backend with the given capabilities
