@@ -2,6 +2,7 @@ package circuit
 
 import (
 	"fmt"
+	"reflect"
 	"runtime"
 	"sync"
 	"sync/atomic"
@@ -12,11 +13,24 @@ import (
 // validateIndependentStates checks that all state pointers in the executions
 // are unique. It returns a SharedStateError if any state is shared between
 // multiple executions.
+//
+// This requires keying a map by quantum.QuantumState interface values, which
+// panics at runtime if a state's dynamic type is not comparable (for example,
+// a struct value holding a slice, map, or function field, rather than a
+// pointer). All in-repo backends use pointer receivers and are safe. A state
+// with an uncomparable dynamic type is rejected with an UncomparableStateError
+// before it reaches the map, rather than panicking.
 func validateIndependentStates(executions []Execution) error {
 	seen := make(map[quantum.QuantumState]int)
 	for i, exec := range executions {
 		if exec.State == nil {
 			continue // nil states are caught by executeOne
+		}
+		if !reflect.TypeOf(exec.State).Comparable() {
+			return &quantum.UncomparableStateError{
+				Index:    i,
+				TypeName: reflect.TypeOf(exec.State).String(),
+			}
 		}
 		if firstIdx, exists := seen[exec.State]; exists {
 			return &quantum.SharedStateError{
@@ -57,7 +71,10 @@ func ExecuteAll(executions []Execution) error {
 //
 // SAFETY: All Execution.State values must be unique pointers. Passing the same
 // state to multiple executions will return a SharedStateError before any
-// concurrent execution begins.
+// concurrent execution begins. Each state's dynamic type must also be
+// comparable (as all in-repo backends are, being pointer types); a state
+// backed by an uncomparable type (e.g. a struct value containing a slice)
+// will return an UncomparableStateError instead of panicking.
 func ExecuteAllParallel(executions []Execution, opts ParallelOptions) error {
 	if len(executions) == 0 {
 		return nil

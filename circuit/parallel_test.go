@@ -12,6 +12,92 @@ import (
 	"github.com/pjbaur/quantum/state"
 )
 
+// uncomparableState is a deliberately uncomparable quantum.QuantumState
+// implementation: it is used as a struct value (not a pointer) and holds a
+// slice field, so comparing two values of this type panics. It exists to
+// verify that validateIndependentStates rejects such states with a typed
+// error instead of panicking when it keys its seen-state map.
+type uncomparableState struct {
+	amplitudes []complex128
+}
+
+func (u uncomparableState) NumQubits() int                                      { return 1 }
+func (u uncomparableState) Amplitude(basisState int) complex128                 { return u.amplitudes[basisState] }
+func (u uncomparableState) SetAmplitude(basisState int, value complex128) error { return nil }
+func (u uncomparableState) ApplyGate(gate quantum.Gate, targets ...int) error   { return nil }
+func (u uncomparableState) Measure(qubitIndex int) (int, error)                 { return 0, nil }
+func (u uncomparableState) Probability(basisState int) float64                  { return 0 }
+func (u uncomparableState) Clone() quantum.QuantumState                         { return u }
+
+func TestExecuteAllParallelValidatesStateComparability(t *testing.T) {
+	c, err := circuit.New(1)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if err := c.AddGate(gates.NewPauliX(), 0); err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+
+	s1, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	s2, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+
+	tests := []struct {
+		name       string
+		executions []circuit.Execution
+		checkErr   func(t *testing.T, err error)
+	}{
+		{
+			name: "pointer states still validate as before",
+			executions: []circuit.Execution{
+				{Circuit: c, State: s1},
+				{Circuit: c, State: s2},
+			},
+			checkErr: func(t *testing.T, err error) {
+				if err != nil {
+					t.Fatalf("unexpected error: %v", err)
+				}
+			},
+		},
+		{
+			name: "uncomparable state returns typed error instead of panicking",
+			executions: []circuit.Execution{
+				{Circuit: c, State: uncomparableState{amplitudes: []complex128{1, 0}}},
+				{Circuit: c, State: uncomparableState{amplitudes: []complex128{1, 0}}},
+			},
+			checkErr: func(t *testing.T, err error) {
+				var uncomparableErr *quantum.UncomparableStateError
+				if !errors.As(err, &uncomparableErr) {
+					t.Fatalf("expected UncomparableStateError, got %T: %v", err, err)
+				}
+				if uncomparableErr.Index != 0 {
+					t.Fatalf("expected index 0, got %d", uncomparableErr.Index)
+				}
+				if !strings.Contains(err.Error(), "uncomparableState") {
+					t.Fatalf("expected error message to name the type, got: %v", err)
+				}
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			defer func() {
+				if r := recover(); r != nil {
+					t.Fatalf("ExecuteAllParallel panicked: %v", r)
+				}
+			}()
+			err := circuit.ExecuteAllParallel(tt.executions, circuit.ParallelOptions{MaxParallelism: 2})
+			tt.checkErr(t, err)
+		})
+	}
+}
+
 func TestExecuteAllAppliesCircuits(t *testing.T) {
 	c, err := circuit.New(1)
 	if err != nil {

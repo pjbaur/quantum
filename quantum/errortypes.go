@@ -95,6 +95,21 @@ func (e *UnsupportedOperationError) Error() string {
 		e.Backend, e.Operation, e.Alternative)
 }
 
+// UncomparableStateError indicates that an execution's state has a dynamic
+// type that is not comparable (e.g. a struct value containing a slice, map,
+// or function field), so it cannot be used as a map key when checking for
+// shared state across parallel executions.
+type UncomparableStateError struct {
+	Index    int
+	TypeName string
+}
+
+func (e *UncomparableStateError) Error() string {
+	return fmt.Sprintf("execution %d: state has uncomparable type %s: "+
+		"QuantumState implementations must use a comparable dynamic type "+
+		"(e.g. a pointer receiver) to support parallel execution", e.Index, e.TypeName)
+}
+
 // InvalidGateMatrixError indicates that a gate's matrix representation is invalid.
 type InvalidGateMatrixError struct {
 	GateName string
