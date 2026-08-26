@@ -41,6 +41,41 @@ func New(numQubits int) (*Matrix, error) {
 	}, nil
 }
 
+// FromState builds the density matrix ρ = |ψ⟩⟨ψ| of the pure state s.
+// Amplitudes are read through the quantum.QuantumState accessor, so every
+// backend works without this package knowing the concrete type.
+//
+// The result holds 4ⁿ elements for an n-qubit state, quadratically more than
+// the state vector it was built from, so this is meant for the small states
+// diagnostics and visualization inspect.
+//
+// Returns InvalidQubitCountError if s reports a non-positive qubit count.
+func FromState(s quantum.QuantumState) (*Matrix, error) {
+	if s == nil {
+		return nil, errors.New("state must not be nil")
+	}
+
+	m, err := New(s.NumQubits())
+	if err != nil {
+		return nil, err
+	}
+
+	// Read each amplitude once: the outer product touches every pair.
+	amplitudes := make([]complex128, m.dim)
+	for i := range amplitudes {
+		amplitudes[i] = s.Amplitude(i)
+	}
+
+	for i := 0; i < m.dim; i++ {
+		row := i * m.dim
+		for j := 0; j < m.dim; j++ {
+			m.data[row+j] = amplitudes[i] * cmplx.Conj(amplitudes[j])
+		}
+	}
+
+	return m, nil
+}
+
 // NumQubits returns the number of qubits represented by the matrix.
 func (m *Matrix) NumQubits() int {
 	return m.numQubits

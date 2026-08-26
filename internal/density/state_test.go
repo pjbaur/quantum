@@ -192,6 +192,130 @@ func TestAmplitudeDampingChannel(t *testing.T) {
 	assertPositiveSemidefinite2x2(t, state)
 }
 
+func TestFromStateBuildsOuterProduct(t *testing.T) {
+	invSqrt2 := 1 / math.Sqrt2
+
+	cases := []struct {
+		name       string
+		numQubits  int
+		amplitudes []complex128
+		expected   [][]complex128
+	}{
+		{
+			name:       "single_qubit_zero",
+			numQubits:  1,
+			amplitudes: []complex128{1, 0},
+			expected: [][]complex128{
+				{1, 0},
+				{0, 0},
+			},
+		},
+		{
+			name:       "single_qubit_plus_i",
+			numQubits:  1,
+			amplitudes: []complex128{complex(invSqrt2, 0), complex(0, invSqrt2)},
+			expected: [][]complex128{
+				{0.5, complex(0, -0.5)},
+				{complex(0, 0.5), 0.5},
+			},
+		},
+		{
+			name:       "bell_pair",
+			numQubits:  2,
+			amplitudes: []complex128{complex(invSqrt2, 0), 0, 0, complex(invSqrt2, 0)},
+			expected: [][]complex128{
+				{0.5, 0, 0, 0.5},
+				{0, 0, 0, 0},
+				{0, 0, 0, 0},
+				{0.5, 0, 0, 0.5},
+			},
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			state, err := FromState(&stubState{numQubits: tc.numQubits, amplitudes: tc.amplitudes})
+			if err != nil {
+				t.Fatalf("FromState failed: %v", err)
+			}
+			if state.NumQubits() != tc.numQubits {
+				t.Errorf("NumQubits() = %d, want %d", state.NumQubits(), tc.numQubits)
+			}
+
+			for row := range tc.expected {
+				for col := range tc.expected[row] {
+					if cmplx.Abs(state.Element(row, col)-tc.expected[row][col]) > tol {
+						t.Errorf("Element(%d, %d) = %v, want %v",
+							row, col, state.Element(row, col), tc.expected[row][col])
+					}
+				}
+			}
+
+			assertCloseFloat(t, state.Trace(), 1)
+			assertCloseFloat(t, state.Purity(), 1)
+		})
+	}
+}
+
+func TestFromStateRejectsNilState(t *testing.T) {
+	state, err := FromState(nil)
+	if state != nil {
+		t.Errorf("FromState(nil) returned non-nil matrix")
+	}
+	if err == nil {
+		t.Fatal("FromState(nil) error = nil, want an error")
+	}
+}
+
+func TestFromStateRejectsNonPositiveQubitCount(t *testing.T) {
+	for _, n := range []int{0, -2} {
+		state, err := FromState(&stubState{numQubits: n})
+		if state != nil {
+			t.Errorf("FromState(%d qubits) returned non-nil matrix", n)
+		}
+		var invalidErr *quantum.InvalidQubitCountError
+		if !errors.As(err, &invalidErr) {
+			t.Fatalf("FromState(%d qubits) error = %v, want *quantum.InvalidQubitCountError", n, err)
+		}
+		if invalidErr.Requested != n {
+			t.Errorf("FromState(%d qubits) error Requested = %d, want %d", n, invalidErr.Requested, n)
+		}
+	}
+}
+
+// stubState is a minimal quantum.QuantumState that hands FromState a fixed
+// amplitude vector, including combinations no real backend can produce, such
+// as a non-positive qubit count.
+type stubState struct {
+	numQubits  int
+	amplitudes []complex128
+}
+
+func (s *stubState) NumQubits() int { return s.numQubits }
+
+func (s *stubState) Amplitude(basisState int) complex128 {
+	if basisState < 0 || basisState >= len(s.amplitudes) {
+		return 0
+	}
+	return s.amplitudes[basisState]
+}
+
+func (s *stubState) SetAmplitude(int, complex128) error { return errors.New("not supported") }
+
+func (s *stubState) ApplyGate(quantum.Gate, ...int) error { return errors.New("not supported") }
+
+func (s *stubState) Measure(int) (int, error) { return 0, errors.New("not supported") }
+
+func (s *stubState) Probability(basisState int) float64 {
+	return quantum.Probability(s.Amplitude(basisState))
+}
+
+func (s *stubState) Clone() quantum.QuantumState {
+	clone := &stubState{numQubits: s.numQubits}
+	clone.amplitudes = append(clone.amplitudes, s.amplitudes...)
+	return clone
+}
+
 func newFromAmplitudes(t *testing.T, alpha, beta complex128) *Matrix {
 	t.Helper()
 	state, err := New(1)
