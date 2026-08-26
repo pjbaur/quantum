@@ -286,6 +286,50 @@ An educational quantum-computing simulator in pure Go: dense and sparse state-ve
 - **Impact**: The dense/sparse equivalence fuzz would have caught the CNOT-name-dispatch hazard mechanically; guards 3.2's refactor.
 - **Result (2026-08-25, verified at v0.3.0 / 846268f)**: ✅ Done. Six fuzz targets: `FuzzGateQubitCount` (1×1 case seeded), `FuzzSetAmplitude(s)` in both backends with seeds straddling the 1e-10 tolerance edge, and `FuzzDenseSparseGateEquivalence` over random 1–2 qubit unitaries (angle-built, unitarity-guarded, both target orders, canonical-CNOT fast-path seed). The 1×1 acceptance was fixed at the source: `GateQubitCount` now returns `InvalidGateMatrixError` ("matrix must be at least 2x2", `quantum/gateutil.go:57-63`) with unit + fuzz coverage. Bonus landed in the same commit: non-finite amplitude validation (`quantum.IsFiniteAmplitude`, `NonFiniteAmplitudeError`) enforced in both backends' setters. **Residual**: CI runs the fuzz targets over their seed corpora only (via `go test ./...`) — no extended `-fuzz` step or committed corpora; long fuzzing stays manual. Commit 93fbfcc.
 
+### Priority 4: Remaining Subsystem Concerns (queued 2026-08-25)
+
+> Sourced from a post-P3 sweep of the Detailed Subsystem Analysis: concerns raised above that no P1–P3 recommendation covered. Verified still present on `main` at 15b6c9d. Not queued: `GateQubitCount` per-call validation — the `QubitCounter` fast path (`quantum/gateutil.go:21-26`, implemented by every built-in gate) short-circuits before the matrix walk, resolving the cost concern in practice.
+
+#### 4.1 Make `quantum all` safe when piped
+- **What**: `cmd/quantum/main.go:112-132` — six unguarded `fmt.Scanln()` calls with discarded errors hang the `all` demo under pipes/CI. Add a non-interactive path (flag such as `-no-pause`, or skip pauses when stdin is not a TTY) and stop discarding the `Scanln` error.
+- **Risk**: Low — CLI-only; extend the ADR-0006 contract tests.
+- **Impact**: Removes the most user-visible defect left in the module; `quantum all` becomes scriptable.
+
+#### 4.2 Untrack the committed pprof binaries
+- **What**: `CHANGES/profiles/*.pprof` are tracked, and README:132-136 documents a workflow that regenerates them into the tracked path. `git rm --cached`, gitignore the pattern, point the README workflow at an ignored path.
+- **Risk**: Low — no code change.
+- **Impact**: Ends binary churn in version control; profiling docs stop dirtying the tree.
+
+#### 4.3 Decide the fate of `MaxGateQubits`
+- **What**: Half the `BackendCapabilities` contract is still dead — zero non-test callers (`quantum/interfaces.go:114`). Either consult it in `circuit.checkCapabilities` alongside `SupportsGateQubits`, or deprecate it per the deprecation policy.
+- **Risk**: Low to wire in; removing is a breaking interface change.
+- **Impact**: "Built means reachable" for the capabilities contract; same class of debt P1 item 1.3 cleared elsewhere.
+
+#### 4.4 Document the comparability assumption in `validateIndependentStates`
+- **What**: `circuit/parallel.go:16` keys a map by `quantum.QuantumState` interface values — an uncomparable implementation panics at runtime, and the doc comment is silent about it. Minimum: state the requirement in the doc comment; optional: guard with `reflect.TypeOf(s).Comparable()` and return a typed error.
+- **Risk**: Low — doc-only, or a cold-path check.
+- **Impact**: Turns an undocumented panic into a stated contract.
+
+#### 4.5 Bloch vectors for multi-qubit states
+- **What**: `visualization.BlochVectorFromQubit` remains single-qubit; `density.ReducedBlochVector` exists but is `internal/` with no bridge from a state vector. Add a state-vector → reduced-density path (e.g. `density.FromState` + a visualization entry point taking `quantum.QuantumState` and a target index).
+- **Risk**: Medium — new public API; needs entangled-state tests (reduced vector of a Bell pair is the zero vector).
+- **Impact**: Bloch export works for the states users actually build; gives the density package its second consumer.
+
+#### 4.6 Decide density's relationship to `QuantumState`
+- **What**: `internal/density` still implements a fixed-arity `ApplySingleQubitGate` rather than `quantum.QuantumState` (`ApplyGate(gate, targets...)`, `Measure`, `Clone`, ...). Either implement the interface so it can join the circuit abstraction, or record the deliberate scope (noise-demo backend only) in an ADR/doc comment.
+- **Risk**: Medium-High to implement (measurement on density matrices is real design work); Low to document.
+- **Impact**: Closes the last "built but not integrated" question; 4.5 gets easier if implemented.
+
+#### 4.7 Extract the shared example banner code
+- **What**: `internal/examples/utils.go` holds one function while the `=====` banner/section blocks are hand-inlined in `bell.go:257-265`, `hadamard.go:201-219`, `tgate.go:234-243`, and `cmd/quantum/main.go:105-108,136-138`. Extract a shared banner/section helper.
+- **Risk**: Low — demo output only; CLI contract tests pin the strings.
+- **Impact**: Cosmetic debt cleared; new demos stop copy-pasting.
+
+#### 4.8 Small-sweep leftovers
+- **What**: (a) test `visualization.DefaultStateViewOptions` (the package's only 0% function); (b) add the versioning note to `docs/deprecation-policy-v2.md` that `MIGRATION-v2.md:5-10` already carries; (c) trim CI's triple suite execution (plain + race + coverage per matrix leg — race and coverage suffice) and consider pre-commit hooks.
+- **Risk**: Low — each independent and mechanical.
+- **Impact**: Coverage floor honesty, doc consistency, ~⅓ less CI compute.
+
 ---
 
 ## Summary
