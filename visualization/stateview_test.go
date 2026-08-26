@@ -8,6 +8,20 @@ import (
 	"github.com/pjbaur/quantum/visualization"
 )
 
+func TestDefaultStateViewOptions(t *testing.T) {
+	opts := visualization.DefaultStateViewOptions()
+
+	if opts.MinProbability != 0 {
+		t.Errorf("MinProbability = %v, want 0", opts.MinProbability)
+	}
+	if opts.Precision != 4 {
+		t.Errorf("Precision = %v, want 4", opts.Precision)
+	}
+	if !opts.IncludeHeader {
+		t.Errorf("IncludeHeader = false, want true")
+	}
+}
+
 func TestFormatStateViewIncludesHeaderAndEntry(t *testing.T) {
 	s, err := state.New(1)
 	if err != nil {

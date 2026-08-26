@@ -40,9 +40,6 @@ jobs:
           go install honnef.co/go/tools/cmd/staticcheck@latest
           staticcheck ./...
 
-      - name: Go test
-        run: go test ./...
-
       - name: Go test (race detector)
         run: go test -race ./...
 

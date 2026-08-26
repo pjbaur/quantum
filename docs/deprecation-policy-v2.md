@@ -2,6 +2,12 @@
 
 This document lists all API removals planned for v2.0, with migration guidance.
 
+> **Versioning note (2026-08-25):** "v2" in this policy names the current
+> API generation (the state-vector-first API), not a Go module major
+> version. Releases are tagged in the v0.x series (first tag: `v0.2.0`);
+> the module path remains `github.com/pjbaur/quantum` with no `/v2`
+> suffix.
+
 ## Overview
 
 Version 2.0 removes the legacy single-qubit gate application API in favor of the state-vector-first approach. See `docs/adr/0001-state-vector-first-api.md` for the rationale.
