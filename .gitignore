@@ -33,3 +33,6 @@ go.work.sum
 
 # env file
 .env
+
+# Local pprof profiles (generated during benchmarking)
+CHANGES/profiles/*.pprof

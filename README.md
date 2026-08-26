@@ -135,6 +135,8 @@ go test ./circuit -bench BenchmarkCircuitExecute \
 
 Inspect profiles with `go tool pprof CHANGES/profiles/ws1-circuit-cpu.pprof`
 
+Profiles are local artifacts and are not tracked in git.
+
 Run full state/sparse comparison suite: go test ./state ./internal/sparsestate
 
 ## Demos
