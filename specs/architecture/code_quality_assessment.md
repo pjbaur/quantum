@@ -336,6 +336,7 @@ An educational quantum-computing simulator in pure Go: dense and sparse state-ve
 - **What**: (a) test `visualization.DefaultStateViewOptions` (the package's only 0% function); (b) add the versioning note to `docs/deprecation-policy-v2.md` that `MIGRATION-v2.md:5-10` already carries; (c) trim CI's triple suite execution (plain + race + coverage per matrix leg — race and coverage suffice) and consider pre-commit hooks.
 - **Risk**: Low — each independent and mechanical.
 - **Impact**: Coverage floor honesty, doc consistency, ~⅓ less CI compute.
+- **Result (2026-08-26)**: ✅ Done. (a) `TestDefaultStateViewOptions` asserts all three default fields (`MinProbability` 0, `Precision` 4, `IncludeHeader` true) — the function is now 100% covered. (b) `docs/deprecation-policy-v2.md` carries the same versioning-note blockquote as MIGRATION-v2.md, verbatim except "this guide"→"this policy". (c) CI's plain `Go test` step removed — race and coverage steps jointly run the full suite, cutting per-leg suite executions from three to two; step names/structure otherwise intact, YAML validated. Pre-commit hooks deliberately not added: local dev tooling is the maintainer's opt-in choice and CI already gates — decision recorded here rather than implemented. Commit 8e1f3fc.
 
 ---
 
