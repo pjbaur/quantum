@@ -11,6 +11,7 @@ import (
 	"fmt"
 	"math"
 	"math/cmplx"
+	"reflect"
 
 	"github.com/pjbaur/quantum/quantum"
 )
@@ -55,9 +56,13 @@ func New(numQubits int) (*Matrix, error) {
 // the state vector it was built from, so this is meant for the small states
 // diagnostics and visualization inspect.
 //
+// Returns an error if s is nil or a typed nil (e.g. a nil *state.State
+// boxed in the interface); either way the error is untyped, a deliberate
+// choice consistent with nil-argument handling elsewhere in the module
+// (e.g. circuit.Execute).
 // Returns InvalidQubitCountError if s reports a non-positive qubit count.
 func FromState(s quantum.QuantumState) (*Matrix, error) {
-	if s == nil {
+	if isNilState(s) {
 		return nil, errors.New("state must not be nil")
 	}
 
@@ -80,6 +85,24 @@ func FromState(s quantum.QuantumState) (*Matrix, error) {
 	}
 
 	return m, nil
+}
+
+// isNilState reports whether s is nil or holds a typed nil (for example, a
+// nil *state.State boxed in the quantum.QuantumState interface). A plain
+// `s == nil` check misses the typed-nil case: the interface value itself is
+// non-nil (it carries a concrete type), but the underlying pointer is nil,
+// and calling a method on it, such as NumQubits(), would panic.
+func isNilState(s quantum.QuantumState) bool {
+	if s == nil {
+		return true
+	}
+	v := reflect.ValueOf(s)
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 // NumQubits returns the number of qubits represented by the matrix.

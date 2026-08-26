@@ -4,6 +4,7 @@ import (
 	"errors"
 	"fmt"
 	"math/cmplx"
+	"reflect"
 
 	"github.com/pjbaur/quantum/internal/density"
 	"github.com/pjbaur/quantum/quantum"
@@ -43,9 +44,11 @@ func BlochVectorFromQubit(q quantum.Qubit) BlochVector {
 // than the state vector it was built from, so it is intended for the small
 // states diagnostics and visualization inspect.
 //
+// Returns an error if s is nil or a typed nil (e.g. a nil *state.State
+// boxed in the interface).
 // Returns QubitsOutOfRangeError if target does not name a qubit of s.
 func BlochVectorFromState(s quantum.QuantumState, target int) (BlochVector, error) {
-	if s == nil {
+	if isNilState(s) {
 		return BlochVector{}, errors.New("state must not be nil")
 	}
 
@@ -69,6 +72,24 @@ func BlochVectorFromState(s quantum.QuantumState, target int) (BlochVector, erro
 	}
 
 	return BlochVector{X: x, Y: y, Z: z}, nil
+}
+
+// isNilState reports whether s is nil or holds a typed nil (for example, a
+// nil *state.State boxed in the quantum.QuantumState interface). A plain
+// `s == nil` check misses the typed-nil case: the interface value itself is
+// non-nil (it carries a concrete type), but the underlying pointer is nil,
+// and calling a method on it, such as NumQubits(), would panic.
+func isNilState(s quantum.QuantumState) bool {
+	if s == nil {
+		return true
+	}
+	v := reflect.ValueOf(s)
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func:
+		return v.IsNil()
+	default:
+		return false
+	}
 }
 
 // FormatBlochVector renders a simple ASCII representation of a Bloch vector.

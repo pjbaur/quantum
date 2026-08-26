@@ -149,6 +149,48 @@ func TestBlochVectorFromState(t *testing.T) {
 			expected:  visualization.BlochVector{X: 0, Y: 0, Z: 1},
 		},
 		{
+			// Every qubit carries a distinct single-qubit state, unlike the
+			// all-|0⟩ corners above, so this pins the little-endian target
+			// index mapping: it would catch target 0 and target 2 being
+			// swapped.
+			name:      "distinct_target_0_is_zero_ket",
+			numQubits: 3,
+			prepare:   prepareDistinct,
+			target:    0,
+			expected:  visualization.BlochVector{X: 0, Y: 0, Z: 1},
+		},
+		{
+			name:      "distinct_target_1_is_plus_ket",
+			numQubits: 3,
+			prepare:   prepareDistinct,
+			target:    1,
+			expected:  visualization.BlochVector{X: 1, Y: 0, Z: 0},
+		},
+		{
+			name:      "distinct_target_2_is_one_ket",
+			numQubits: 3,
+			prepare:   prepareDistinct,
+			target:    2,
+			expected:  visualization.BlochVector{X: 0, Y: 0, Z: -1},
+		},
+		{
+			// A complex phase on one factor of a product state exercises
+			// conjugation across off-diagonal amplitude pairs in the
+			// multi-qubit reduction path.
+			name:      "phased_product_target_0_has_imaginary_phase",
+			numQubits: 2,
+			prepare:   preparePhasedProduct,
+			target:    0,
+			expected:  visualization.BlochVector{X: 0, Y: 1, Z: 0},
+		},
+		{
+			name:      "phased_product_target_1_is_zero_ket",
+			numQubits: 2,
+			prepare:   preparePhasedProduct,
+			target:    1,
+			expected:  visualization.BlochVector{X: 0, Y: 0, Z: 1},
+		},
+		{
 			// Either half of a Bell pair is maximally mixed, so its
 			// reduced state sits at the centre of the Bloch sphere.
 			name:      "bell_pair_target_0_is_maximally_mixed",
@@ -231,10 +273,11 @@ func TestBlochVectorFromStateMatchesBlochVectorFromQubit(t *testing.T) {
 
 func TestBlochVectorFromStateErrors(t *testing.T) {
 	cases := []struct {
-		name       string
-		state      func(t *testing.T) quantum.QuantumState
-		target     int
-		wantsRange bool
+		name         string
+		state        func(t *testing.T) quantum.QuantumState
+		target       int
+		wantsRange   bool
+		wantMaxIndex int
 	}{
 		{
 			name:   "nil_state",
@@ -242,16 +285,30 @@ func TestBlochVectorFromStateErrors(t *testing.T) {
 			target: 0,
 		},
 		{
-			name:       "negative_target",
-			state:      twoQubitState,
-			target:     -1,
-			wantsRange: true,
+			name: "typed_nil_state",
+			state: func(*testing.T) quantum.QuantumState {
+				// A nil *state.State boxed in the quantum.QuantumState
+				// interface is not == nil (the interface carries a
+				// concrete type), so BlochVectorFromState must detect it
+				// via reflection rather than a plain nil comparison.
+				var typedNil *state.State
+				return typedNil
+			},
+			target: 0,
 		},
 		{
-			name:       "target_equals_qubit_count",
-			state:      twoQubitState,
-			target:     2,
-			wantsRange: true,
+			name:         "negative_target",
+			state:        twoQubitState,
+			target:       -1,
+			wantsRange:   true,
+			wantMaxIndex: 1,
+		},
+		{
+			name:         "target_equals_qubit_count",
+			state:        twoQubitState,
+			target:       2,
+			wantsRange:   true,
+			wantMaxIndex: 1,
 		},
 	}
 
@@ -273,6 +330,9 @@ func TestBlochVectorFromStateErrors(t *testing.T) {
 			}
 			if rangeErr.Index != tt.target {
 				t.Errorf("error Index = %d, want %d", rangeErr.Index, tt.target)
+			}
+			if rangeErr.MaxIndex != tt.wantMaxIndex {
+				t.Errorf("error MaxIndex = %d, want %d", rangeErr.MaxIndex, tt.wantMaxIndex)
 			}
 		})
 	}
@@ -299,6 +359,23 @@ func prepareBell(t *testing.T, s quantum.QuantumState) {
 	t.Helper()
 	applyGate(t, s, gates.NewHadamard(), 0)
 	applyGate(t, s, gates.NewCNOT(), 0, 1)
+}
+
+// prepareDistinct puts a different single-qubit state on each of three
+// qubits: qubit 0 is left in |0⟩, qubit 1 is put into |+⟩ via Hadamard, and
+// qubit 2 is put into |1⟩ via Pauli-X. The register stays unentangled.
+func prepareDistinct(t *testing.T, s quantum.QuantumState) {
+	t.Helper()
+	applyGate(t, s, gates.NewHadamard(), 1)
+	applyGate(t, s, gates.NewPauliX(), 2)
+}
+
+// preparePhasedProduct puts qubit 0 into (|0⟩+i|1⟩)/√2 via Hadamard then S,
+// leaving qubit 1 in |0⟩. The register stays unentangled.
+func preparePhasedProduct(t *testing.T, s quantum.QuantumState) {
+	t.Helper()
+	applyGate(t, s, gates.NewHadamard(), 0)
+	applyGate(t, s, gates.NewS(), 0)
 }
 
 func applyGate(t *testing.T, s quantum.QuantumState, gate quantum.Gate, targets ...int) {

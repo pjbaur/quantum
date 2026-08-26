@@ -267,6 +267,22 @@ func TestFromStateRejectsNilState(t *testing.T) {
 	}
 }
 
+func TestFromStateRejectsTypedNilState(t *testing.T) {
+	// A nil *stubState boxed in the quantum.QuantumState interface is not
+	// == nil (the interface carries a concrete type), so FromState must
+	// detect it via reflection rather than a plain nil comparison. Calling
+	// NumQubits() on the nil receiver would otherwise panic.
+	var typedNil *stubState
+
+	got, err := FromState(typedNil)
+	if got != nil {
+		t.Errorf("FromState(typed nil) returned non-nil matrix")
+	}
+	if err == nil {
+		t.Fatal("FromState(typed nil) error = nil, want an error")
+	}
+}
+
 func TestFromStateRejectsNonPositiveQubitCount(t *testing.T) {
 	for _, n := range []int{0, -2} {
 		state, err := FromState(&stubState{numQubits: n})
