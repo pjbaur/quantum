@@ -1,3 +1,9 @@
+// Package density implements a density-matrix backend for noise
+// simulation and analysis: Kraus channels (depolarizing, dephasing,
+// amplitude damping), trace/purity, and reduced single-qubit Bloch
+// vectors, with FromState bridging in a pure quantum.QuantumState for
+// that analysis. It deliberately does not implement quantum.QuantumState
+// itself; see docs/adr/0007-density-backend-scope.md.
 package density
 
 import (
