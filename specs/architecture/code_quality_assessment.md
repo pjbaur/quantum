@@ -260,25 +260,31 @@ An educational quantum-computing simulator in pure Go: dense and sparse state-ve
 
 ### Priority 3: Strategic / Long-term
 
+> **Status (2026-08-25)**: All four items completed and verified on `main` as of v0.3.0 (846268f). Known residuals, recorded per item: some backend math beyond 3.2's stated scope remains duplicated, and 3.4's fuzz targets run in CI over seed corpora only (no extended `-fuzz` step).
+
 #### 3.1 Decouple algorithms from the dense backend
 - **What**: Have `Grover`/`DeutschJozsa` accept a `quantum.QuantumState` (or a state factory), moving bulk amplitude access behind an optional `AmplitudeBatcher` interface that `state.State` already satisfies via `SetAmplitudes`.
 - **Risk**: Medium-High — public signatures change; sparse backend needs bulk ops to participate.
 - **Impact**: The backend abstraction reaches the layer users actually call; enables sparse-backend Grover for few-marked-state instances (its best case).
+- **Result (2026-08-25, verified at v0.3.0 / 846268f)**: ✅ Done. `Grover` and `DeutschJozsa` now take and return `quantum.QuantumState` (`algorithm/grover.go:21`, `algorithm/deutsch_jozsa.go:25`); bulk access lives behind `quantum.BulkAmplitudeSetter` (`quantum/interfaces.go:90` — the interface shipped under this name, not the proposed "AmplitudeBatcher"), kept out of `QuantumState` deliberately. Sparse backend gained `SetAmplitudes` and runs both algorithms — backend-table tests plus cross-backend equivalence (`TestGroverBackendsAgree`, `TestDeutschJozsaBackendsAgree`). A backend without bulk ops gets a typed `*quantum.UnsupportedOperationError` (tested). Shipped as a documented breaking change in v0.3.0 (`BREAKING CHANGE:` trailer, before/after in CHANGELOG). Package coverage 53.1% → **92.2%**. Commit 9e8654f.
 
 #### 3.2 Extract shared backend math
 - **What**: Factor duplicated logic between `state/` and `internal/sparsestate/` (target validation, combo-mask construction, collapse-and-renormalize) into an internal package.
 - **Risk**: Medium — refactor across both hot paths, benchmark before/after.
 - **Impact**: One implementation of the physics; drift class the prior review fixed once cannot recur.
+- **Result (2026-08-25, verified at v0.3.0 / 846268f)**: ✅ Done for the three named pieces. `internal/backendmath` (97.7% coverage) holds `ValidateTargets`, `ComboMasks`, and `PlanCollapse`/`Renormalize` (with the 1e-24 zero-probability floor from 2.5); both backends call all three symmetrically (`state/state.go:158,235,300` ↔ `internal/sparsestate/state.go:171,242,345`). Benchmarked before/after per the commit bodies — dense measurement ~7% faster, sparse gate paths +7–14%, dense gate application unchanged (interleaved against a prior-commit worktree). **Residual**: physics beyond the item's list is still duplicated — `SetAmplitude(s)` validation/rollback, `isNormalized`/`probabilitySum`, and the 2×2/combo mixing loops remain near-verbatim in both backends, guarded by the dense-vs-sparse equivalence fuzz (3.4). Commits e484434, 80a1a10.
 
 #### 3.3 Grow the gate set toward the algorithm ambitions
 - **What**: After 2.4, add parameterized rotations (Rx/Ry/Rz/Phase), Toffoli, and controlled-U construction (via existing `TensorProduct`/`ComposeMatrices`); then express Grover's diffusion as gates in an example, keeping the O(2ⁿ) path as the fast implementation.
 - **Risk**: Medium — new API surface, needs matrix-identity tests.
 - **Impact**: Closes the pedagogical gap where the flagship algorithms bypass the gate model the project exists to teach; `DecomposeSwap` and `Registry` gain reasons to exist.
+- **Result (2026-08-25, verified at v0.3.0 / 846268f)**: ✅ Done, one documented deviation. `NewRx/NewRy/NewRz/NewPhase/NewToffoli` in `gates/gates.go` plus `NewControlled` (`gates/controlled.go:23`). **Deviation**: controlled-U builds `diag(I, U)` by direct block copy rather than via `TensorProduct`/`ComposeMatrices` — the doc comment explains why (no matrix-addition helper exists; composing would add unreachable error paths). Matrix-identity tests are thorough: Toffoli truth table, Rx/Ry/Rz(π) = Pauli up to asserted global phase, Phase(π/2ᵏ) = Z/S/T, unitarity sweep, Controlled(X)=CNOT, Controlled(CNOT)=Toffoli. Grover's diffusion expressed as gates in `internal/examples/algorithm.go` (H⊗n·X⊗n·MCZ·X⊗n·H⊗n via stacked `NewControlled`, plus `Rz(2π)` global-phase restore), with the O(2ⁿ) closed form explicitly kept as the fast path and the demo diffing both amplitude sets; wired into the CLI and covered by `TestCLIAlgorithmDemoRuns`. `Registry` gained Toffoli (parameterized gates deliberately excluded, rationale at `gates/registry.go:70-74`). Commit cb06d2c.
 
 #### 3.4 Fuzz the validation boundary
 - **What**: Go-native fuzz tests for `GateQubitCount` (fix the 1×1-matrix acceptance while at it), `SetAmplitude(s)` normalization boundaries, and dense-vs-sparse gate-application equivalence with random 1–2 qubit unitaries.
 - **Risk**: Low — additive.
 - **Impact**: The dense/sparse equivalence fuzz would have caught the CNOT-name-dispatch hazard mechanically; guards 3.2's refactor.
+- **Result (2026-08-25, verified at v0.3.0 / 846268f)**: ✅ Done. Six fuzz targets: `FuzzGateQubitCount` (1×1 case seeded), `FuzzSetAmplitude(s)` in both backends with seeds straddling the 1e-10 tolerance edge, and `FuzzDenseSparseGateEquivalence` over random 1–2 qubit unitaries (angle-built, unitarity-guarded, both target orders, canonical-CNOT fast-path seed). The 1×1 acceptance was fixed at the source: `GateQubitCount` now returns `InvalidGateMatrixError` ("matrix must be at least 2x2", `quantum/gateutil.go:57-63`) with unit + fuzz coverage. Bonus landed in the same commit: non-finite amplitude validation (`quantum.IsFiniteAmplitude`, `NonFiniteAmplitudeError`) enforced in both backends' setters. **Residual**: CI runs the fuzz targets over their seed corpora only (via `go test ./...`) — no extended `-fuzz` step or committed corpora; long fuzzing stays manual. Commit 93fbfcc.
 
 ---
 
