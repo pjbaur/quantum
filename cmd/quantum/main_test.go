@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"bytes"
 	"os"
 	"os/exec"
@@ -420,6 +421,72 @@ func TestCLINoPauseFlagDocumented(t *testing.T) {
 
 	if !strings.Contains(string(output), "no-pause") {
 		t.Errorf("help output missing -no-pause flag, got:\n%s", string(output))
+	}
+}
+
+// TestPausePrompterTypedContentDoesNotDisablePauses verifies that typing
+// something other than a bare Enter at a pause (e.g. "y" + Enter, a natural
+// response to a "Press Enter to continue" prompt) does not silently disable
+// the remaining pauses. This is the byte-identical-TTY-behavior regression
+// this test guards against: the original fmt.Scanln() call discarded its
+// result entirely, so stray input at one pause never affected later ones.
+func TestPausePrompterTypedContentDoesNotDisablePauses(t *testing.T) {
+	var out bytes.Buffer
+	p := &pausePrompter{
+		w: &out,
+		r: bufio.NewReader(strings.NewReader("y\nanything else\n")),
+	}
+
+	p.pause("section A")
+	if p.disabled {
+		t.Fatalf("pause disabled itself after typed content \"y\\n\", want still enabled")
+	}
+
+	p.pause("section B")
+	if p.disabled {
+		t.Fatalf("pause disabled itself after typed content \"anything else\\n\", want still enabled")
+	}
+
+	want := "\nPress Enter to continue to section A...\n" + "\nPress Enter to continue to section B...\n"
+	if got := out.String(); got != want {
+		t.Errorf("prompt output = %q, want %q", got, want)
+	}
+}
+
+// TestPausePrompterEOFDisablesRemainingPauses verifies that a genuine read
+// failure (stdin ending before a newline arrives) disables all later pauses
+// instead of repeating the prompt or aborting the demos: the section after
+// the failed read still runs, just without any further pausing.
+func TestPausePrompterEOFDisablesRemainingPauses(t *testing.T) {
+	var out bytes.Buffer
+	p := &pausePrompter{
+		w: &out,
+		r: bufio.NewReader(strings.NewReader("")), // EOF with no data at all
+	}
+
+	p.pause("first section")
+	if !p.disabled {
+		t.Fatalf("pause did not disable itself after a read failure, want disabled")
+	}
+
+	p.pause("second section")
+
+	want := "\nPress Enter to continue to first section...\n"
+	if got := out.String(); got != want {
+		t.Errorf("prompt output = %q, want %q (second pause should have printed nothing)", got, want)
+	}
+}
+
+// TestPausePrompterDisabledIsNoOp verifies that an already-disabled prompter
+// neither prints nor reads.
+func TestPausePrompterDisabledIsNoOp(t *testing.T) {
+	var out bytes.Buffer
+	p := &pausePrompter{w: &out, disabled: true}
+
+	p.pause("some section")
+
+	if out.Len() != 0 {
+		t.Errorf("disabled pause() wrote output: %q", out.String())
 	}
 }
 

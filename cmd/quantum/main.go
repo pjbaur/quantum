@@ -1,6 +1,7 @@
 package main
 
 import (
+	"bufio"
 	"flag"
 	"fmt"
 	"io"
@@ -83,22 +84,28 @@ func runGate(out io.Writer, name string) error {
 
 // pausePrompter drives the "Press Enter to continue..." pauses between
 // sections of the "all" demo. Once disabled (via -no-pause, non-interactive
-// stdin, or a failed Scanln) it becomes a no-op instead of prompting.
+// stdin, or a failed read) it becomes a no-op instead of prompting. r is
+// shared across every pause() call so buffered input isn't dropped between
+// sections.
 type pausePrompter struct {
 	w        io.Writer
+	r        *bufio.Reader
 	disabled bool
 }
 
-// pause prints the prompt for the upcoming section and waits for input,
-// unless pauses are already disabled. A Scanln error (e.g. EOF because
-// stdin closed mid-run) disables all later pauses rather than repeating the
-// prompt or aborting the remaining demos.
+// pause prints the prompt for the upcoming section and waits for a line of
+// input, unless pauses are already disabled. Whatever the user types before
+// the newline is read and discarded, exactly as the original fmt.Scanln()
+// call ignored it — typing something other than a bare Enter has no effect
+// on later pauses. Only a genuine read failure (stdin ending before a
+// newline arrives, e.g. because it closed mid-run) disables all later
+// pauses, rather than repeating the prompt or aborting the remaining demos.
 func (p *pausePrompter) pause(next string) {
 	if p.disabled {
 		return
 	}
 	fmt.Fprintf(p.w, "\nPress Enter to continue to %s...\n", next)
-	if _, err := fmt.Scanln(); err != nil {
+	if _, err := p.r.ReadString('\n'); err != nil {
 		p.disabled = true
 	}
 }
@@ -143,7 +150,7 @@ func runDemos(demoType, gateName string, noPause bool) error {
 		fmt.Println("              ALL DEMONSTRATIONS")
 		fmt.Println("========================================================")
 
-		p := &pausePrompter{w: os.Stdout, disabled: noPause || !stdinIsTerminal()}
+		p := &pausePrompter{w: os.Stdout, r: bufio.NewReader(os.Stdin), disabled: noPause || !stdinIsTerminal()}
 
 		examples.RunAllHadamardDemos()
 		p.pause("T-gate demonstrations")
