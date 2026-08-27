@@ -145,6 +145,28 @@ func (e *InvalidPauliAxisError) Error() string {
 		e.Axis, e.Qubit)
 }
 
+// InvalidBitCountError indicates that a non-positive number of classical
+// bits was requested for a ClassicalRegister.
+type InvalidBitCountError struct {
+	Requested int
+	Reason    string
+}
+
+func (e *InvalidBitCountError) Error() string {
+	return fmt.Sprintf("invalid classical bit count %d: %s", e.Requested, e.Reason)
+}
+
+// BitOutOfRangeError indicates that a classical bit index is outside the
+// register's valid range.
+type BitOutOfRangeError struct {
+	Index    int
+	MaxIndex int
+}
+
+func (e *BitOutOfRangeError) Error() string {
+	return fmt.Sprintf("classical bit index %d is out of range [0,%d]", e.Index, e.MaxIndex)
+}
+
 // InvalidGateMatrixError indicates that a gate's matrix representation is invalid.
 type InvalidGateMatrixError struct {
 	GateName string

@@ -44,10 +44,27 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > behavior, error propagation. TDD caught a real sign bug: the Pauli
   > phase must be evaluated at the permutation source index, not the
   > destination — strings with an odd Y count were sign-flipped.
-- [ ] 3. **Classical control / conditional gates** — mid-circuit `Measure`
+- [x] 3. **Classical control / conditional gates** — mid-circuit `Measure`
   collapses correctly, but there is no classical register and no
   "if bit then gate". Blocks teleportation feed-forward, error correction,
   adaptive algorithms.
+  > **Done (2026-08-27)**: `quantum.ClassicalRegister` (bool bits,
+  > `Set`/`Bit`/`NumBits`/`String`) with new typed errors
+  > `InvalidBitCountError` and `BitOutOfRangeError`;
+  > `quantum.MeasureInto(s, qubit, creg, bit)` bridges quantum to
+  > classical (measures and collapses like `Measure`, stores the 0/1);
+  > `quantum.ApplyIfSet(creg, bit, s, gate, targets...)` is the
+  > "if bit then gate" of feed-forward control — no-op on a cleared bit,
+  > `ApplyGate` errors propagate. Proving consumer:
+  > `algorithm.Teleport(s)` runs the full protocol (Bell pair, entangle,
+  > measure to classical bits, X/Z corrections conditioned on outcomes)
+  > on any backend with ≥3 qubits; measurement randomness via the state's
+  > `SetRandSource`, so outcomes are forceable and the result exact.
+  > Tests: register roundtrip and error paths, conditional apply/skip
+  > semantics, teleport verified by Bloch-vector equality through
+  > `Expectation` (I,I,X / I,I,Y / I,I,Z) across all four correction
+  > branches, 15 fixed+random input states, sparse backend, measured
+  > qubits collapsed, nil/short-state errors.
 - [ ] 4. **Parameter rebinding** — `NewRx(theta)` bakes the matrix at
   construction, so variational outer loops must rebuild the whole circuit
   per iteration. Provide symbolic parameters or a cheap rebuild path.
