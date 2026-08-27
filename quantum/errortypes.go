@@ -132,6 +132,18 @@ func (e *UnnormalizedStateError) Error() string {
 	return fmt.Sprintf("cannot sample state: probability sum is %.6f, must be 1.0", e.Sum)
 }
 
+// InvalidPauliAxisError indicates that a Pauli-string factor is not one of
+// the four Pauli operators I, X, Y, Z.
+type InvalidPauliAxisError struct {
+	Qubit int
+	Axis  PauliAxis
+}
+
+func (e *InvalidPauliAxisError) Error() string {
+	return fmt.Sprintf("invalid Pauli axis %d for qubit %d: must be PauliI, PauliX, PauliY, or PauliZ",
+		e.Axis, e.Qubit)
+}
+
 // InvalidGateMatrixError indicates that a gate's matrix representation is invalid.
 type InvalidGateMatrixError struct {
 	GateName string

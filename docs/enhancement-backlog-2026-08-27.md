@@ -26,9 +26,24 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > non-destructiveness, deterministic stub draws, zero-probability-bucket
   > skip). Sparse backends are walked in full — O(2^n) — documented in the
   > doc comment; a nonzero-only path would need a backend-side override.
-- [ ] 2. **Expectation values** — helpers for ⟨ψ|P|ψ⟩ over Pauli strings and
+- [x] 2. **Expectation values** — helpers for ⟨ψ|P|ψ⟩ over Pauli strings and
   basis-change measurement (X/Y-basis via pre-rotation). Blocks CHSH
   correlation, VQE, QAOA.
+  > **Done (2026-08-27)**: `quantum.Expectation(s, axes)` computes the exact
+  > value from the amplitude vector (permutation + phase sum, O(2ⁿ), no
+  > matrix construction); `quantum.SampleExpectation(s, axes, shots, rng)`
+  > estimates it from shots the way a device would — rotate X qubits by H,
+  > Y qubits by S† then H, sample non-destructively on a Clone, average
+  > outcome parity as ±1. `PauliAxis` type (`PauliI/X/Y/Z`), new typed
+  > error `InvalidPauliAxisError`; length/nil/normalization errors reuse
+  > the existing taxonomy. The rotation gates live in the quantum package
+  > as local matrices because `gates` imports `quantum` (no reverse
+  > import possible). Tests: single-qubit eigenvalue table, Bell-state
+  > correlations (⟨XX⟩=1, ⟨YY⟩=-1, ⟨ZZ⟩=1), dense/sparse agreement over
+  > all 16 two-qubit strings, exact-vs-sampled agreement, non-destructive
+  > behavior, error propagation. TDD caught a real sign bug: the Pauli
+  > phase must be evaluated at the permutation source index, not the
+  > destination — strings with an odd Y count were sign-flipped.
 - [ ] 3. **Classical control / conditional gates** — mid-circuit `Measure`
   collapses correctly, but there is no classical register and no
   "if bit then gate". Blocks teleportation feed-forward, error correction,
