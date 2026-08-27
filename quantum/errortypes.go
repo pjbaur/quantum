@@ -110,6 +110,28 @@ func (e *UncomparableStateError) Error() string {
 		"(e.g. a pointer implementation) to support parallel execution", e.Index, e.TypeName)
 }
 
+// InvalidShotCountError indicates that a non-positive number of measurement
+// shots was requested.
+type InvalidShotCountError struct {
+	Requested int
+	Reason    string
+}
+
+func (e *InvalidShotCountError) Error() string {
+	return fmt.Sprintf("invalid shot count %d: %s", e.Requested, e.Reason)
+}
+
+// UnnormalizedStateError indicates that a state's measurement probabilities
+// do not sum to 1 within the backends' tolerance, so its distribution cannot
+// be sampled. Sum is the offending total; a NaN sum is reported the same way.
+type UnnormalizedStateError struct {
+	Sum float64
+}
+
+func (e *UnnormalizedStateError) Error() string {
+	return fmt.Sprintf("cannot sample state: probability sum is %.6f, must be 1.0", e.Sum)
+}
+
 // InvalidGateMatrixError indicates that a gate's matrix representation is invalid.
 type InvalidGateMatrixError struct {
 	GateName string
