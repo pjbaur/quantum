@@ -51,8 +51,19 @@ later ladder stages (QPE, QAOA, noise-aware demos).
 - [ ] 4. **Parameter rebinding** — `NewRx(theta)` bakes the matrix at
   construction, so variational outer loops must rebuild the whole circuit
   per iteration. Provide symbolic parameters or a cheap rebuild path.
-- [ ] 5. **State fidelity** — an F(|ψ⟩,|φ⟩) helper. Blocks teleportation
+- [x] 5. **State fidelity** — an F(|ψ⟩,|φ⟩) helper. Blocks teleportation
   verification; useful as a cross-backend assertion in tests.
+  > **Done (2026-08-27)**: `quantum.Fidelity(a, b)` in
+  > `quantum/fidelity.go` — |⟨ψ|φ⟩|² computed directly from both
+  > amplitude vectors, O(2ⁿ), non-destructive, symmetric, global-phase
+  > insensitive. Errors reuse the taxonomy (nil/typed-nil with
+  > first/second naming, IncompatibleQubitCountError,
+  > UnnormalizedStateError per side). `UnnormalizedStateError`'s message
+  > generalized from "cannot sample" to "state is not normalized" since
+  > it now guards Sample, Expectation, and Fidelity. Tests: known-value
+  > table (orthogonal, half-overlap, phase-insensitivity),
+  > Bell-vs-product 0.25, dense/sparse Bell agreement, symmetry,
+  > non-destructiveness, full error paths.
 - [ ] 6. **QFT / inverse QFT** — absent. Blocks phase estimation.
   `NewControlled` already provides controlled-U powers, so QFT is the
   missing half.

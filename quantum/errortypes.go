@@ -122,14 +122,15 @@ func (e *InvalidShotCountError) Error() string {
 }
 
 // UnnormalizedStateError indicates that a state's measurement probabilities
-// do not sum to 1 within the backends' tolerance, so its distribution cannot
-// be sampled. Sum is the offending total; a NaN sum is reported the same way.
+// do not sum to 1 within the backends' tolerance, so quantities defined for
+// normalized states (samples, expectation values, fidelity) cannot be
+// computed. Sum is the offending total; a NaN sum is reported the same way.
 type UnnormalizedStateError struct {
 	Sum float64
 }
 
 func (e *UnnormalizedStateError) Error() string {
-	return fmt.Sprintf("cannot sample state: probability sum is %.6f, must be 1.0", e.Sum)
+	return fmt.Sprintf("state is not normalized: probability sum is %.6f, must be 1.0", e.Sum)
 }
 
 // InvalidPauliAxisError indicates that a Pauli-string factor is not one of
