@@ -143,8 +143,9 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > Amplitude-vector policy (`NormalizationTolerance`, `IsNormalizedSum`,
   > `CheckNormalization`, `ValidateAmplitudeVector`) lives in
   > `quantum/normalization.go` beside `IsFiniteAmplitude`/`Probability`
-  > and replaces the five independent 1e-10 declarations (sample,
-  > fidelity, expectation, both backends, qubit). Gate-application
+  > and replaces the six 1e-10 literals that lived in four packages —
+  > sample's const (shared by fidelity and expectation), two in each
+  > backend, and qubit's check. Gate-application
   > physics (`MixCombos` matmul kernel, `ValidateQubitCount`,
   > `RandFloat64`) joins `ValidateTargets`/`ComboMasks`/`PlanCollapse` in
   > `internal/backendmath`. Both backends' `New`/`SetAmplitude`/

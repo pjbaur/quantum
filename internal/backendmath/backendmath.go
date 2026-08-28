@@ -226,7 +226,8 @@ func RandFloat64(src quantum.RandomSource) float64 {
 // The caller owns and shapes the buffers — matrix must be len(outputs)
 // rows by len(inputs) columns — because the dense backend's inner loops
 // keep their bounds checks eliminated only while the slices it iterates
-// are shaped in the caller; see state.applyMultiQubitGate.
+// are shaped in the caller; see state.applyMultiQubitGate. inputs and
+// outputs must not alias: the kernel writes outputs while still reading inputs.
 func MixCombos(matrix [][]complex128, inputs, outputs []complex128) {
 	for row := 0; row < len(outputs); row++ {
 		sum := complex(0, 0)

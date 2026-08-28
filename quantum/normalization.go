@@ -8,8 +8,9 @@ import (
 // NormalizationTolerance is the window around 1 within which a state's
 // probability sum counts as normalized. Both state backends enforce it on
 // every amplitude write, and Sample, Expectation, and Fidelity require it
-// of the states they are given. One declaration replaces the five that
-// used to cross-reference each other by comment.
+// of the states they are given. One declaration replaces the six literals
+// that lived across four packages — sample's private const (which fidelity
+// and expectation shared), two in each backend, and the qubit package's check.
 const NormalizationTolerance = 1e-10
 
 // IsNormalizedSum reports whether sum is the probability sum of a
