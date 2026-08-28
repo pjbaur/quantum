@@ -283,3 +283,95 @@ func TestRandFloat64(t *testing.T) {
 		t.Errorf("nil-source draw %g outside [0,1)", v)
 	}
 }
+
+func TestMixCombos(t *testing.T) {
+	invSqrt2 := 1 / math.Sqrt2
+
+	t.Run("identity copies inputs to outputs", func(t *testing.T) {
+		identity := [][]complex128{
+			{1, 0, 0, 0},
+			{0, 1, 0, 0},
+			{0, 0, 1, 0},
+			{0, 0, 0, 1},
+		}
+		inputs := []complex128{0.1, complex(0.3, 0.2), 0.4, 0.5i}
+		outputs := make([]complex128, 4)
+		MixCombos(identity, inputs, outputs)
+		for i := range inputs {
+			if outputs[i] != inputs[i] {
+				t.Fatalf("outputs[%d] = %v, want %v", i, outputs[i], inputs[i])
+			}
+		}
+	})
+
+	t.Run("CNOT permutes", func(t *testing.T) {
+		cnot := [][]complex128{
+			{1, 0, 0, 0},
+			{0, 1, 0, 0},
+			{0, 0, 0, 1},
+			{0, 0, 1, 0},
+		}
+		inputs := []complex128{0, 0, 1, 0} // |10⟩
+		outputs := make([]complex128, 4)
+		MixCombos(cnot, inputs, outputs)
+		want := []complex128{0, 0, 0, 1} // |11⟩
+		for i := range want {
+			if outputs[i] != want[i] {
+				t.Fatalf("outputs[%d] = %v, want %v", i, outputs[i], want[i])
+			}
+		}
+	})
+
+	t.Run("hadamard on one pair", func(t *testing.T) {
+		h := [][]complex128{
+			{complex(invSqrt2, 0), complex(invSqrt2, 0)},
+			{complex(invSqrt2, 0), complex(-invSqrt2, 0)},
+		}
+		inputs := []complex128{1, 0}
+		outputs := make([]complex128, 2)
+		MixCombos(h, inputs, outputs)
+		want := []complex128{complex(invSqrt2, 0), complex(invSqrt2, 0)}
+		for i := range want {
+			if outputs[i] != want[i] {
+				t.Fatalf("outputs[%d] = %v, want %v", i, outputs[i], want[i])
+			}
+		}
+	})
+
+	t.Run("complex 2x2 rotates phases", func(t *testing.T) {
+		m := [][]complex128{
+			{0, 1i},
+			{1i, 0},
+		}
+		inputs := []complex128{1, 0}
+		outputs := make([]complex128, 2)
+		MixCombos(m, inputs, outputs)
+		if outputs[0] != 0 || outputs[1] != 1i {
+			t.Fatalf("outputs = %v, want [0 +1i]", outputs)
+		}
+	})
+
+	t.Run("toffoli flips only the last combo", func(t *testing.T) {
+		// CCX as the 8×8 permutation: |110⟩ → |111⟩.
+		toffoli := make([][]complex128, 8)
+		for i := range toffoli {
+			toffoli[i] = make([]complex128, 8)
+			toffoli[i][i] = 1
+		}
+		toffoli[6][6], toffoli[7][7] = 0, 0
+		toffoli[6][7], toffoli[7][6] = 1, 1
+
+		inputs := make([]complex128, 8)
+		inputs[6] = 1
+		outputs := make([]complex128, 8)
+		MixCombos(toffoli, inputs, outputs)
+		if outputs[7] != 1 {
+			t.Fatalf("outputs[7] = %v, want 1", outputs[7])
+		}
+		for i := 0; i < 7; i++ {
+			if outputs[i] != 0 {
+				t.Fatalf("outputs[%d] = %v, want 0", i, outputs[i])
+			}
+		}
+	})
+}

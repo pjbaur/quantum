@@ -2,10 +2,14 @@
 // backends share.
 //
 // The two backends store amplitudes differently — a dense slice indexed by
-// basis state versus a map that prunes near-zero entries — and their loops
-// over those containers are theirs alone. What sits between the loops is
-// identical physics: which target qubits a gate may address, which basis
-// states a gate mixes, and where a measurement leaves the state. Keeping one
+// basis state versus a map that prunes near-zero entries — so the loops
+// that walk those containers, and the buffers those loops are shaped
+// around, are theirs alone. The matrix multiply at the middle of every
+// mixing loop is shared here as MixCombos, and so is the rest of the
+// physics between the loops: which target qubits a gate may address,
+// which basis states a gate mixes, where a measurement leaves the state,
+// and the register-width and randomness checks the loops' callers share.
+// Keeping one
 // implementation of that here means a correction to the physics lands in both
 // backends at once, and a divergence between them becomes impossible rather
 // than merely unlikely.
@@ -212,4 +216,23 @@ func RandFloat64(src quantum.RandomSource) float64 {
 		return src.Float64()
 	}
 	return mathrand.Float64()
+}
+
+// MixCombos computes one base's worth of gate output, outputs = matrix ·
+// inputs, where inputs and outputs hold the 2^k amplitudes a gate mixes
+// for one anchor basis state and combo doubles as the matrix row/column
+// index (see ComboMasks for the convention).
+//
+// The caller owns and shapes the buffers — matrix must be len(outputs)
+// rows by len(inputs) columns — because the dense backend's inner loops
+// keep their bounds checks eliminated only while the slices it iterates
+// are shaped in the caller; see state.applyMultiQubitGate.
+func MixCombos(matrix [][]complex128, inputs, outputs []complex128) {
+	for row := 0; row < len(outputs); row++ {
+		sum := complex(0, 0)
+		for col := 0; col < len(inputs); col++ {
+			sum += matrix[row][col] * inputs[col]
+		}
+		outputs[row] = sum
+	}
 }
