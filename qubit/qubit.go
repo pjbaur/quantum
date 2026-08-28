@@ -114,5 +114,5 @@ func (q *Qubit) Clone() quantum.Qubit {
 // IsNormalized checks if the qubit is properly normalized
 func (q *Qubit) IsNormalized() bool {
 	sum := quantum.Probability(q.alpha) + quantum.Probability(q.beta)
-	return math.Abs(sum-1.0) <= 1e-10
+	return quantum.IsNormalizedSum(sum)
 }

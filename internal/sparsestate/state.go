@@ -27,7 +27,6 @@ func (s *State) SetRandSource(src quantum.RandomSource) {
 	s.randSource = src
 }
 
-
 // New creates a new sparse quantum state with the specified number of qubits.
 // All qubits are initialized to |0⟩.
 // Returns InvalidQubitCountError if numQubits <= 0.
@@ -63,6 +62,9 @@ func (s *State) Amplitude(basisState int) complex128 {
 	return s.amplitudes[basisState]
 }
 
+// SetAmplitude sets the amplitude for a specific basis state.
+// A NaN or infinite value is rejected outright; otherwise the write is
+// rolled back unless the state stays normalized.
 func (s *State) SetAmplitude(basisState int, value complex128) error {
 	if basisState < 0 || basisState >= (1<<s.numQubits) {
 		return &quantum.QubitsOutOfRangeError{

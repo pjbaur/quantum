@@ -135,10 +135,27 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > (three old contract tests updated as part of this approved change:
   > sparse caps, sparse unsupported-gate → size-mismatch, circuit sparse
   > capability checks). Full suite, race, vet, gofmt clean.
-- [ ] 8. **Dedupe backend math residuals** — `SetAmplitude(s)` validation
+- [x] 8. **Dedupe backend math residuals** — `SetAmplitude(s)` validation
   and rollback, `isNormalized`/`probabilitySum`, and the 2×2/combo mixing
   loops remain near-verbatim in dense and sparse backends (guarded by the
   dense-vs-sparse equivalence fuzz).
+  > **Done (2026-08-28)**: residuals deduped into the two shared homes.
+  > Amplitude-vector policy (`NormalizationTolerance`, `IsNormalizedSum`,
+  > `CheckNormalization`, `ValidateAmplitudeVector`) lives in
+  > `quantum/normalization.go` beside `IsFiniteAmplitude`/`Probability`
+  > and replaces the five independent 1e-10 declarations (sample,
+  > fidelity, expectation, both backends, qubit). Gate-application
+  > physics (`MixCombos` matmul kernel, `ValidateQubitCount`,
+  > `RandFloat64`) joins `ValidateTargets`/`ComboMasks`/`PlanCollapse` in
+  > `internal/backendmath`. Both backends' `New`/`SetAmplitude`/
+  > `SetAmplitudes`/`Measure` now call the shared helpers;
+  > `isNormalized` and `randFloat64` are gone; `probabilitySum` stays
+  > per-backend (slice vs map iteration is a real difference). Dense
+  > `applyMultiQubitGate` keeps its caller-shaped buffers and loop
+  > structure (BCE-sensitive) and shares only the middle matmul;
+  > benchmarks before/after: no regression beyond noise. Single-qubit
+  > 2×2 loops stay per-backend by design. Full suite, race, vet, gofmt,
+  > fuzz seeds (including `FuzzDenseSparseGateEquivalence`) clean.
 - [ ] 9. **Density backend as `QuantumState`** — ADR-0007 deliberately
   scopes `internal/density` to noise-and-analysis. Revisit trigger: a
   concrete consumer needing full circuits on density matrices (for example
