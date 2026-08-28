@@ -97,9 +97,24 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > table (orthogonal, half-overlap, phase-insensitivity),
   > Bell-vs-product 0.25, dense/sparse Bell agreement, symmetry,
   > non-destructiveness, full error paths.
-- [ ] 6. **QFT / inverse QFT** — absent. Blocks phase estimation.
+- [x] 6. **QFT / inverse QFT** — absent. Blocks phase estimation.
   `NewControlled` already provides controlled-U powers, so QFT is the
   missing half.
+  > **Done (2026-08-27)**: `quantum.QFT(s)` / `quantum.InverseQFT(s)` in
+  > `quantum/qft.go` — the exact 2ⁿ-dimensional DFT unitary
+  > F|x⟩ = (1/√N)Σ_y e^{2πixy/N}|y⟩, computed by an in-place radix-2 FFT
+  > over the amplitude vector (O(N log N), no matrix construction, no
+  > gate decomposition, so no bit-reversal caveat — the basis index maps
+  > directly onto the phase register the way QPE expects) and written
+  > back through one `BulkAmplitudeSetter` call. Requires that capability
+  > (`UnsupportedOperationError` otherwise); normalization/non-finite
+  > rejections come from `SetAmplitudes` and leave the state untouched.
+  > Sparse backends work but lose sparsity by nature — the QFT of a
+  > sparse vector is dense. Tests: QFT|0…0⟩ uniform, exact QFT|j⟩ values
+  > for n=2, inverse-QFT of phase gradients returns |j⟩ exactly,
+  > forward/inverse roundtrips on seeded random states, normalization
+  > preserved, nil/typed-nil, missing-bulk-writes error, dense/sparse
+  > agreement plus roundtrip, sparse post-QFT probabilities.
 
 ## Backend Work
 
