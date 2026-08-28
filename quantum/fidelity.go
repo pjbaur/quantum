@@ -2,7 +2,6 @@ package quantum
 
 import (
 	"errors"
-	"math"
 	"math/cmplx"
 )
 
@@ -48,10 +47,10 @@ func Fidelity(a, b QuantumState) (float64, error) {
 	}
 
 	// Negated comparisons so a NaN probability sum is rejected too.
-	if !(math.Abs(sumA-1.0) <= sampleNormalizationTolerance) {
+	if !IsNormalizedSum(sumA) {
 		return 0, &UnnormalizedStateError{Sum: sumA}
 	}
-	if !(math.Abs(sumB-1.0) <= sampleNormalizationTolerance) {
+	if !IsNormalizedSum(sumB) {
 		return 0, &UnnormalizedStateError{Sum: sumB}
 	}
 

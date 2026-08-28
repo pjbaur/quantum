@@ -3,15 +3,10 @@ package quantum
 import (
 	"errors"
 	"fmt"
-	"math"
 	"math/rand"
 	"reflect"
 	"sort"
 )
-
-// sampleNormalizationTolerance is the same 1e-10 window the state backends
-// enforce for SetAmplitude and SetAmplitudes writes.
-const sampleNormalizationTolerance = 1e-10
 
 // Sample draws `shots` measurement outcomes from the computational-basis
 // probability distribution of s and returns them as a histogram keyed by
@@ -63,7 +58,7 @@ func Sample(s QuantumState, shots int, rng RandomSource) (map[string]int, error)
 		total += Probability(s.Amplitude(i))
 		cumulative[i] = total
 	}
-	if !(math.Abs(total-1.0) <= sampleNormalizationTolerance) {
+	if !IsNormalizedSum(total) {
 		return nil, &UnnormalizedStateError{Sum: total}
 	}
 

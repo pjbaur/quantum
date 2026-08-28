@@ -110,7 +110,7 @@ func Expectation(s QuantumState, axes []PauliAxis) (float64, error) {
 	}
 
 	// Negated comparison so a NaN probability sum is rejected too.
-	if !(math.Abs(sum-1.0) <= sampleNormalizationTolerance) {
+	if !IsNormalizedSum(sum) {
 		return 0, &UnnormalizedStateError{Sum: sum}
 	}
 	return real(expectation), nil
