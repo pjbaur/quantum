@@ -65,9 +65,25 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > `Expectation` (I,I,X / I,I,Y / I,I,Z) across all four correction
   > branches, 15 fixed+random input states, sparse backend, measured
   > qubits collapsed, nil/short-state errors.
-- [ ] 4. **Parameter rebinding** — `NewRx(theta)` bakes the matrix at
+- [x] 4. **Parameter rebinding** — `NewRx(theta)` bakes the matrix at
   construction, so variational outer loops must rebuild the whole circuit
   per iteration. Provide symbolic parameters or a cheap rebuild path.
+  > **Done (2026-08-27)** — via the cheap-rebuild path, which is the half
+  > the loop actually lacked. Circuits were already safe to `Execute`
+  > against many states, and gate reconstruction is trivial next to the
+  > O(2ⁿ) execution; what forced reallocation each iteration was the
+  > state. Added optional capability `quantum.Resetter` (interface
+  > following the `BulkAmplitudeSetter` precedent, so backends without it
+  > still satisfy `QuantumState`): `Reset()` restores |0…0⟩ in place,
+  > reusing the amplitude vector (dense) or clearing the map (sparse),
+  > and preserves an injected `RandomSource`. Variational pattern:
+  > rebuild gates with new angles, `Reset`, `Execute` again on the same
+  > state. Symbolic parameter binding deliberately deferred — it adds a
+  > concept layer no current consumer needs; revisit with a real VQE/QAOA
+  > driver. Tests: reset-to-zero, rand-source survival across reset
+  > (stub draws consumed in order), reset-state vs fresh-state amplitude
+  > equality after dirtying with gates and a measurement, `Resetter`
+  > assertions on both backends.
 - [x] 5. **State fidelity** — an F(|ψ⟩,|φ⟩) helper. Blocks teleportation
   verification; useful as a cross-backend assertion in tests.
   > **Done (2026-08-27)**: `quantum.Fidelity(a, b)` in

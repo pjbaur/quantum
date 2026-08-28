@@ -105,6 +105,24 @@ type BulkAmplitudeSetter interface {
 	SetAmplitudes(values []complex128) error
 }
 
+// Resetter is implemented by state backends that can return a state to
+// |0…0⟩ in place, reusing its allocations. That is the cheap-rebuild half
+// of a variational loop: the circuit object is already safe to Execute on
+// many states, so with Reset an outer loop can re-run the same
+// parameterized circuit sequence on one state without reallocating it —
+// rebuild the gates with new angles, Reset, Execute again. An injected
+// RandomSource survives the reset.
+//
+// Like BulkAmplitudeSetter it is an optional capability, kept out of
+// QuantumState so backends that cannot offer it still satisfy the core
+// interface. Callers type-assert and fall back to constructing a fresh
+// state when the assertion fails.
+type Resetter interface {
+	// Reset restores the state to |0…0⟩ as if freshly constructed,
+	// keeping the qubit count and randomness source.
+	Reset()
+}
+
 // BackendCapabilities describes what operations a quantum state backend supports.
 type BackendCapabilities interface {
 	// SupportsGateQubits returns whether this backend can apply gates

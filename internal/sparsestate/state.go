@@ -59,6 +59,14 @@ func (s *State) NumQubits() int {
 	return s.numQubits
 }
 
+// Reset restores the state to |0…0⟩ in place, satisfying
+// quantum.Resetter. The amplitude map is cleared rather than reallocated,
+// and an injected randomness source survives.
+func (s *State) Reset() {
+	clear(s.amplitudes)
+	s.amplitudes[0] = 1
+}
+
 // Amplitude returns the amplitude of a specific basis state.
 func (s *State) Amplitude(basisState int) complex128 {
 	if basisState < 0 || basisState >= (1<<s.numQubits) {
