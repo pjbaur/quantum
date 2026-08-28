@@ -15,6 +15,7 @@ import (
 	"errors"
 	"fmt"
 	"math"
+	mathrand "math/rand"
 
 	"github.com/pjbaur/quantum/quantum"
 )
@@ -190,4 +191,25 @@ func (c Collapse) Keeps(basisState int) bool {
 // backends generated while this arithmetic lived in them.
 func (c Collapse) Renormalize(amplitude complex128) complex128 {
 	return amplitude / complex(c.norm, 0)
+}
+
+// ValidateQubitCount rejects a non-positive register width with the
+// InvalidQubitCountError both backends' constructors return.
+func ValidateQubitCount(numQubits int) error {
+	if numQubits <= 0 {
+		return &quantum.InvalidQubitCountError{
+			Requested: numQubits,
+			Reason:    "must be positive",
+		}
+	}
+	return nil
+}
+
+// RandFloat64 draws from src, or from the global math/rand source when
+// src is nil — the fallback both backends' Measure paths share.
+func RandFloat64(src quantum.RandomSource) float64 {
+	if src != nil {
+		return src.Float64()
+	}
+	return mathrand.Float64()
 }

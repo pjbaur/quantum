@@ -237,3 +237,49 @@ func TestPlanCollapseFloorIsPruneEpsilonSquared(t *testing.T) {
 		t.Errorf("branch probability %g was collapsed onto, want a redirect to outcome 1", below)
 	}
 }
+
+func TestValidateQubitCount(t *testing.T) {
+	for _, n := range []int{1, 2, 64, 100} {
+		if err := ValidateQubitCount(n); err != nil {
+			t.Errorf("ValidateQubitCount(%d) = %v, want nil", n, err)
+		}
+	}
+	for _, n := range []int{0, -1} {
+		err := ValidateQubitCount(n)
+		qe, ok := err.(*quantum.InvalidQubitCountError)
+		if !ok {
+			t.Fatalf("ValidateQubitCount(%d) error type %T, want *quantum.InvalidQubitCountError", n, err)
+		}
+		if qe.Requested != n || qe.Reason != "must be positive" {
+			t.Errorf("fields = (%d, %q), want (%d, \"must be positive\")", qe.Requested, qe.Reason, n)
+		}
+	}
+}
+
+// seqSource yields its values in order, forever, so draws are assertable.
+type seqSource struct {
+	values []float64
+	next   int
+}
+
+func (s *seqSource) Float64() float64 {
+	v := s.values[s.next%len(s.values)]
+	s.next++
+	return v
+}
+
+func TestRandFloat64(t *testing.T) {
+	src := &seqSource{values: []float64{0.25, 0.75}}
+	if got := RandFloat64(src); got != 0.25 {
+		t.Errorf("first draw = %g, want 0.25", got)
+	}
+	if got := RandFloat64(src); got != 0.75 {
+		t.Errorf("second draw = %g, want 0.75", got)
+	}
+
+	// nil falls back to the global source; only assert the draw is a
+	// uniform [0, 1) value, not which one.
+	if v := RandFloat64(nil); v < 0 || v >= 1 {
+		t.Errorf("nil-source draw %g outside [0,1)", v)
+	}
+}
