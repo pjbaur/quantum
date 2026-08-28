@@ -1,10 +1,6 @@
 package state
 
 import (
-	"fmt"
-	"math"
-	"math/rand"
-
 	"github.com/pjbaur/quantum/internal/backendmath"
 	"github.com/pjbaur/quantum/quantum"
 )
@@ -27,22 +23,12 @@ func (s *State) SetRandSource(src quantum.RandomSource) {
 	s.randSource = src
 }
 
-func (s *State) randFloat64() float64 {
-	if s.randSource != nil {
-		return s.randSource.Float64()
-	}
-	return rand.Float64()
-}
-
 // New creates a new quantum state with the specified number of qubits.
 // All qubits are initialized to |0⟩.
 // Returns InvalidQubitCountError if numQubits <= 0.
 func New(numQubits int) (*State, error) {
-	if numQubits <= 0 {
-		return nil, &quantum.InvalidQubitCountError{
-			Requested: numQubits,
-			Reason:    "must be positive",
-		}
+	if err := backendmath.ValidateQubitCount(numQubits); err != nil {
+		return nil, err
 	}
 
 	// Allocate 2^n amplitudes
@@ -100,18 +86,14 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 	oldValue := s.amplitudes[basisState]
 	s.amplitudes[basisState] = value
 
-	if !s.isNormalized() {
-		// Capture the attempted sum before rollback
-		attemptedSum := s.probabilitySum()
-		// Restore the previous value
-		s.amplitudes[basisState] = oldValue
-		return &quantum.NormalizationError{
-			AttemptedSum: attemptedSum,
-			CurrentSum:   s.probabilitySum(),
-		}
+	attemptedSum := s.probabilitySum()
+	if quantum.IsNormalizedSum(attemptedSum) {
+		return nil
 	}
 
-	return nil
+	// Restore the previous value
+	s.amplitudes[basisState] = oldValue
+	return quantum.CheckNormalization(attemptedSum, s.probabilitySum())
 }
 
 // SetAmplitudes sets all amplitudes at once with a single normalization check,
@@ -120,26 +102,12 @@ func (s *State) SetAmplitude(basisState int, value complex128) error {
 // validates normalization once at the end. The values slice must have exactly
 // 2^numQubits elements, and every value must be finite.
 func (s *State) SetAmplitudes(values []complex128) error {
-	if len(values) != len(s.amplitudes) {
-		return fmt.Errorf("values slice length %d does not match state size %d", len(values), len(s.amplitudes))
+	sum, err := quantum.ValidateAmplitudeVector(values, len(s.amplitudes))
+	if err != nil {
+		return err
 	}
-
-	// Check normalization of new values. Non-finite amplitudes have to be
-	// caught here rather than by the sum: a NaN amplitude makes the sum NaN,
-	// and NaN fails every comparison, so the tolerance test below would let
-	// it through as normalized.
-	sum := 0.0
-	for i, v := range values {
-		if !quantum.IsFiniteAmplitude(v) {
-			return &quantum.NonFiniteAmplitudeError{BasisState: i, Value: v}
-		}
-		sum += quantum.Probability(v)
-	}
-	if math.Abs(sum-1.0) > 1e-10 {
-		return &quantum.NormalizationError{
-			AttemptedSum: sum,
-			CurrentSum:   s.probabilitySum(),
-		}
+	if err := quantum.CheckNormalization(sum, s.probabilitySum()); err != nil {
+		return err
 	}
 
 	// Copy values
@@ -269,13 +237,7 @@ func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
 			inputs[combo] = s.amplitudes[base|comboMasks[combo]]
 		}
 
-		for row := 0; row < comboCount; row++ {
-			sum := complex(0, 0)
-			for col := 0; col < comboCount; col++ {
-				sum += matrix[row][col] * inputs[col]
-			}
-			outputs[row] = sum
-		}
+		backendmath.MixCombos(matrix, inputs, outputs)
 
 		for combo := 0; combo < comboCount; combo++ {
 			newAmplitudes[base|comboMasks[combo]] = outputs[combo]
@@ -307,7 +269,7 @@ func (s *State) Measure(qubitIndex int) (int, error) {
 
 	// Randomly determine the measurement outcome, guarding against a draw
 	// that lands on a branch holding no probability at all.
-	collapse, err := backendmath.PlanCollapse(qubitIndex, s.randFloat64(), prob0, prob1)
+	collapse, err := backendmath.PlanCollapse(qubitIndex, backendmath.RandFloat64(s.randSource), prob0, prob1)
 	if err != nil {
 		return 0, err
 	}
@@ -347,12 +309,6 @@ func (s *State) Clone() quantum.QuantumState {
 		amplitudes: newAmplitudes,
 		randSource: s.randSource,
 	}
-}
-
-// isNormalized checks if the state is properly normalized
-func (s *State) isNormalized() bool {
-	sum := s.probabilitySum()
-	return math.Abs(sum-1.0) <= 1e-10
 }
 
 // probabilitySum calculates the sum of probabilities for all basis states
