@@ -588,81 +588,67 @@ func TestSparseBackendCapabilities(t *testing.T) {
 		t.Fatalf("New failed: %v", err)
 	}
 
-	// Test SupportsGateQubits
-	if !sparse.SupportsGateQubits(1) {
-		t.Error("expected sparse backend to support 1-qubit gates")
-	}
-	if !sparse.SupportsGateQubits(2) {
-		t.Error("expected sparse backend to support 2-qubit gates")
-	}
-	if sparse.SupportsGateQubits(3) {
-		t.Error("expected sparse backend to NOT support 3-qubit gates")
-	}
-	if sparse.SupportsGateQubits(4) {
-		t.Error("expected sparse backend to NOT support 4-qubit gates")
+	// Test SupportsGateQubits: the generic k-qubit path covers any width.
+	for k := 1; k <= 5; k++ {
+		if !sparse.SupportsGateQubits(k) {
+			t.Errorf("expected sparse backend to support %d-qubit gates", k)
+		}
 	}
 	if sparse.SupportsGateQubits(0) {
 		t.Error("expected sparse backend to NOT support 0-qubit gates")
 	}
 
-	// Test MaxGateQubits
-	if max := sparse.MaxGateQubits(); max != 2 {
-		t.Errorf("expected MaxGateQubits=2, got %d", max)
+	// Test MaxGateQubits: zero means no limit.
+	if max := sparse.MaxGateQubits(); max != 0 {
+		t.Errorf("expected MaxGateQubits=0 (no limit), got %d", max)
 	}
 }
 
-// TestSparseUnsupportedGateError pins the backend's size boundary, both for a
-// bare 8x8 matrix and for the built-in Toffoli a caller would actually reach
-// for: a gate one qubit past what this backend implements has to be refused
-// outright, never partially applied.
-func TestSparseUnsupportedGateError(t *testing.T) {
-	cases := []struct {
-		name string
-		gate quantum.Gate
-	}{
-		{"three-qubit identity", newMockThreeQubitGate()},
-		{"built-in Toffoli", gates.NewToffoli()},
+// TestSparseGateMatrixSizeMismatch pins that a gate whose matrix does not
+// match its target count is refused outright, never partially applied —
+// the boundary check the backend still owns now that every gate width is
+// supported.
+func TestSparseGateMatrixSizeMismatch(t *testing.T) {
+	sparse, err := New(3)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+	for qubit := 0; qubit < 3; qubit++ {
+		if err := sparse.ApplyGate(gates.NewPauliX(), qubit); err != nil {
+			t.Fatalf("ApplyGate(PauliX, %d) failed: %v", qubit, err)
+		}
 	}
 
-	for _, tc := range cases {
-		t.Run(tc.name, func(t *testing.T) {
-			sparse, err := New(3)
-			if err != nil {
-				t.Fatalf("New failed: %v", err)
-			}
-			// Put the register somewhere a silently-wrong application would
-			// move it away from: a Toffoli sends |111⟩ to |110⟩, so an
-			// amplitude still sitting on |111⟩ afterwards proves the gate was
-			// refused rather than half-applied.
-			for qubit := 0; qubit < 3; qubit++ {
-				if err := sparse.ApplyGate(gates.NewPauliX(), qubit); err != nil {
-					t.Fatalf("ApplyGate(PauliX, %d) failed: %v", qubit, err)
-				}
-			}
+	// A 4x4 matrix cannot act on 3 targets.
+	fourByFour, err := gates.NewMatrixGate("FourByFour", [][]complex128{
+		{1, 0, 0, 0},
+		{0, 1, 0, 0},
+		{0, 0, 1, 0},
+		{0, 0, 0, 1},
+	})
+	if err != nil {
+		t.Fatalf("NewMatrixGate failed: %v", err)
+	}
 
-			err = sparse.ApplyGate(tc.gate, 2, 1, 0)
-			if err == nil {
-				t.Fatal("expected error for 3-qubit gate on sparse backend")
-			}
+	err = sparse.ApplyGate(fourByFour, 0, 1, 2)
+	if err == nil {
+		t.Fatal("expected error for 4x4 matrix on 3 targets")
+	}
 
-			var unsupportedErr *quantum.UnsupportedOperationError
-			if !errors.As(err, &unsupportedErr) {
-				t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
-			}
+	// The mismatch is caught by the target-count validation: a 4x4 matrix
+	// is a 2-qubit gate, so three targets are rejected before the matrix
+	// is ever read.
+	var sizeErr *quantum.InvalidGateApplicationError
+	if !errors.As(err, &sizeErr) {
+		t.Fatalf("expected InvalidGateApplicationError, got %T: %v", err, err)
+	}
+	if sizeErr.RequiredLen != 2 || sizeErr.ActualLen != 3 {
+		t.Errorf("error reports required %d actual %d, want 2 and 3", sizeErr.RequiredLen, sizeErr.ActualLen)
+	}
 
-			// Verify error message contains useful information
-			if unsupportedErr.Backend != "sparse" {
-				t.Errorf("expected Backend='sparse', got '%s'", unsupportedErr.Backend)
-			}
-			if unsupportedErr.Alternative == "" {
-				t.Error("expected Alternative to be non-empty")
-			}
-
-			// The refusal must leave the state exactly as it was.
-			if got := sparse.Amplitude(7); cmplx.Abs(got-1) > tolerance {
-				t.Errorf("amplitude of |111⟩ = %v after refused gate, want 1", got)
-			}
-		})
+	// The refusal must leave the state exactly as it was.
+	if got := sparse.Amplitude(7); cmplx.Abs(got-1) > tolerance {
+		t.Errorf("amplitude of |111⟩ = %v after refused gate, want 1", got)
 	}
 }
 

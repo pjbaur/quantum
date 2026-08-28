@@ -299,30 +299,37 @@ func ExampleCircuit_nonAdjacentCNOT() {
 }
 
 func TestExecuteWithSparseBackendCapabilityCheck(t *testing.T) {
-	// Test that sparse backend rejects 3-qubit gates during circuit execution
+	// The sparse backend applies gates of any width generically, so a
+	// 3-qubit gate in a circuit must execute and match the dense result.
 	c, err := circuit.New(3)
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Add a 3-qubit gate
 	if err := c.AddGate(newMockThreeQubitGate(), 0, 1, 2); err != nil {
 		t.Fatalf("unexpected error adding gate: %v", err)
 	}
 
-	// Sparse backend should fail with UnsupportedOperationError
+	dense, err := state.New(3)
+	if err != nil {
+		t.Fatalf("state.New failed: %v", err)
+	}
+	if err := c.Execute(dense); err != nil {
+		t.Fatalf("unexpected error on dense backend: %v", err)
+	}
+
 	sparse, err := sparsestate.New(3)
 	if err != nil {
 		t.Fatalf("sparsestate.New failed: %v", err)
 	}
-	err = c.Execute(sparse)
-	if err == nil {
-		t.Fatal("expected error for 3-qubit gate on sparse backend")
+	if err := c.Execute(sparse); err != nil {
+		t.Fatalf("unexpected error on sparse backend: %v", err)
 	}
 
-	var unsupportedErr *quantum.UnsupportedOperationError
-	if !errors.As(err, &unsupportedErr) {
-		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	for i := 0; i < 8; i++ {
+		if dense.Amplitude(i) != sparse.Amplitude(i) {
+			t.Errorf("amplitude %d: dense %v vs sparse %v", i, dense.Amplitude(i), sparse.Amplitude(i))
+		}
 	}
 }
 
@@ -360,19 +367,14 @@ func TestCheckBackendCapabilities(t *testing.T) {
 		t.Fatalf("unexpected error adding gate: %v", err)
 	}
 
-	// Check sparse backend - should fail
+	// Check sparse backend - any-width gate support means it passes too
 	sparse, err := sparsestate.New(3)
 	if err != nil {
 		t.Fatalf("sparsestate.New failed: %v", err)
 	}
 	err = c.CheckBackendCapabilities(sparse)
-	if err == nil {
-		t.Fatal("expected error checking sparse backend capabilities")
-	}
-
-	var unsupportedErr *quantum.UnsupportedOperationError
-	if !errors.As(err, &unsupportedErr) {
-		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	if err != nil {
+		t.Fatalf("unexpected error checking sparse backend capabilities: %v", err)
 	}
 
 	// Check dense backend - should succeed
@@ -415,19 +417,14 @@ func TestCircuitWithMixedGatesCapabilityCheck(t *testing.T) {
 		t.Fatalf("unexpected error: %v", err)
 	}
 
-	// Sparse should fail on the 3-qubit gate
+	// Sparse applies the mixed circuit generically and matches dense
 	sparse, err := sparsestate.New(3)
 	if err != nil {
 		t.Fatalf("sparsestate.New failed: %v", err)
 	}
 	err = c.Execute(sparse)
-	if err == nil {
-		t.Fatal("expected error for 3-qubit gate on sparse backend")
-	}
-
-	var unsupportedErr *quantum.UnsupportedOperationError
-	if !errors.As(err, &unsupportedErr) {
-		t.Fatalf("expected UnsupportedOperationError, got %T: %v", err, err)
+	if err != nil {
+		t.Fatalf("unexpected error on sparse backend: %v", err)
 	}
 
 	// Dense should succeed
@@ -438,6 +435,12 @@ func TestCircuitWithMixedGatesCapabilityCheck(t *testing.T) {
 	err = c.Execute(dense)
 	if err != nil {
 		t.Fatalf("unexpected error on dense backend: %v", err)
+	}
+
+	for i := 0; i < 8; i++ {
+		if dense.Amplitude(i) != sparse.Amplitude(i) {
+			t.Errorf("amplitude %d: dense %v vs sparse %v", i, dense.Amplitude(i), sparse.Amplitude(i))
+		}
 	}
 }
 

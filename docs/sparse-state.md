@@ -50,43 +50,37 @@ type BackendCapabilities interface {
 
 ### Checking Capabilities
 
+The sparse backend applies gates of any width: a k-qubit gate groups the
+non-zero amplitudes by target register and multiplies each group of 2^k
+amplitudes by the gate matrix. Cost is O(nonzero * 4^k), so wide gates are
+supported but trade the matrix's density for the state's sparsity — a
+10-qubit gate on a sparse state pays a 1024x1024 matrix-vector product per
+occupied register.
+
 ```go
 sparse := sparsestate.New(10)
 caps := sparse.(quantum.BackendCapabilities)
 
 if !caps.SupportsGateQubits(3) {
+    // never true for k >= 1 anymore; the backend reports no width limit
     fmt.Printf("Sparse backend only supports up to %d-qubit gates\n",
-        caps.MaxGateQubits())  // Output: 2
+        caps.MaxGateQubits())  // Output: 0 (no limit)
 }
-```
-
-### Unsupported Operations
-
-When attempting to apply a 3+ qubit gate, the sparse backend returns an `UnsupportedOperationError`:
-
-```go
-toffoli := gates.NewToffoli()  // 3-qubit gate
-err := sparse.ApplyGate(toffoli, 0, 1, 2)
-// Returns: &UnsupportedOperationError{
-//     Operation: "3-qubit gate application",
-//     Backend: "sparse",
-//     Alternative: "dense state backend (state.State)",
-// }
 ```
 
 ## When to Use Dense Backend Instead
 
 Use the dense backend (`state.State`) when:
 
-- Circuits contain 3+ qubit gates (Toffoli, Fredkin, etc.)
 - Qubit count is small (< 25 qubits)
-- Maximum feature compatibility is required
+- Gates are wide relative to the state's sparsity (the sparse cost is
+  O(nonzero * 4^k) versus the dense O(2^n * 2^k))
 
 Use the sparse backend (`sparsestate.State`) when:
 
 - Large qubit counts with limited entanglement
 - Memory-constrained environments
-- Circuits use only 1-2 qubit gates
+- Gates stay narrow (1-2 qubits) while the state stays sparse
 
 ## Accuracy and Performance Comparison
 

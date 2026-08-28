@@ -118,9 +118,23 @@ later ladder stages (QPE, QAOA, noise-aware demos).
 
 ## Backend Work
 
-- [ ] 7. **Generic k-qubit sparse gates** — sparse backend is capped at
+- [x] 7. **Generic k-qubit sparse gates** — sparse backend is capped at
   2-qubit gates by explicit contract. Lifting the cap makes sparse a true
   drop-in; the `BackendCapabilities` machinery can enforce either policy.
+  > **Done (2026-08-27)**: `applyTwoQubitGate` generalized to
+  > `applyMultiQubitGate(gate, targets)` for any k ≥ 2 — the algorithm was
+  > already generic, only two hardcoded `4`s were 2-specific. Single-qubit
+  > and canonical-CNOT fast paths kept. `SupportsGateQubits` true for all
+  > k ≥ 1, `MaxGateQubits` 0 (no limit). Cost O(nonzero · 4^k) documented
+  > in `docs/sparse-state.md` and method comments. ADR-0008 records the
+  > decision and partially supersedes ADR-0003's width limit (capability
+  > API retained). Tests: Toffoli and CC-S sparse-vs-dense equality,
+  > controlled-Toffoli at k=4, Toffoli truth table, any-width capability
+  > assertions, matrix/target-count mismatch still refused without partial
+  > application, circuit execution with 3-qubit gates now matches dense
+  > (three old contract tests updated as part of this approved change:
+  > sparse caps, sparse unsupported-gate → size-mismatch, circuit sparse
+  > capability checks). Full suite, race, vet, gofmt clean.
 - [ ] 8. **Dedupe backend math residuals** — `SetAmplitude(s)` validation
   and rollback, `isNormalized`/`probabilitySum`, and the 2×2/combo mixing
   loops remain near-verbatim in dense and sparse backends (guarded by the

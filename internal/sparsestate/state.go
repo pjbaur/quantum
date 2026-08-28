@@ -184,16 +184,7 @@ func (s *State) ApplyGate(gate quantum.Gate, targets ...int) error {
 		return s.applySingleQubitGate(gate, targets[0])
 	}
 
-	if requiredQubits == 2 {
-		return s.applyTwoQubitGate(gate, targets)
-	}
-
-	// 3+ qubit gates are not supported by the sparse backend
-	return &quantum.UnsupportedOperationError{
-		Operation:   fmt.Sprintf("%d-qubit gate application", requiredQubits),
-		Backend:     "sparse",
-		Alternative: "dense state backend (state.State)",
-	}
+	return s.applyMultiQubitGate(gate, targets)
 }
 
 func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
@@ -232,45 +223,54 @@ func (s *State) applySingleQubitGate(gate quantum.Gate, target int) error {
 	return nil
 }
 
-func (s *State) applyTwoQubitGate(gate quantum.Gate, targets []int) error {
+// applyMultiQubitGate applies a k-qubit gate (k >= 2) by grouping the
+// non-zero amplitudes into bases — registers where every target qubit is
+// zero — and multiplying each group of 2^k amplitudes by the gate matrix.
+// Cost is O(nonzero * 4^k), so wide gates on sparse states trade the
+// matrix's density for the state's sparsity.
+func (s *State) applyMultiQubitGate(gate quantum.Gate, targets []int) error {
+	k := len(targets)
+	size := 1 << k
+
 	matrix := gate.Matrix()
-	if len(matrix) != 4 || len(matrix[0]) != 4 {
+	if len(matrix) != size || len(matrix[0]) != size {
 		return &quantum.InvalidGateApplicationError{
 			Gate:        gate.Name(),
-			RequiredLen: 4,
+			RequiredLen: size,
 			ActualLen:   len(matrix),
 		}
 	}
 
-	if isCanonicalCNOT(matrix) {
+	// CNOT keeps its permutation fast path: no matrix multiply at all.
+	if k == 2 && isCanonicalCNOT(matrix) {
 		return s.applyCNOT(targets[0], targets[1])
 	}
 
-	comboMasks := make([]int, 1<<len(targets))
+	comboMasks := make([]int, size)
 	targetMask := backendmath.ComboMasks(comboMasks, targets)
 	bases := make(map[int]struct{}, len(s.amplitudes))
 	for index := range s.amplitudes {
 		bases[index&^targetMask] = struct{}{}
 	}
 
-	inputs := make([]complex128, 4)
-	outputs := make([]complex128, 4)
+	inputs := make([]complex128, size)
+	outputs := make([]complex128, size)
 	newAmplitudes := make(map[int]complex128, len(s.amplitudes))
 
 	for base := range bases {
-		for combo := 0; combo < 4; combo++ {
+		for combo := 0; combo < size; combo++ {
 			inputs[combo] = s.amplitudes[base|comboMasks[combo]]
 		}
 
-		for row := 0; row < 4; row++ {
+		for row := 0; row < size; row++ {
 			sum := complex(0, 0)
-			for col := 0; col < 4; col++ {
+			for col := 0; col < size; col++ {
 				sum += matrix[row][col] * inputs[col]
 			}
 			outputs[row] = sum
 		}
 
-		for combo := 0; combo < 4; combo++ {
+		for combo := 0; combo < size; combo++ {
 			value := outputs[combo]
 			if !isNearZero(value) {
 				newAmplitudes[base|comboMasks[combo]] = value
@@ -414,14 +414,15 @@ func isNearZero(value complex128) bool {
 }
 
 // SupportsGateQubits returns whether this backend can apply gates
-// operating on the specified number of qubits.
-// The sparse backend supports 1- and 2-qubit gates only.
+// operating on the specified number of qubits. The sparse backend applies
+// any k-qubit gate generically (k >= 1); see applyMultiQubitGate for the
+// cost tradeoff on wide gates.
 func (s *State) SupportsGateQubits(qubitCount int) bool {
-	return qubitCount >= 1 && qubitCount <= 2
+	return qubitCount >= 1
 }
 
 // MaxGateQubits returns the maximum number of qubits a gate can operate on.
-// The sparse backend supports at most 2-qubit gates.
+// Zero means no limit; the sparse backend applies gates of any width.
 func (s *State) MaxGateQubits() int {
-	return 2
+	return 0
 }

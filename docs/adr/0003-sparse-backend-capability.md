@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. The gate-width limit (1–2 qubit gates only) was later lifted by
+[ADR-0008](0008-sparse-generic-k-qubit-gates.md); the capability-check API
+(`BackendCapabilities`, `SupportsGateQubits`, `MaxGateQubits`) decided here
+is retained unchanged.
 
 ## Context
 
