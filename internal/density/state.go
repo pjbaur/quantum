@@ -261,28 +261,6 @@ func (m *Matrix) ReducedBlochVector(target int) (x, y, z float64, err error) {
 	return x, y, z, nil
 }
 
-// ApplySingleQubitGate applies a single-qubit unitary to the specified target.
-func (m *Matrix) ApplySingleQubitGate(gate quantum.Gate, target int) error {
-	if target < 0 || target >= m.numQubits {
-		return &quantum.QubitsOutOfRangeError{
-			Index:    target,
-			MaxIndex: m.numQubits - 1,
-		}
-	}
-
-	matrix := gate.Matrix()
-	if len(matrix) != 2 || len(matrix[0]) != 2 || len(matrix[1]) != 2 {
-		return &quantum.InvalidGateApplicationError{
-			Gate:        gate.Name(),
-			RequiredLen: 2,
-			ActualLen:   len(matrix),
-		}
-	}
-
-	m.applySingleQubitOperator(matrix, target, m.data, m.data)
-	return nil
-}
-
 // ApplyGate applies a k-qubit unitary as ρ → U ρ U†, satisfying
 // quantum.QuantumState. Qubit indices are little-endian and the gate
 // matrix ordering follows the targets slice, with targets[0] as the most

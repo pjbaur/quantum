@@ -103,8 +103,8 @@ func TestReducedBlochVectorTwoQubit(t *testing.T) {
 	if err != nil {
 		t.Fatalf("New(2) failed: %v", err)
 	}
-	if err := state.ApplySingleQubitGate(gates.NewHadamard(), 0); err != nil {
-		t.Fatalf("ApplySingleQubitGate failed: %v", err)
+	if err := state.ApplyGate(gates.NewHadamard(), 0); err != nil {
+		t.Fatalf("ApplyGate failed: %v", err)
 	}
 
 	x, y, z, err := state.ReducedBlochVector(0)
@@ -135,10 +135,10 @@ func TestReducedBlochVectorRejectsOutOfRangeTarget(t *testing.T) {
 	}
 }
 
-func TestApplySingleQubitGateHadamard(t *testing.T) {
+func TestApplyGateHadamard(t *testing.T) {
 	state := newFromAmplitudes(t, 1, 0)
-	if err := state.ApplySingleQubitGate(gates.NewHadamard(), 0); err != nil {
-		t.Fatalf("ApplySingleQubitGate failed: %v", err)
+	if err := state.ApplyGate(gates.NewHadamard(), 0); err != nil {
+		t.Fatalf("ApplyGate failed: %v", err)
 	}
 
 	assertCloseComplex(t, state.Element(0, 0), 0.5)

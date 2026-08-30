@@ -19,9 +19,12 @@ package examples
 
 import (
 	"fmt"
+	"math/cmplx"
 
+	"github.com/pjbaur/quantum/circuit"
 	"github.com/pjbaur/quantum/gates"
 	"github.com/pjbaur/quantum/internal/density"
+	"github.com/pjbaur/quantum/state"
 	"github.com/pjbaur/quantum/visualization"
 )
 
@@ -50,7 +53,7 @@ func DephasingDemo() {
 			fmt.Printf("Error creating density matrix: %v\n", err)
 			return
 		}
-		if err := m.ApplySingleQubitGate(gates.NewHadamard(), 0); err != nil {
+		if err := m.ApplyGate(gates.NewHadamard(), 0); err != nil {
 			fmt.Printf("Error applying Hadamard gate: %v\n", err)
 			return
 		}
@@ -76,7 +79,7 @@ func AmplitudeDampingDemo() {
 			fmt.Printf("Error creating density matrix: %v\n", err)
 			return
 		}
-		if err := m.ApplySingleQubitGate(gates.NewPauliX(), 0); err != nil {
+		if err := m.ApplyGate(gates.NewPauliX(), 0); err != nil {
 			fmt.Printf("Error applying Pauli-X gate: %v\n", err)
 			return
 		}
@@ -112,6 +115,67 @@ func DepolarizingDemo() {
 	fmt.Println("\nAt p = 0.75 the state is maximally mixed: purity 1/2, Bloch vector at the origin.")
 }
 
+// NoisyBellDemo executes one Bell circuit on both a state-vector and a
+// density-matrix backend — the same circuit.Execute call — then applies
+// depolarizing noise to the density matrix. Populations stay correlated
+// while off-diagonal coherence and purity decay: the mixed-state
+// signature of a state vector cannot represent.
+func NoisyBellDemo() {
+	fmt.Println("\n=== Noisy Bell Pair Demonstration ===")
+	fmt.Println("One circuit (H, CNOT) executed unchanged on a state vector and a")
+	fmt.Println("density matrix, then depolarizing noise on both qubits of the latter.")
+
+	bell, err := circuit.New(2)
+	if err != nil {
+		fmt.Printf("Error creating circuit: %v\n", err)
+		return
+	}
+	if err := bell.AddGate(gates.NewHadamard(), 0); err != nil {
+		fmt.Printf("Error adding Hadamard: %v\n", err)
+		return
+	}
+	if err := bell.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		fmt.Printf("Error adding CNOT: %v\n", err)
+		return
+	}
+
+	ideal, err := state.New(2)
+	if err != nil {
+		fmt.Printf("Error creating state: %v\n", err)
+		return
+	}
+	if err := bell.Execute(ideal); err != nil {
+		fmt.Printf("Error executing circuit on state vector: %v\n", err)
+		return
+	}
+	fmt.Printf("\nIdeal state vector: P(00) = %.4f, P(11) = %.4f\n",
+		ideal.Probability(0), ideal.Probability(3))
+
+	for _, p := range []float64{0, 0.05, 0.2} {
+		m, err := density.New(2)
+		if err != nil {
+			fmt.Printf("Error creating density matrix: %v\n", err)
+			return
+		}
+		if err := bell.Execute(m); err != nil {
+			fmt.Printf("Error executing circuit on density matrix: %v\n", err)
+			return
+		}
+		for q := 0; q < 2; q++ {
+			if err := m.ApplyDepolarizing(q, p); err != nil {
+				fmt.Printf("Error applying depolarizing channel: %v\n", err)
+				return
+			}
+		}
+		fmt.Printf("\np = %.2f:\n", p)
+		fmt.Printf("  P(00) = %.4f, P(11) = %.4f\n", m.Probability(0), m.Probability(3))
+		fmt.Printf("  coherence |ρ(00,11)| = %.4f\n", cmplx.Abs(m.Element(0, 3)))
+		fmt.Printf("  purity Tr(ρ²) = %.4f\n", m.Purity())
+	}
+	fmt.Println("\nNoise leaves the populations correlated while coherence and purity")
+	fmt.Println("decay — only a density matrix can carry that mixed state.")
+}
+
 // RunAllNoiseDemos runs all noise-channel demonstrations in sequence.
 func RunAllNoiseDemos() {
 	fmt.Println("\n========================================")
@@ -121,6 +185,7 @@ func RunAllNoiseDemos() {
 	DephasingDemo()
 	AmplitudeDampingDemo()
 	DepolarizingDemo()
+	NoisyBellDemo()
 
 	fmt.Println("\n=== All noise demonstrations completed ===")
 }
