@@ -13,6 +13,7 @@ import (
 	"math/cmplx"
 	"reflect"
 
+	"github.com/pjbaur/quantum/internal/backendmath"
 	"github.com/pjbaur/quantum/quantum"
 )
 
@@ -271,6 +272,108 @@ func (m *Matrix) ApplySingleQubitGate(gate quantum.Gate, target int) error {
 
 	m.applySingleQubitOperator(matrix, target, m.data, m.data)
 	return nil
+}
+
+// ApplyGate applies a k-qubit unitary as ρ → U ρ U†, satisfying
+// quantum.QuantumState. Qubit indices are little-endian and the gate
+// matrix ordering follows the targets slice, with targets[0] as the most
+// significant bit — the same convention as the state-vector backends.
+// Cost is O(4ⁿ·4ᵏ) for an n-qubit register.
+func (m *Matrix) ApplyGate(gate quantum.Gate, targets ...int) error {
+	requiredQubits, err := quantum.GateQubitCount(gate)
+	if err != nil {
+		return err
+	}
+
+	if len(targets) != requiredQubits {
+		return &quantum.InvalidGateApplicationError{
+			Gate:        gate.Name(),
+			RequiredLen: requiredQubits,
+			ActualLen:   len(targets),
+		}
+	}
+
+	if err := backendmath.ValidateTargets(targets, m.numQubits); err != nil {
+		return err
+	}
+
+	if requiredQubits == 1 {
+		matrix := gate.Matrix()
+		if len(matrix) != 2 || len(matrix[0]) != 2 {
+			return &quantum.InvalidGateApplicationError{
+				Gate:        gate.Name(),
+				RequiredLen: 2,
+				ActualLen:   len(matrix),
+			}
+		}
+		m.applySingleQubitOperator(matrix, targets[0], m.data, m.data)
+		return nil
+	}
+
+	m.applyMultiQubitGate(gate.Matrix(), targets)
+	return nil
+}
+
+// applyMultiQubitGate computes ρ → U ρ U† for a k-qubit gate, k ≥ 2.
+//
+// Left pass (Uρ): every column of ρ transforms exactly like a state
+// vector, so the shared ComboMasks/MixCombos kernel applies per column.
+// Right pass ((Uρ)U†): ((Uρ)U†)ᵢⱼ = Σₖ (Uρ)ᵢₖ·conj(Uⱼₖ), which is the
+// same mixing along each row with the conjugated matrix.
+//
+// Buffers are allocated per call: unlike the dense backend's
+// bounds-check-sensitive loops, the two O(4ⁿ) passes dominate the cost
+// here, so caller-shaped buffer plumbing buys nothing.
+func (m *Matrix) applyMultiQubitGate(matrix [][]complex128, targets []int) {
+	comboCount := 1 << len(targets)
+
+	comboMasks := make([]int, comboCount)
+	targetMask := backendmath.ComboMasks(comboMasks, targets)
+
+	conj := make([][]complex128, comboCount)
+	for r := range conj {
+		conj[r] = make([]complex128, comboCount)
+		for c := range conj[r] {
+			conj[r][c] = cmplx.Conj(matrix[r][c])
+		}
+	}
+
+	inputs := make([]complex128, comboCount)
+	outputs := make([]complex128, comboCount)
+	temp := m.ensureTemp()
+
+	// Left pass: temp = U·ρ, mixing down each column j.
+	for base := 0; base < m.dim; base++ {
+		if base&targetMask != 0 {
+			continue
+		}
+		for j := 0; j < m.dim; j++ {
+			for combo := 0; combo < comboCount; combo++ {
+				inputs[combo] = m.data[(base|comboMasks[combo])*m.dim+j]
+			}
+			backendmath.MixCombos(matrix, inputs, outputs)
+			for combo := 0; combo < comboCount; combo++ {
+				temp[(base|comboMasks[combo])*m.dim+j] = outputs[combo]
+			}
+		}
+	}
+
+	// Right pass: data = temp·U†, mixing along each row i with conj(U).
+	for i := 0; i < m.dim; i++ {
+		row := i * m.dim
+		for base := 0; base < m.dim; base++ {
+			if base&targetMask != 0 {
+				continue
+			}
+			for combo := 0; combo < comboCount; combo++ {
+				inputs[combo] = temp[row+(base|comboMasks[combo])]
+			}
+			backendmath.MixCombos(conj, inputs, outputs)
+			for combo := 0; combo < comboCount; combo++ {
+				m.data[row+(base|comboMasks[combo])] = outputs[combo]
+			}
+		}
+	}
 }
 
 // ApplyDepolarizing applies a single-qubit depolarizing channel to the target.

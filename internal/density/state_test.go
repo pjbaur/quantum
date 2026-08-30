@@ -7,7 +7,9 @@ import (
 	"testing"
 
 	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/internal/backendmath"
 	"github.com/pjbaur/quantum/quantum"
+	"github.com/pjbaur/quantum/state"
 )
 
 const tol = 1e-12
@@ -535,5 +537,96 @@ func TestAmplitudeOutOfRangeIsZero(t *testing.T) {
 	}
 	if got := m.Amplitude(2); got != 0 {
 		t.Errorf("Amplitude(2) = %v, want 0", got)
+	}
+}
+
+func TestApplyGateMatchesDenseBackend(t *testing.T) {
+	type op struct {
+		gate    quantum.Gate
+		targets []int
+	}
+	cases := []struct {
+		name      string
+		numQubits int
+		ops       []op
+	}{
+		{"hadamard k=1", 1, []op{
+			{gates.NewHadamard(), []int{0}},
+		}},
+		{"bell k=2", 2, []op{
+			{gates.NewHadamard(), []int{0}},
+			{gates.NewCNOT(), []int{0, 1}},
+		}},
+		{"toffoli k=3", 3, []op{
+			{gates.NewPauliX(), []int{0}},
+			{gates.NewHadamard(), []int{1}},
+			{gates.NewToffoli(), []int{0, 1, 2}},
+			{gates.NewCNOT(), []int{2, 0}},
+		}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			dense, err := state.New(tc.numQubits)
+			if err != nil {
+				t.Fatalf("state.New: %v", err)
+			}
+			m, err := New(tc.numQubits)
+			if err != nil {
+				t.Fatalf("New: %v", err)
+			}
+
+			for _, o := range tc.ops {
+				if err := dense.ApplyGate(o.gate, o.targets...); err != nil {
+					t.Fatalf("dense ApplyGate(%s): %v", o.gate.Name(), err)
+				}
+				if err := m.ApplyGate(o.gate, o.targets...); err != nil {
+					t.Fatalf("density ApplyGate(%s): %v", o.gate.Name(), err)
+				}
+			}
+
+			want, err := FromState(dense)
+			if err != nil {
+				t.Fatalf("FromState: %v", err)
+			}
+			dim := 1 << tc.numQubits
+			for i := 0; i < dim; i++ {
+				for j := 0; j < dim; j++ {
+					if diff := cmplx.Abs(m.Element(i, j) - want.Element(i, j)); diff > 1e-12 {
+						t.Fatalf("ρ(%d,%d) = %v, want %v (diff %g)",
+							i, j, m.Element(i, j), want.Element(i, j), diff)
+					}
+				}
+			}
+			if got := m.Trace(); math.Abs(got-1) > 1e-12 {
+				t.Errorf("trace after circuit = %g, want 1", got)
+			}
+		})
+	}
+}
+
+func TestApplyGateValidation(t *testing.T) {
+	m, err := New(2)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	var gateErr *quantum.InvalidGateApplicationError
+	if err := m.ApplyGate(gates.NewCNOT(), 0); !errors.As(err, &gateErr) {
+		t.Errorf("CNOT with one target: err = %v, want *InvalidGateApplicationError", err)
+	}
+
+	var rangeErr *quantum.QubitsOutOfRangeError
+	if err := m.ApplyGate(gates.NewHadamard(), 2); !errors.As(err, &rangeErr) {
+		t.Errorf("target out of range: err = %v, want *QubitsOutOfRangeError", err)
+	}
+
+	if err := m.ApplyGate(gates.NewCNOT(), 1, 1); !errors.Is(err, backendmath.ErrDuplicateTargets) {
+		t.Errorf("duplicate targets: err = %v, want ErrDuplicateTargets", err)
+	}
+
+	// A rejected application leaves ρ untouched.
+	if got := m.Element(0, 0); got != 1 {
+		t.Errorf("ρ(0,0) = %v after rejected applications, want 1", got)
 	}
 }
