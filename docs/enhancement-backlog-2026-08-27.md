@@ -193,8 +193,15 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > uploaded as artifacts so they reproduce locally. Loop verified
   > locally under bash at 5s/target — all six targets discovered and
   > run; workflow actionlint-clean.
-- [ ] 11. **Coverage floor** — CI threshold is 40.0, actual coverage 48.0.
+- [x] 11. **Coverage floor** — CI threshold is 40.0, actual coverage 48.0.
   Raise the threshold to ~45 to lock in gains.
+  > **Done (2026-08-29)**: threshold raised to 50.0, not 45 — coverage had
+  > grown to 54.4% since this item was written, and the original ~45 was
+  > chosen as roughly three points under the then-actual 48.0. Applying
+  > the same margin to today's number gives 50.0: gains locked in,
+  > ~4 points of headroom so unrelated PRs don't flake the gate. Gate
+  > logic verified locally (awk comparison passes at 54.4 vs 50.0);
+  > workflow actionlint-clean.
 - [ ] 12. **`.gitignore` fix** — `.claude/settings.local.json` is tracked
   and not ignored; it should be gitignored and untracked.
 

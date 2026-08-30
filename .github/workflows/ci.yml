@@ -48,5 +48,5 @@ jobs:
           go test ./... -coverprofile=coverage.out
           total=$(go tool cover -func=coverage.out | awk '/^total:/ {print substr($3, 1, length($3)-1)}')
           echo "Total coverage: ${total}%"
-          threshold=40.0
+          threshold=50.0
           awk -v total="$total" -v threshold="$threshold" 'BEGIN { if (total + 0 < threshold + 0) { printf("Coverage %.1f%% is below %.1f%%\n", total, threshold); exit 1 } }'
