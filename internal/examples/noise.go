@@ -119,7 +119,7 @@ func DepolarizingDemo() {
 // density-matrix backend — the same circuit.Execute call — then applies
 // depolarizing noise to the density matrix. Populations stay correlated
 // while off-diagonal coherence and purity decay: the mixed-state
-// signature of a state vector cannot represent.
+// signature no state vector can represent.
 func NoisyBellDemo() {
 	fmt.Println("\n=== Noisy Bell Pair Demonstration ===")
 	fmt.Println("One circuit (H, CNOT) executed unchanged on a state vector and a")
