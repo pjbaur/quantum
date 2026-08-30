@@ -870,9 +870,10 @@ func TestH2GroundEnergyInLiteratureRange(t *testing.T) {
 }
 
 func TestH2HamiltonianEnergyAtZeroParams(t *testing.T) {
-	// theta = 0: ansatz is identity+CNOT, state stays |00>; energy is the
-	// diagonal element H[0][0] (the g4 term has zero diagonal). Compare
-	// against the Jacobi-built matrix's [0][0] entry.
+	// theta = 0 with the amended ansatz: X(1) then identity-Ry leaves |10>
+	// (basis index 2, qubit 0 = LSB); CNOT preserves it. Energy is the
+	// diagonal element H[2][2] (the g4 term has zero diagonal). Compare
+	// against the Jacobi-built matrix's [2][2] entry.
 	tmpl := algorithm.H2Ansatz()
 	c, err := tmpl.Bind(parameterized.Params{"theta": 0})
 	if err != nil {
@@ -889,9 +890,9 @@ func TestH2HamiltonianEnergyAtZeroParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Energy: %v", err)
 	}
-	want := h2Matrix(t)[0][0]
+	want := h2Matrix(t)[2][2]
 	if math.Abs(got-want) > 1e-12 {
-		t.Fatalf("Energy(|00>) = %v, want matrix[0][0] = %v", got, want)
+		t.Fatalf("Energy(|10>) = %v, want matrix[2][2] = %v", got, want)
 	}
 }
 ```
