@@ -1,9 +1,12 @@
-// Package density implements a density-matrix backend for noise
-// simulation and analysis: Kraus channels (depolarizing, dephasing,
-// amplitude damping), trace/purity, and reduced single-qubit Bloch
-// vectors, with FromState bridging in a pure quantum.QuantumState for
-// that analysis. It deliberately does not implement quantum.QuantumState
-// itself; see docs/adr/0007-density-backend-scope.md.
+// Package density implements a density-matrix backend. Matrix satisfies
+// quantum.QuantumState (see docs/adr/0009-density-backend-quantumstate.md),
+// so circuits execute on it interchangeably with the state-vector
+// backends, and adds what only a density matrix can represent: Kraus
+// noise channels (depolarizing, dephasing, amplitude damping),
+// trace/purity, reduced single-qubit Bloch vectors, and FromState for
+// bridging in a pure state. Mixed states have no amplitude vector, so
+// Amplitude returns NaN once noise mixes the state and SetAmplitude is
+// refused; cost is O(4ⁿ) in memory and O(4ⁿ·4ᵏ) per k-qubit gate.
 package density
 
 import (

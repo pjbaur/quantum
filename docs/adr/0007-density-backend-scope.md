@@ -2,7 +2,10 @@
 
 ## Status
 
-Accepted
+Accepted. The QuantumState-conformance restriction was later lifted by
+[ADR-0009](0009-density-backend-quantumstate.md) when the noisy-Bell
+demo became the concrete consumer this ADR's revisit trigger named; the
+noise-channel and analysis API decided here is retained unchanged.
 
 ## Context
 

@@ -7,6 +7,28 @@ generation rather than a Go module major version.
 
 An "Unreleased" section describes what is on `main` but not yet tagged.
 
+## Unreleased
+
+### Added
+
+#### Density-matrix backend implements `QuantumState`
+
+`internal/density.Matrix` now satisfies `quantum.QuantumState` and
+`quantum.BackendCapabilities` (ADR-0009): circuits execute on a density
+matrix interchangeably with the state-vector backends, including
+projective measurement with injectable randomness. Mixed states report
+NaN amplitudes, so `Sample`/`Expectation`/`Fidelity` refuse them with
+`UnnormalizedStateError`, and `SetAmplitude` returns
+`UnsupportedOperationError`. New `NoisyBellDemo` in the noise demos runs
+one Bell circuit on both backend families and applies depolarizing
+noise.
+
+### Breaking
+
+#### `density.ApplySingleQubitGate` removed
+
+Use `ApplyGate(gate, target)` — same behavior, interface-shaped.
+
 ## v0.3.0 — 2026-08-25
 
 ### Breaking

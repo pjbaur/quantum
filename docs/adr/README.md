@@ -47,6 +47,7 @@ What becomes easier or harder as a result?
 | 0006 | CLI Contract and Drift Prevention | Accepted | 2026-02-21 |
 | 0007 | Density Backend Scope | Accepted | 2026-08-26 |
 | 0008 | Sparse Backend Generic k-Qubit Gate Support | Accepted | 2026-08-27 |
+| 0009 | Density Backend Implements QuantumState | Accepted | 2026-08-29 |
 | - | [Data-driven gates (design spec, supersedes concrete gate types)](../superpowers/specs/2026-08-25-data-driven-gates-design.md) | Accepted | 2026-08-25 |
 
 ## Process

@@ -157,10 +157,24 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > benchmarks before/after: no regression beyond noise. Single-qubit
   > 2×2 loops stay per-backend by design. Full suite, race, vet, gofmt,
   > fuzz seeds (including `FuzzDenseSparseGateEquivalence`) clean.
-- [ ] 9. **Density backend as `QuantumState`** — ADR-0007 deliberately
+- [x] 9. **Density backend as `QuantumState`** — ADR-0007 deliberately
   scopes `internal/density` to noise-and-analysis. Revisit trigger: a
   concrete consumer needing full circuits on density matrices (for example
   trajectory-style noisy execution).
+  > **Done (2026-08-29)**: `Matrix` implements `quantum.QuantumState` and
+  > `BackendCapabilities` (ADR-0009, superseding ADR-0007's restriction).
+  > `ApplyGate` is generic-k ρ → UρU† through the shared backendmath
+  > kernel; `Measure` is projective collapse via `PlanCollapse` with
+  > injectable randomness; `Probability` reads the diagonal; `Amplitude`
+  > reconstructs pure states and returns NaN for mixed ones, so
+  > Sample/Expectation/Fidelity refuse mixed states through their
+  > existing guards; `SetAmplitude` returns `UnsupportedOperationError`;
+  > no `BulkAmplitudeSetter` (QFT refuses) or `Resetter`.
+  > `ApplySingleQubitGate` removed. Consumer: `NoisyBellDemo` executes
+  > one Bell circuit on dense and density backends via `circuit.Execute`
+  > and applies depolarizing noise. Tests: dense-equality circuits
+  > (k=1..3), forced measurements, entangled-partner collapse, helper
+  > guards, QFT refusal, capability assertions.
 
 ## Quality / Infrastructure
 
