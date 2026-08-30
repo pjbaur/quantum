@@ -154,6 +154,35 @@ func (m *Matrix) Probability(basisState int) float64 {
 	return real(m.data[basisState*m.dim+basisState])
 }
 
+// Amplitude returns the amplitude of a specific basis state when ρ is
+// pure, and NaN when it is mixed — a mixed state has no amplitude
+// vector, and this signature has no error to return. The NaN flows into
+// the NaN-safe UnnormalizedStateError guards of Sample, Expectation, and
+// Fidelity, which is how those helpers refuse mixed states.
+//
+// For pure ρ = |ψ⟩⟨ψ|, the vector is recovered from the column of the
+// first basis state k with nonzero probability: ψᵢ = ρᵢₖ/√ρₖₖ, which
+// fixes the global phase by making ψₖ real positive. Each call scans the
+// matrix (the purity check is O(4ⁿ)); callers reading the whole vector
+// on the small states this backend serves are still cheap.
+func (m *Matrix) Amplitude(basisState int) complex128 {
+	if basisState < 0 || basisState >= m.dim {
+		return 0
+	}
+
+	if math.Abs(m.Purity()-1) > quantum.NormalizationTolerance {
+		return cmplx.NaN()
+	}
+
+	for k := 0; k < m.dim; k++ {
+		diag := real(m.data[k*m.dim+k])
+		if diag > quantum.NormalizationTolerance {
+			return m.data[basisState*m.dim+k] / complex(math.Sqrt(diag), 0)
+		}
+	}
+	return cmplx.NaN()
+}
+
 // SetAmplitude is not supported: a density matrix has no amplitude
 // vector to write one entry of. It always returns
 // UnsupportedOperationError, the capability-refusal convention

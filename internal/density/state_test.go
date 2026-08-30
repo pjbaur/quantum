@@ -453,3 +453,87 @@ func TestBackendCapabilitiesUnlimited(t *testing.T) {
 		t.Errorf("MaxGateQubits() = %d, want 0 (no limit)", got)
 	}
 }
+
+func TestAmplitudePureReconstruction(t *testing.T) {
+	invRoot2 := complex(1/math.Sqrt2, 0)
+	cases := []struct {
+		name       string
+		amplitudes []complex128
+	}{
+		{"plus", []complex128{invRoot2, invRoot2}},
+		{"relative phase", []complex128{invRoot2, complex(0, 1/math.Sqrt2)}},
+		{"global phase", []complex128{complex(0, 1/math.Sqrt2), complex(-1/math.Sqrt2, 0)}},
+		{"zero leading amplitude", []complex128{0, 1}},
+		{"bell", []complex128{invRoot2, 0, 0, invRoot2}},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			n := 1
+			if len(tc.amplitudes) == 4 {
+				n = 2
+			}
+			m, err := FromState(&stubState{numQubits: n, amplitudes: tc.amplitudes})
+			if err != nil {
+				t.Fatalf("FromState: %v", err)
+			}
+
+			// The reconstruction is defined up to global phase, so verify it
+			// by rebuilding ρ from the reconstructed vector: ψ'ψ'† must equal
+			// the matrix it was read from, whatever phase convention holds.
+			dim := len(tc.amplitudes)
+			recon := make([]complex128, dim)
+			for i := range recon {
+				recon[i] = m.Amplitude(i)
+			}
+			for i := 0; i < dim; i++ {
+				for j := 0; j < dim; j++ {
+					want := m.Element(i, j)
+					got := recon[i] * cmplx.Conj(recon[j])
+					if cmplx.Abs(got-want) > 1e-12 {
+						t.Fatalf("outer product (%d,%d) = %v, want %v", i, j, got, want)
+					}
+				}
+			}
+
+			// Phase convention: the anchor amplitude is real and positive.
+			for _, a := range recon {
+				if cmplx.Abs(a) > 1e-12 {
+					if math.Abs(imag(a)) > 1e-12 || real(a) <= 0 {
+						t.Fatalf("first nonzero reconstructed amplitude %v is not real positive", a)
+					}
+					break
+				}
+			}
+		})
+	}
+}
+
+func TestAmplitudeNaNWhenMixed(t *testing.T) {
+	m, err := New(1)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := m.ApplyDepolarizing(0, 0.5); err != nil {
+		t.Fatalf("ApplyDepolarizing: %v", err)
+	}
+
+	for basis := 0; basis < 2; basis++ {
+		if got := m.Amplitude(basis); !cmplx.IsNaN(got) {
+			t.Errorf("Amplitude(%d) on mixed state = %v, want NaN", basis, got)
+		}
+	}
+}
+
+func TestAmplitudeOutOfRangeIsZero(t *testing.T) {
+	m, err := New(1)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if got := m.Amplitude(-1); got != 0 {
+		t.Errorf("Amplitude(-1) = %v, want 0", got)
+	}
+	if got := m.Amplitude(2); got != 0 {
+		t.Errorf("Amplitude(2) = %v, want 0", got)
+	}
+}
