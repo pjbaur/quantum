@@ -378,3 +378,78 @@ func assertPositiveSemidefinite2x2(t *testing.T, state *Matrix) {
 		t.Fatalf("matrix has negative diagonal entries: %v, %v", r00, r11)
 	}
 }
+
+func TestProbabilityIsDiagonal(t *testing.T) {
+	invRoot2 := complex(1/math.Sqrt2, 0)
+	m, err := FromState(&stubState{numQubits: 1, amplitudes: []complex128{invRoot2, invRoot2}})
+	if err != nil {
+		t.Fatalf("FromState: %v", err)
+	}
+
+	for basis, want := range []float64{0.5, 0.5} {
+		if got := m.Probability(basis); math.Abs(got-want) > 1e-12 {
+			t.Errorf("Probability(%d) = %g, want %g", basis, got, want)
+		}
+	}
+	if got := m.Probability(-1); got != 0 {
+		t.Errorf("Probability(-1) = %g, want 0", got)
+	}
+	if got := m.Probability(2); got != 0 {
+		t.Errorf("Probability(2) = %g, want 0", got)
+	}
+}
+
+func TestSetAmplitudeUnsupported(t *testing.T) {
+	m, err := New(1)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	err = m.SetAmplitude(0, 1)
+	var unsupported *quantum.UnsupportedOperationError
+	if !errors.As(err, &unsupported) {
+		t.Fatalf("SetAmplitude error = %v, want *quantum.UnsupportedOperationError", err)
+	}
+	if m.Element(0, 0) != 1 {
+		t.Errorf("refused SetAmplitude mutated the matrix: ρ(0,0) = %v", m.Element(0, 0))
+	}
+}
+
+func TestCloneIsIndependent(t *testing.T) {
+	m, err := New(1)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	c := m.Clone()
+
+	// Mutate the original through a noise channel; the clone must not move.
+	if err := m.ApplyDepolarizing(0, 0.5); err != nil {
+		t.Fatalf("ApplyDepolarizing: %v", err)
+	}
+	if got := c.Element(0, 0); got != 1 {
+		t.Errorf("clone ρ(0,0) = %v after mutating original, want 1", got)
+	}
+	if got := c.Purity(); math.Abs(got-1) > 1e-12 {
+		t.Errorf("clone purity = %g after mutating original, want 1", got)
+	}
+}
+
+func TestBackendCapabilitiesUnlimited(t *testing.T) {
+	m, err := New(2)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+
+	for _, k := range []int{1, 2, 3, 5} {
+		if !m.SupportsGateQubits(k) {
+			t.Errorf("SupportsGateQubits(%d) = false, want true", k)
+		}
+	}
+	if m.SupportsGateQubits(0) {
+		t.Error("SupportsGateQubits(0) = true, want false")
+	}
+	if got := m.MaxGateQubits(); got != 0 {
+		t.Errorf("MaxGateQubits() = %d, want 0 (no limit)", got)
+	}
+}

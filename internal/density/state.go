@@ -19,12 +19,13 @@ import (
 // Matrix represents a density matrix for an n-qubit system.
 // This type is internal to the module to keep the API surface focused.
 type Matrix struct {
-	numQubits int
-	dim       int
-	data      []complex128
-	temp      []complex128
-	scratch   []complex128
-	work      []complex128
+	numQubits  int
+	dim        int
+	data       []complex128
+	temp       []complex128
+	scratch    []complex128
+	work       []complex128
+	randSource quantum.RandomSource
 }
 
 // New creates a density matrix initialized to |00...0⟩⟨00...0|.
@@ -135,6 +136,62 @@ func (m *Matrix) Purity() float64 {
 		sum += real(v)*real(v) + imag(v)*imag(v)
 	}
 	return sum
+}
+
+// SetRandSource sets the randomness source used by Measure, enabling
+// reproducible measurements from a seeded generator. A nil source
+// restores the default (the global math/rand source).
+func (m *Matrix) SetRandSource(src quantum.RandomSource) {
+	m.randSource = src
+}
+
+// Probability returns the probability of measuring a specific basis
+// state: the diagonal element ρᵢᵢ, exact for pure and mixed states alike.
+func (m *Matrix) Probability(basisState int) float64 {
+	if basisState < 0 || basisState >= m.dim {
+		return 0
+	}
+	return real(m.data[basisState*m.dim+basisState])
+}
+
+// SetAmplitude is not supported: a density matrix has no amplitude
+// vector to write one entry of. It always returns
+// UnsupportedOperationError, the capability-refusal convention
+// BulkAmplitudeSetter established. Prepare states with gates, FromState,
+// or a state-vector backend instead.
+func (m *Matrix) SetAmplitude(basisState int, value complex128) error {
+	return &quantum.UnsupportedOperationError{
+		Operation:   "SetAmplitude",
+		Backend:     "density matrix backend",
+		Alternative: "gates, FromState, or a state-vector backend",
+	}
+}
+
+// Clone creates an independent copy of the density matrix. The clone
+// shares the randomness source (if any), so seeded pipelines stay
+// deterministic across clones; scratch buffers are not copied.
+func (m *Matrix) Clone() *Matrix {
+	data := make([]complex128, len(m.data))
+	copy(data, m.data)
+	return &Matrix{
+		numQubits:  m.numQubits,
+		dim:        m.dim,
+		data:       data,
+		randSource: m.randSource,
+	}
+}
+
+// SupportsGateQubits returns whether this backend can apply gates
+// operating on the specified number of qubits. The density backend
+// supports all gate sizes (memory permitting).
+func (m *Matrix) SupportsGateQubits(qubitCount int) bool {
+	return qubitCount >= 1
+}
+
+// MaxGateQubits returns the maximum number of qubits a gate can operate
+// on. Returns 0 to indicate no limit.
+func (m *Matrix) MaxGateQubits() int {
+	return 0
 }
 
 // ReducedBlochVector traces out all qubits except target and returns the
