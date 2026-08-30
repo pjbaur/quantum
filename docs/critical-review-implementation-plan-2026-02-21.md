@@ -18,7 +18,7 @@ Use dedicated worktrees so teams can ship independent PRs in parallel with low m
 - [x] `ws3-sparse-backend`: sparse backend capability strategy and implementation/contract enforcement.
 - [x] `ws4-algorithms`: Grover + Deutsch-Jozsa scalability refactor and negative-path test coverage.
 - [x] `ws5-cli-docs-tests`: CLI/help drift fixes, dead parameter resolution, visualization helper tests, docs alignment.
-- [ ] `ws6-integration`: final integration pass, conflict resolution, cross-package verification, release notes.
+- [x] `ws6-integration`: final integration pass, conflict resolution, cross-package verification, release notes.
 
 ## Phase 0 (Do First): “What To Do Differently” Decisions and Guardrails
 
@@ -285,4 +285,4 @@ This phase sets project-level direction before code-heavy changes. No feature wo
 - [x] PR4: `ws3-sparse-backend` capability implementation + tests.
 - [x] PR5: `ws4-algorithms` scalability + negative-path tests.
 - [x] PR6: `ws5-cli-docs-tests` UX/docs/test fixes.
-- [ ] PR7: `ws6-integration` final merge, verification, and closure report.
+- [x] PR7: `ws6-integration` final merge, verification, and closure report.
