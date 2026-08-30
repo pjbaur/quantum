@@ -29,6 +29,15 @@ type Matrix struct {
 	randSource quantum.RandomSource
 }
 
+// Matrix implements quantum.QuantumState (see ADR-0009) and
+// quantum.BackendCapabilities. It deliberately does not implement
+// quantum.BulkAmplitudeSetter (a mixed state has no amplitude vector to
+// replace, so QFT refuses it) or quantum.Resetter (no consumer).
+var (
+	_ quantum.QuantumState        = (*Matrix)(nil)
+	_ quantum.BackendCapabilities = (*Matrix)(nil)
+)
+
 // New creates a density matrix initialized to |00...0⟩⟨00...0|.
 // Returns InvalidQubitCountError if numQubits <= 0.
 func New(numQubits int) (*Matrix, error) {
@@ -200,7 +209,7 @@ func (m *Matrix) SetAmplitude(basisState int, value complex128) error {
 // Clone creates an independent copy of the density matrix. The clone
 // shares the randomness source (if any), so seeded pipelines stay
 // deterministic across clones; scratch buffers are not copied.
-func (m *Matrix) Clone() *Matrix {
+func (m *Matrix) Clone() quantum.QuantumState {
 	data := make([]complex128, len(m.data))
 	copy(data, m.data)
 	return &Matrix{
@@ -312,6 +321,52 @@ func (m *Matrix) ApplyGate(gate quantum.Gate, targets ...int) error {
 
 	m.applyMultiQubitGate(gate.Matrix(), targets)
 	return nil
+}
+
+// Measure performs a projective measurement of one qubit and collapses
+// ρ in place: outcome b with probability Σ ρᵢᵢ over basis states whose
+// qubit bit is b, then ρ → ΠρΠ / p. Randomness comes from the source
+// set via SetRandSource (global math/rand by default), so outcomes are
+// forceable in tests. The shared PlanCollapse supplies the outcome
+// choice and its zero-branch and unnormalized-state safety.
+func (m *Matrix) Measure(qubitIndex int) (int, error) {
+	if qubitIndex < 0 || qubitIndex >= m.numQubits {
+		return 0, &quantum.QubitsOutOfRangeError{
+			Index:    qubitIndex,
+			MaxIndex: m.numQubits - 1,
+		}
+	}
+
+	prob0, prob1 := 0.0, 0.0
+	for i := 0; i < m.dim; i++ {
+		p := real(m.data[i*m.dim+i])
+		if (i>>qubitIndex)&1 == 0 {
+			prob0 += p
+		} else {
+			prob1 += p
+		}
+	}
+
+	collapse, err := backendmath.PlanCollapse(qubitIndex, backendmath.RandFloat64(m.randSource), prob0, prob1)
+	if err != nil {
+		return 0, err
+	}
+
+	// ρᵢⱼ survives only when both indices agree with the outcome, scaled
+	// by 1/p. Renormalize divides by √p, so applying it to both the row
+	// and column factor of each element divides by p, exactly ΠρΠ/p.
+	for i := 0; i < m.dim; i++ {
+		row := i * m.dim
+		for j := 0; j < m.dim; j++ {
+			if collapse.Keeps(i) && collapse.Keeps(j) {
+				m.data[row+j] = collapse.Renormalize(collapse.Renormalize(m.data[row+j]))
+			} else {
+				m.data[row+j] = 0
+			}
+		}
+	}
+
+	return collapse.Outcome, nil
 }
 
 // applyMultiQubitGate computes ρ → U ρ U† for a k-qubit gate, k ≥ 2.

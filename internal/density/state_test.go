@@ -423,7 +423,11 @@ func TestCloneIsIndependent(t *testing.T) {
 		t.Fatalf("New: %v", err)
 	}
 
-	c := m.Clone()
+	cloned := m.Clone()
+	c, ok := cloned.(*Matrix)
+	if !ok {
+		t.Fatalf("Clone returned %T, want *Matrix", cloned)
+	}
 
 	// Mutate the original through a noise channel; the clone must not move.
 	if err := m.ApplyDepolarizing(0, 0.5); err != nil {
@@ -628,5 +632,107 @@ func TestApplyGateValidation(t *testing.T) {
 	// A rejected application leaves ρ untouched.
 	if got := m.Element(0, 0); got != 1 {
 		t.Errorf("ρ(0,0) = %v after rejected applications, want 1", got)
+	}
+}
+
+// stubRandSource returns queued draws in order, so measurement outcomes
+// are forced deterministically.
+type stubRandSource struct {
+	draws []float64
+	next  int
+}
+
+func (s *stubRandSource) Float64() float64 {
+	v := s.draws[s.next]
+	s.next++
+	return v
+}
+
+func TestMeasureForcedOutcomes(t *testing.T) {
+	for _, tc := range []struct {
+		draw      float64
+		outcome   int
+		surviving int
+	}{
+		{0.1, 0, 0}, // draw < prob0 → outcome 0, state |0⟩⟨0|
+		{0.9, 1, 1}, // draw ≥ prob0 → outcome 1, state |1⟩⟨1|
+	} {
+		m, err := New(1)
+		if err != nil {
+			t.Fatalf("New: %v", err)
+		}
+		if err := m.ApplyGate(gates.NewHadamard(), 0); err != nil {
+			t.Fatalf("ApplyGate: %v", err)
+		}
+		m.SetRandSource(&stubRandSource{draws: []float64{tc.draw}})
+
+		outcome, err := m.Measure(0)
+		if err != nil {
+			t.Fatalf("Measure: %v", err)
+		}
+		if outcome != tc.outcome {
+			t.Errorf("draw %g: outcome = %d, want %d", tc.draw, outcome, tc.outcome)
+		}
+		if got := m.Probability(tc.surviving); math.Abs(got-1) > 1e-12 {
+			t.Errorf("draw %g: P(%d) = %g after collapse, want 1", tc.draw, tc.surviving, got)
+		}
+		if got := m.Purity(); math.Abs(got-1) > 1e-12 {
+			t.Errorf("draw %g: purity = %g after collapse, want 1", tc.draw, got)
+		}
+		if got := m.Trace(); math.Abs(got-1) > 1e-12 {
+			t.Errorf("draw %g: trace = %g after collapse, want 1", tc.draw, got)
+		}
+	}
+}
+
+func TestMeasureCollapsesEntangledPartner(t *testing.T) {
+	m, err := New(2)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	if err := m.ApplyGate(gates.NewHadamard(), 0); err != nil {
+		t.Fatalf("H: %v", err)
+	}
+	if err := m.ApplyGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatalf("CNOT: %v", err)
+	}
+	m.SetRandSource(&stubRandSource{draws: []float64{0.9}})
+
+	outcome, err := m.Measure(0)
+	if err != nil {
+		t.Fatalf("Measure: %v", err)
+	}
+	if outcome != 1 {
+		t.Fatalf("outcome = %d, want 1", outcome)
+	}
+	// Bell pair: measuring qubit 0 as 1 leaves |11⟩ with certainty.
+	if got := m.Probability(3); math.Abs(got-1) > 1e-12 {
+		t.Errorf("P(11) = %g after measuring qubit 0, want 1", got)
+	}
+}
+
+func TestMeasureRejectsOutOfRangeQubit(t *testing.T) {
+	m, err := New(1)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	var rangeErr *quantum.QubitsOutOfRangeError
+	if _, err := m.Measure(1); !errors.As(err, &rangeErr) {
+		t.Errorf("Measure(1) err = %v, want *QubitsOutOfRangeError", err)
+	}
+	if _, err := m.Measure(-1); !errors.As(err, &rangeErr) {
+		t.Errorf("Measure(-1) err = %v, want *QubitsOutOfRangeError", err)
+	}
+}
+
+func TestMeasureRejectsUnnormalizedMatrix(t *testing.T) {
+	m, err := New(1)
+	if err != nil {
+		t.Fatalf("New: %v", err)
+	}
+	m.data[0] = 0 // zero matrix: no branch holds probability
+
+	if _, err := m.Measure(0); err == nil {
+		t.Error("Measure on zero matrix succeeded, want unnormalized-state error")
 	}
 }
