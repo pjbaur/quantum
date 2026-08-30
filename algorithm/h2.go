@@ -51,12 +51,18 @@ func H2Hamiltonian() *Hamiltonian {
 	return h
 }
 
-// H2Ansatz returns the canonical UCC-inspired H2 ansatz template:
+// H2Ansatz returns the canonical H2 ansatz template: X on qubit 1 (seeds
+// the odd-parity sector where this Hamiltonian's ground state lives), then
 // Ry(theta) on qubit 0, then CNOT with control 0 and target 1.
+// Amended 2026-08-30: plain Ry+CNOT from |00> spans only the even-parity
+// sector (reachable minimum -1.2446 Ha) and cannot reach the ground state.
 func H2Ansatz() *parameterized.Template {
 	t := parameterized.NewTemplate(2)
-	if err := t.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+	if err := t.AddGate(gates.NewPauliX(), 1); err != nil {
 		panic(err) // targets are static; an error here is a programming bug
+	}
+	if err := t.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		panic(err)
 	}
 	if err := t.AddGate(gates.NewCNOT(), 0, 1); err != nil {
 		panic(err)

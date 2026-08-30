@@ -31,9 +31,11 @@ func TestH2GroundEnergyInLiteratureRange(t *testing.T) {
 }
 
 func TestH2HamiltonianEnergyAtZeroParams(t *testing.T) {
-	// theta = 0: ansatz is identity+CNOT, state stays |00>; energy is the
-	// diagonal element H[0][0] (the g4 term has zero diagonal). Compare
-	// against the Jacobi-built matrix's [0][0] entry.
+	// theta = 0: X on qubit 1 seeds q1=1, Ry(0) is identity, and the CNOT
+	// (control q0=0) does not fire, so the state stays at basis index 2
+	// (q0=0, q1=1). Energy is the diagonal element H[2][2] (the g4 term
+	// has zero diagonal). Compare against the Jacobi-built matrix's [2][2]
+	// entry.
 	tmpl := algorithm.H2Ansatz()
 	c, err := tmpl.Bind(parameterized.Params{"theta": 0})
 	if err != nil {
@@ -50,8 +52,46 @@ func TestH2HamiltonianEnergyAtZeroParams(t *testing.T) {
 	if err != nil {
 		t.Fatalf("Energy: %v", err)
 	}
-	want := h2Matrix(t)[0][0]
+	want := h2Matrix(t)[2][2]
 	if math.Abs(got-want) > 1e-12 {
-		t.Fatalf("Energy(|00>) = %v, want matrix[0][0] = %v", got, want)
+		t.Fatalf("Energy(theta=0) = %v, want matrix[2][2] = %v", got, want)
+	}
+}
+
+func TestH2AnsatzReachesGroundSector(t *testing.T) {
+	// Sweep theta over a fine grid and take the minimum ansatz energy:
+	// proves the ansatz spans the ground state's sector without relying
+	// on any optimizer. 256 steps rather than the suggested 64: the
+	// energy's curvature near the minimum is ~0.82, so a 64-point grid
+	// can miss the minimum by ~2e-3 Ha, over the 1e-3 tolerance. The
+	// tolerance itself is unchanged.
+	tmpl := algorithm.H2Ansatz()
+	h := algorithm.H2Hamiltonian()
+	best := math.Inf(1)
+	const steps = 256
+	for i := 0; i <= steps; i++ {
+		theta := -math.Pi + 2*math.Pi*float64(i)/steps
+		c, err := tmpl.Bind(parameterized.Params{"theta": theta})
+		if err != nil {
+			t.Fatalf("Bind: %v", err)
+		}
+		s, err := state.New(2)
+		if err != nil {
+			t.Fatalf("state.New: %v", err)
+		}
+		if err := c.Execute(s); err != nil {
+			t.Fatalf("Execute: %v", err)
+		}
+		e, err := h.Energy(s)
+		if err != nil {
+			t.Fatalf("Energy: %v", err)
+		}
+		if e < best {
+			best = e
+		}
+	}
+	ground := h2GroundEnergy(t)
+	if diff := math.Abs(best - ground); diff > 1e-3 {
+		t.Fatalf("ansatz minimum over grid = %v, Jacobi ground energy = %v (diff %v, want <= 1e-3)", best, ground, diff)
 	}
 }
