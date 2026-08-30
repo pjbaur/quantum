@@ -178,8 +178,21 @@ later ladder stages (QPE, QAOA, noise-aware demos).
 
 ## Quality / Infrastructure
 
-- [ ] 10. **Extended fuzzing** — CI runs fuzz targets over seed corpora
+- [x] 10. **Extended fuzzing** — CI runs fuzz targets over seed corpora
   only. Commit grown corpora or add a periodic long `-fuzz` job.
+  > **Done (2026-08-29)**: periodic job, not committed corpora — a
+  > snapshot goes stale while a scheduled run keeps exploring.
+  > `.github/workflows/fuzz.yml`: weekly (Mon 04:17 UTC) plus
+  > `workflow_dispatch` with configurable per-target `fuzztime`
+  > (default 10m). Targets are discovered dynamically
+  > (`go test -list '^Fuzz'` per package), so new fuzz tests join the
+  > rotation without workflow edits; each runs in its own
+  > `-fuzz '^Name$'` invocation because Go allows only one fuzz target
+  > per `go test` run. All targets run even after a failure (single
+  > `failed` flag), and new crashers under `testdata/fuzz/` are
+  > uploaded as artifacts so they reproduce locally. Loop verified
+  > locally under bash at 5s/target — all six targets discovered and
+  > run; workflow actionlint-clean.
 - [ ] 11. **Coverage floor** — CI threshold is 40.0, actual coverage 48.0.
   Raise the threshold to ~45 to lock in gains.
 - [ ] 12. **`.gitignore` fix** — `.claude/settings.local.json` is tracked

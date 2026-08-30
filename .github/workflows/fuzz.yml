@@ -1,0 +1,54 @@
+name: Fuzz
+
+# Long fuzzing runs, complementing CI's seed-corpus-only execution
+# (backlog item 10). Weekly schedule plus manual dispatch with a
+# configurable per-target budget.
+on:
+  schedule:
+    # Mondays 04:17 UTC — off the top of the hour to dodge load spikes.
+    - cron: '17 4 * * 1'
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: 'Fuzz time per target (Go duration)'
+        required: false
+        default: '10m'
+
+jobs:
+  fuzz:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+
+      - uses: actions/setup-go@v6
+        with:
+          go-version: '1.26.x'
+          # No dependencies, so no go.sum to key a module cache on.
+          cache: false
+
+      - name: Fuzz all targets
+        run: |
+          fuzztime='${{ github.event.inputs.fuzztime || '10m' }}'
+          echo "Running each fuzz target for ${fuzztime}"
+          failed=0
+          for pkg in $(go list ./...); do
+            targets=$(go test -list '^Fuzz' "$pkg" | grep '^Fuzz' || true)
+            for target in $targets; do
+              echo "::group::${pkg} ${target}"
+              if ! go test -run '^$' -fuzz "^${target}\$" -fuzztime "$fuzztime" "$pkg"; then
+                failed=1
+              fi
+              echo "::endgroup::"
+            done
+          done
+          exit "$failed"
+
+      - name: Upload crashers
+        # New failing inputs are written to <pkg>/testdata/fuzz/<Target>/.
+        # Keep them so the crash reproduces locally after the runner is gone.
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: fuzz-crashers
+          path: '**/testdata/fuzz/**'
+          if-no-files-found: ignore
