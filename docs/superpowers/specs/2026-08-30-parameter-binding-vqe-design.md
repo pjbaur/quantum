@@ -106,8 +106,12 @@ Pauli sum (see Testing). This guards against coefficient-convention mistakes.
 
 ### `H2Ansatz()` — canonical template
 
-`Ry("theta")` on qubit 0, then `CNOT(0 -> 1)`. One parameter, the standard
-UCC-inspired H2 demo ansatz. Returns `*parameterized.Template`.
+`X` on qubit 1 (seeds the odd-parity sector carrying the ground state in
+the O'Malley parity-basis Hamiltonian), then `Ry("theta")` on qubit 0,
+then `CNOT(0 -> 1)`. One parameter. Amended 2026-08-30 after measurement:
+the original Ry+CNOT-from-|00> form spans only the even-parity sector
+(reachable minimum -1.2446 Ha) and cannot reach the -1.8573 Ha ground
+state. Returns `*parameterized.Template`.
 
 ### `VQE` — the driver
 

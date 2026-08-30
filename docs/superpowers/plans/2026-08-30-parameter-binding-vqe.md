@@ -682,7 +682,7 @@ git commit -m "feat(algorithm): Pauli-sum Hamiltonian with exact Energy"
 - Consumes: Task 2's `Hamiltonian` API; Task 1's `parameterized.NewTemplate/AddParamGate/AddGate/Ry`; `gates.NewCNOT()`; `quantum.PauliI/X/Y/Z`.
 - Produces (Task 5 depends):
   - `func H2Hamiltonian() *Hamiltonian`
-  - `func H2Ansatz() *parameterized.Template` — Ry("theta") on qubit 0, CNOT(0→1)
+  - `func H2Ansatz() *parameterized.Template` — X on qubit 1, Ry("theta") on qubit 0, CNOT(0→1) (odd-parity seed; see amended H2Ansatz code below)
   - Test-only: `func h2GroundEnergy(t testing.TB) float64` (or equivalent helper) in `jacobi_test.go`
 
 - [ ] **Step 1: Write the Jacobi test helper**
@@ -960,12 +960,18 @@ func H2Hamiltonian() *Hamiltonian {
 	return h
 }
 
-// H2Ansatz returns the canonical UCC-inspired H2 ansatz template:
+// H2Ansatz returns the canonical H2 ansatz template: X on qubit 1 (seeds
+// the odd-parity sector where this Hamiltonian's ground state lives), then
 // Ry(theta) on qubit 0, then CNOT with control 0 and target 1.
+// Amended 2026-08-30: plain Ry+CNOT from |00> spans only the even-parity
+// sector (reachable minimum -1.2446 Ha) and cannot reach the ground state.
 func H2Ansatz() *parameterized.Template {
 	t := parameterized.NewTemplate(2)
-	if err := t.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+	if err := t.AddGate(gates.NewPauliX(), 1); err != nil {
 		panic(err) // targets are static; an error here is a programming bug
+	}
+	if err := t.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		panic(err)
 	}
 	if err := t.AddGate(gates.NewCNOT(), 0, 1); err != nil {
 		panic(err)
