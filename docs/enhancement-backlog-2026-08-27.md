@@ -202,8 +202,13 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > ~4 points of headroom so unrelated PRs don't flake the gate. Gate
   > logic verified locally (awk comparison passes at 54.4 vs 50.0);
   > workflow actionlint-clean.
-- [ ] 12. **`.gitignore` fix** — `.claude/settings.local.json` is tracked
+- [x] 12. **`.gitignore` fix** — `.claude/settings.local.json` is tracked
   and not ignored; it should be gitignored and untracked.
+  > **Done (2026-08-29)**: `git rm --cached` only — `.claude/` was already
+  > in `.gitignore`, but a tracked file overrides the ignore rule, so no
+  > `.gitignore` edit was needed. Local copy stays on disk;
+  > `git check-ignore` confirms the rule now applies. Only file tracked
+  > under `.claude/`, so the directory is now fully ignored.
 
 ## Suggested Order
 
