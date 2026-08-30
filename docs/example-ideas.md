@@ -142,8 +142,8 @@ Here are quasi-practical “this feels like a thing you’d actually use” exam
 
 **Capabilities required**
 
-* Parameterized circuits (RX/RY/RZ with symbolic parameters)
-* Ability to run the same circuit many times with different parameters
+* Parameterized circuits (RX/RY/RZ with symbolic parameters) (satisfied: parameterized.Template, 2026-08-30)
+* Ability to run the same circuit many times with different parameters (satisfied: Template.Bind + VQE driver, 2026-08-30)
 * Expectation estimation of Pauli strings via basis changes (measure X/Y/Z)
 * Classical outer loop integration (you can keep this outside the simulator API, but you need fast repeated runs)
 * Optional but very helpful: **shot noise** simulation and/or exact expectation from statevector

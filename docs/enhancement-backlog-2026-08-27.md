@@ -84,6 +84,12 @@ later ladder stages (QPE, QAOA, noise-aware demos).
   > (stub draws consumed in order), reset-state vs fresh-state amplitude
   > equality after dirtying with gates and a measurement, `Resetter`
   > assertions on both backends.
+  >
+  > **Addendum (2026-08-30)**: the deferred symbolic half is now done too —
+  > `parameterized.Template` + `Bind` materializes circuits from named
+  > parameter maps, with the H2 VQE driver as the consuming evidence.
+  > See `docs/adr/0010-parameter-binding-template.md` and
+  > `docs/superpowers/specs/2026-08-30-parameter-binding-vqe-design.md`.
 - [x] 5. **State fidelity** — an F(|ψ⟩,|φ⟩) helper. Blocks teleportation
   verification; useful as a cross-backend assertion in tests.
   > **Done (2026-08-27)**: `quantum.Fidelity(a, b)` in
