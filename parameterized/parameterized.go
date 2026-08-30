@@ -1,0 +1,171 @@
+// Package parameterized provides circuit templates with named symbolic
+// parameters. Bind materializes a template into an ordinary circuit, so
+// variational loops can re-run the same structure at many parameter points
+// without rebuilding gate lists by hand.
+package parameterized
+
+import (
+	"fmt"
+	"math"
+
+	"github.com/pjbaur/quantum/circuit"
+	"github.com/pjbaur/quantum/gates"
+	"github.com/pjbaur/quantum/quantum"
+)
+
+// Params maps parameter names to gate angles.
+type Params map[string]float64
+
+// Factory builds a gate from a parameter value.
+type Factory func(value float64) quantum.Gate
+
+// Rx, Ry, Rz, and Phase are Factory constructors delegating to the gates
+// package. Angles are not validated here: gates.NewRx and friends document
+// that non-finite angles yield non-finite matrices; Bind rejects non-finite
+// parameter values before any factory runs.
+func Rx(value float64) quantum.Gate { return gates.NewRx(value) }
+
+func Ry(value float64) quantum.Gate { return gates.NewRy(value) }
+
+func Rz(value float64) quantum.Gate { return gates.NewRz(value) }
+
+func Phase(value float64) quantum.Gate { return gates.NewPhase(value) }
+
+// step is one template instruction: either a fixed gate (param == "") or a
+// parameter-driven factory.
+type step struct {
+	param   string
+	factory Factory
+	gate    quantum.Gate
+	targets []int
+}
+
+// Template is a circuit recipe with named parameter holes. A Template is
+// safe for concurrent reads after all Add calls complete.
+type Template struct {
+	numQubits  int
+	steps      []step
+	paramOrder []string
+	seen       map[string]bool
+}
+
+// NewTemplate returns a template for circuits on numQubits qubits.
+func NewTemplate(numQubits int) *Template {
+	return &Template{
+		numQubits: numQubits,
+		seen:      make(map[string]bool),
+	}
+}
+
+// NumQubits returns the qubit count the template builds circuits for.
+func (t *Template) NumQubits() int { return t.numQubits }
+
+// ParamNames returns declared parameter names in first-use order, without
+// duplicates.
+func (t *Template) ParamNames() []string {
+	out := make([]string, len(t.paramOrder))
+	copy(out, t.paramOrder)
+	return out
+}
+
+func (t *Template) checkTargets(targets []int) error {
+	for _, target := range targets {
+		if target < 0 || target >= t.numQubits {
+			return &quantum.QubitsOutOfRangeError{Index: target, MaxIndex: t.numQubits - 1}
+		}
+	}
+	return nil
+}
+
+// AddParamGate adds a gate built by factory from the named parameter's
+// value at Bind time. The same name may drive several gates.
+func (t *Template) AddParamGate(name string, factory Factory, targets ...int) error {
+	if factory == nil {
+		return fmt.Errorf("parameter %q: factory must not be nil", name)
+	}
+	if err := t.checkTargets(targets); err != nil {
+		return err
+	}
+	if !t.seen[name] {
+		t.seen[name] = true
+		t.paramOrder = append(t.paramOrder, name)
+	}
+	t.steps = append(t.steps, step{param: name, factory: factory, targets: targets})
+	return nil
+}
+
+// AddGate adds a fixed gate needing no parameter.
+func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
+	if gate == nil {
+		return fmt.Errorf("fixed gate must not be nil")
+	}
+	if err := t.checkTargets(targets); err != nil {
+		return err
+	}
+	t.steps = append(t.steps, step{gate: gate, targets: targets})
+	return nil
+}
+
+// Bind materializes the template into a circuit using values. Every declared
+// parameter must be present and finite; unknown names are rejected so typos
+// fail loudly instead of silently ignoring an angle.
+func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
+	for _, name := range t.paramOrder {
+		value, ok := values[name]
+		if !ok {
+			return nil, &MissingParameterError{Name: name}
+		}
+		if math.IsNaN(value) || math.IsInf(value, 0) {
+			return nil, &InvalidParameterValueError{Name: name, Value: value}
+		}
+	}
+	for name := range values {
+		if !t.seen[name] {
+			return nil, &UnknownParameterError{Name: name}
+		}
+	}
+
+	c, err := circuit.New(t.numQubits)
+	if err != nil {
+		return nil, err
+	}
+	for _, s := range t.steps {
+		gate := s.gate
+		if s.factory != nil {
+			gate = s.factory(values[s.param])
+		}
+		if err := c.AddGate(gate, s.targets...); err != nil {
+			return nil, err
+		}
+	}
+	return c, nil
+}
+
+// MissingParameterError indicates Bind was called without a declared name.
+type MissingParameterError struct {
+	Name string
+}
+
+func (e *MissingParameterError) Error() string {
+	return fmt.Sprintf("parameter %q missing from Bind values", e.Name)
+}
+
+// UnknownParameterError indicates Bind was given a name the template never
+// declared (likely a typo).
+type UnknownParameterError struct {
+	Name string
+}
+
+func (e *UnknownParameterError) Error() string {
+	return fmt.Sprintf("parameter %q was never declared in the template", e.Name)
+}
+
+// InvalidParameterValueError indicates a non-finite parameter value.
+type InvalidParameterValueError struct {
+	Name  string
+	Value float64
+}
+
+func (e *InvalidParameterValueError) Error() string {
+	return fmt.Sprintf("parameter %q has non-finite value %v", e.Name, e.Value)
+}
