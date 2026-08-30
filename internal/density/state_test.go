@@ -285,6 +285,63 @@ func TestFromStateRejectsTypedNilState(t *testing.T) {
 	}
 }
 
+func TestFromStateRejectsNonFiniteAmplitude(t *testing.T) {
+	cases := []struct {
+		name       string
+		amplitudes []complex128
+		wantBasis  int
+	}{
+		{
+			name:       "nan_real",
+			amplitudes: []complex128{complex(math.NaN(), 0), 0},
+			wantBasis:  0,
+		},
+		{
+			name:       "inf_imag",
+			amplitudes: []complex128{1, complex(0, math.Inf(1))},
+			wantBasis:  1,
+		},
+	}
+
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			state, err := FromState(&stubState{numQubits: 1, amplitudes: tc.amplitudes})
+			if state != nil {
+				t.Errorf("FromState returned non-nil matrix")
+			}
+			var nonFiniteErr *quantum.NonFiniteAmplitudeError
+			if !errors.As(err, &nonFiniteErr) {
+				t.Fatalf("FromState error = %v, want *quantum.NonFiniteAmplitudeError", err)
+			}
+			if nonFiniteErr.BasisState != tc.wantBasis {
+				t.Errorf("error BasisState = %d, want %d", nonFiniteErr.BasisState, tc.wantBasis)
+			}
+		})
+	}
+}
+
+func TestFromStateRejectsMixedDensitySource(t *testing.T) {
+	// A mixed density matrix has no amplitude vector: its Amplitude method
+	// returns NaN. FromState must refuse it rather than build a NaN-filled
+	// outer product.
+	mixed, err := New(1)
+	if err != nil {
+		t.Fatalf("New failed: %v", err)
+	}
+	if err := mixed.ApplyDepolarizing(0, 0.3); err != nil {
+		t.Fatalf("ApplyDepolarizing failed: %v", err)
+	}
+
+	state, err := FromState(mixed)
+	if state != nil {
+		t.Errorf("FromState(mixed) returned non-nil matrix")
+	}
+	var nonFiniteErr *quantum.NonFiniteAmplitudeError
+	if !errors.As(err, &nonFiniteErr) {
+		t.Fatalf("FromState(mixed) error = %v, want *quantum.NonFiniteAmplitudeError", err)
+	}
+}
+
 func TestFromStateRejectsNonPositiveQubitCount(t *testing.T) {
 	for _, n := range []int{0, -2} {
 		state, err := FromState(&stubState{numQubits: n})

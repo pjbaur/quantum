@@ -75,6 +75,9 @@ func New(numQubits int) (*Matrix, error) {
 // choice consistent with nil-argument handling elsewhere in the module
 // (e.g. circuit.Execute).
 // Returns InvalidQubitCountError if s reports a non-positive qubit count.
+// Returns NonFiniteAmplitudeError if any amplitude is NaN or infinite; in
+// particular a mixed density matrix, whose Amplitude method reports NaN,
+// is refused rather than copied into a NaN-filled outer product.
 func FromState(s quantum.QuantumState) (*Matrix, error) {
 	if isNilState(s) {
 		return nil, errors.New("state must not be nil")
@@ -86,9 +89,18 @@ func FromState(s quantum.QuantumState) (*Matrix, error) {
 	}
 
 	// Read each amplitude once: the outer product touches every pair.
+	// A non-finite amplitude (NaN or Inf) is rejected here rather than
+	// spread across the whole matrix — notably, a mixed density source
+	// reports NaN amplitudes because it has no amplitude vector.
 	amplitudes := make([]complex128, m.dim)
 	for i := range amplitudes {
 		amplitudes[i] = s.Amplitude(i)
+		if !quantum.IsFiniteAmplitude(amplitudes[i]) {
+			return nil, &quantum.NonFiniteAmplitudeError{
+				BasisState: i,
+				Value:      amplitudes[i],
+			}
+		}
 	}
 
 	for i := 0; i < m.dim; i++ {
