@@ -22,8 +22,9 @@ Both dense and sparse `SetAmplitude` restore old values before returning `Normal
 `visual` is implemented (`cmd/quantum/main.go:48`) but omitted from the `-demo` help string (`cmd/quantum/main.go:84`). The optional parameter is parsed but unused (`cmd/quantum/main.go:138`).
 > **Resolution**: Added `visual` to help text, removed dead `-param` flag, added CLI tests. See Phase 2.1.
 
-2. Algorithm implementation scales poorly.
+2. ~~Algorithm implementation scales poorly.~~ ✅ RESOLVED
 Grover and Deutsch-Jozsa construct full dense matrices (`algorithm/grover.go:86`, `algorithm/grover.go:109`, `algorithm/deutsch_jozsa.go:68`), causing avoidable memory/time growth.
+> **Resolution**: Direct state-vector transformations replace dense matrix construction. See Phase 2.2.
 
 3. ~~Gate matrix validation is duplicated.~~ ✅ RESOLVED
 `gateQubitCount` exists in three packages (`circuit/circuit.go:154`, `state/state.go:145`, `internal/sparsestate/state.go:116`), increasing drift risk.
@@ -71,6 +72,7 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 - `go test ./...` passed during this review.
 - `go vet ./...` passed during this review.
 - `go test -race ./...` failed in this environment due race-runtime/package-resolution setup issues, so concurrency findings are based on static analysis and API behavior review.
+- Re-verified 2026-08-27 after all resolutions landed: `go test ./...`, `go vet ./...`, and `go test -race ./...` all pass.
 
 ## Resolution Status
 
@@ -78,7 +80,7 @@ Add negative-path algorithm tests, parallel shared-state hazard tests, and direc
 
 | Finding | Status | Resolution |
 |---------|--------|------------|
-| `quantum.Gate` misleading for multi-qubit | ✅ Resolved | Phase 1.1: Gate API cleaned up, legacy single-qubit paths deprecated ([d183844](https://github.com/pjbaur/quantum/commit/d183844)) |
+| `quantum.Gate` misleading for multi-qubit | ✅ Resolved | Phase 1.1: Gate API cleaned up, legacy single-qubit `Apply` path removed from the interface ([d183844](https://github.com/pjbaur/quantum/commit/d183844)) |
 | Fragile `ExecuteAllParallel` contract | ✅ Resolved | Phase 1.2: Shared-state detection with `SharedStateError` ([fe19529](https://github.com/pjbaur/quantum/commit/fe19529)) |
 | Sparse backend not drop-in | ✅ Resolved | Phase 1.3: `BackendCapabilities` interface with explicit limits ([d9c31a7](https://github.com/pjbaur/quantum/commit/d9c31a7)) |
 | Normalization diagnostics wrong | ✅ Resolved | Phase 1.4: `NormalizationError` now reports `AttemptedSum` and `CurrentSum` ([d183844](https://github.com/pjbaur/quantum/commit/d183844)) |
