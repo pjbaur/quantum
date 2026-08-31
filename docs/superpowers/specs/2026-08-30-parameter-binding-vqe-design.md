@@ -28,7 +28,7 @@ A `Template` is a circuit recipe with named parameter holes. `Bind` fills
 the holes and returns an ordinary `*circuit.Circuit`.
 
 ```go
-t := parameterized.NewTemplate()
+t := parameterized.NewTemplate(2)
 t.AddParamGate("theta", parameterized.Ry, 0) // Ry(theta) on qubit 0
 t.AddGate(gates.NewCNOT(), 0, 1)             // fixed gate
 t.AddParamGate("phi", parameterized.Rx, 1)
@@ -39,11 +39,18 @@ c, err := t.Bind(parameterized.Params{"theta": 0.4, "phi": 1.1})
 ### API
 
 - `Params` is `map[string]float64`.
-- `NewTemplate() *Template`.
+- `NewTemplate(numQubits int) *Template`. Amended 2026-08-30: takes the
+  qubit count so `AddParamGate`/`AddGate` reject out-of-range targets at
+  declaration time, mirroring `circuit.New` (the no-arg sketch predated
+  target validation).
 - `(*Template) AddParamGate(name string, factory Factory, targets ...int) error`
   — declares use of a parameter. `Factory` is `func(value float64) quantum.Gate`.
 - `(*Template) AddGate(gate quantum.Gate, targets ...int) error` — fixed step.
 - `(*Template) ParamNames() []string` — declared names, first-use order.
+- `(*Template) NumQubits() int`.
+- `(*Template) ParamStepCounts() map[string]int` — how many template steps
+  consume each declared name. Amended 2026-08-30 after final review: VQE uses
+  it to reject templates where one name drives several gates.
 - `(*Template) Bind(values Params) (*circuit.Circuit, error)` — materializes.
 
 ### Factory constructors
@@ -104,6 +111,11 @@ The expected ground energy is NOT a hand-copied constant: the test suite
 computes it by independently diagonalizing the 4x4 matrix built from the same
 Pauli sum (see Testing). This guards against coefficient-convention mistakes.
 
+Amended 2026-08-30: the terms are also exported as `H2Terms()
+[]HamiltonianTerm` (coefficient plus ordered axes) — the external
+`algorithm_test` package's Jacobi verifier needs the exact Pauli sum the
+simulator evaluates, and a test-only copy could drift from it.
+
 ### `H2Ansatz()` — canonical template
 
 `X` on qubit 1 (seeds the odd-parity sector carrying the ground state in
@@ -151,6 +163,11 @@ res, err := algorithm.VQE(h, tmpl, algorithm.VQEOptions{
 
 - `nil` Hamiltonian or template: typed error (`InvalidVQEInputError` or
   matching existing taxonomy style).
+- Amended 2026-08-30 after final review: a template where one parameter name
+  drives several gates is rejected with `InvalidVQEInputError`. The shift
+  moves every occurrence of a name at once, breaking the two-eigenvalue rule
+  the gradient rests on; measured as a near-zero gradient with `Converged`
+  reported immediately.
 - `Bind`/`Execute`/`Energy` errors propagate unwrapped-in-meaning: the first
   failure aborts the loop and returns.
 

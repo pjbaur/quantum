@@ -68,6 +68,19 @@ func (t *Template) ParamNames() []string {
 	return out
 }
 
+// ParamStepCounts returns, per declared parameter name, how many template
+// steps consume it. A name driving exactly one gate counts 1; a name driving
+// several gates counts one per step. Names never declared are absent.
+func (t *Template) ParamStepCounts() map[string]int {
+	counts := make(map[string]int, len(t.paramOrder))
+	for _, s := range t.steps {
+		if s.param != "" {
+			counts[s.param]++
+		}
+	}
+	return counts
+}
+
 func (t *Template) checkTargets(targets []int) error {
 	for _, target := range targets {
 		if target < 0 || target >= t.numQubits {

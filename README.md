@@ -81,8 +81,10 @@ fmt.Println(visualization.BlochCSV(vector, 4))
 ### Project Structure
 
 - [`cmd/quantum/main.go`](cmd/quantum/main.go): Entry point and CLI for running demonstrations.
+- [`algorithm/`](algorithm/): Algorithm drivers (Deutsch-Jozsa, Grover, teleportation) plus Pauli-sum Hamiltonians and the VQE loop with parameter-shift gradients.
 - [`circuit/`](circuit/): Circuit abstraction for sequencing gate operations.
 - [`gates/`](gates/): Data-driven gate definitions (H, X, Y, Z, S, T, CNOT, SWAP, Toffoli), the parameterized `Rx`/`Ry`/`Rz`/`Phase` constructors, `NewControlled` for controlled-U, `MatrixGate` for custom gates, the built-in registry, and SWAP decomposition.
+- [`parameterized/`](parameterized/): Circuit templates with named symbolic parameters; `Bind` materializes a concrete circuit.
 - [`quantum/`](quantum/): Core interfaces and error types shared across packages.
 - [`qubit/qubit.go`](qubit/qubit.go): Single qubit representation and operations.
 - [`state/state.go`](state/state.go): Multi-qubit quantum state and gate application.

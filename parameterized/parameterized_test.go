@@ -200,3 +200,47 @@ func TestNumQubits(t *testing.T) {
 		t.Fatalf("NumQubits() = %d, want 5", got)
 	}
 }
+
+func TestParamStepCounts(t *testing.T) {
+	single := parameterized.NewTemplate(2)
+	if err := single.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := single.AddParamGate("phi", parameterized.Rx, 1); err != nil {
+		t.Fatal(err)
+	}
+	multi := parameterized.NewTemplate(2)
+	if err := multi.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := multi.AddParamGate("theta", parameterized.Rz, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	tests := []struct {
+		name string
+		tmpl *parameterized.Template
+		want map[string]int
+	}{
+		{"single-use names", single, map[string]int{"theta": 1, "phi": 1}},
+		{"name driving two gates", multi, map[string]int{"theta": 2}},
+		{"no declared parameters", parameterized.NewTemplate(2), map[string]int{}},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			got := tt.tmpl.ParamStepCounts()
+			if len(got) != len(tt.want) {
+				t.Fatalf("ParamStepCounts() = %v, want %v", got, tt.want)
+			}
+			for name, count := range tt.want {
+				if got[name] != count {
+					t.Fatalf("ParamStepCounts()[%q] = %d, want %d", name, got[name], count)
+				}
+			}
+		})
+	}
+	// A name the template never declared is absent from the map.
+	if _, ok := single.ParamStepCounts()["nope"]; ok {
+		t.Fatal(`ParamStepCounts()["nope"] present, want absent`)
+	}
+}

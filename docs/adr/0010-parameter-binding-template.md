@@ -1,7 +1,8 @@
 # ADR-0010: Parameter Binding via Template Materialization
 
-Date: 2026-08-30
-Status: Accepted
+## Status
+
+Accepted (2026-08-30).
 
 ## Context
 

@@ -28,8 +28,13 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // parameterShiftGradient computes dE/dtheta per parameter via the exact
 // parameter-shift rule: dE/dtheta = (E(theta+pi/2) - E(theta-pi/2)) / 2.
 // Valid because every parameterized factory is a generators-of-Pauli
-// rotation (Rx/Ry/Rz/Phase in parameterized all are). Returns the gradient
-// keyed by name plus the number of energy evaluations consumed.
+// rotation (Rx/Ry/Rz/Phase in parameterized all are), and only when each
+// parameter drives exactly one template step: the rule rests on E(theta)
+// having two eigenvalues per parameter, and shifting a name that feeds
+// several gates moves all of them at once, adding higher harmonics
+// (cos(k*theta)) to which the +/- pi/2 difference is blind. VQE rejects
+// such templates up front. Returns the gradient keyed by name plus the
+// number of energy evaluations consumed.
 func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params parameterized.Params, names []string) (map[string]float64, int, error) {
 	grad := make(map[string]float64, len(names))
 	evals := 0
@@ -93,6 +98,12 @@ func (e *InvalidVQEInputError) Error() string {
 // evaluates exactly, shifts every parameter, and steps. A step that raises
 // the energy reverts the parameters and halves the step size (floor 1e-6).
 // The loop stops when |delta E| < Tolerance (Converged) or MaxIterations.
+//
+// The template must drive exactly one gate per parameter: the parameter
+// shift moves every occurrence of a name at once, which breaks the
+// two-eigenvalue shift rule when a name feeds several gates. Templates
+// violating that precondition are rejected with InvalidVQEInputError rather
+// than optimized against a silently wrong (near-zero) gradient.
 func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult, error) {
 	if h == nil {
 		return nil, &InvalidVQEInputError{Reason: "Hamiltonian must not be nil"}
@@ -115,6 +126,12 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 	}
 
 	names := t.ParamNames()
+	stepCounts := t.ParamStepCounts()
+	for _, name := range names {
+		if count := stepCounts[name]; count > 1 {
+			return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("parameter %q drives %d template steps; the parameter-shift gradient requires exactly one gate per parameter", name, count)}
+		}
+	}
 	params := parameterized.Params{}
 	for _, name := range names {
 		params[name] = 0
