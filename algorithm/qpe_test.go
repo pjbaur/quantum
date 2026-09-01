@@ -84,3 +84,85 @@ func TestSubregisterIQFTMatchesQuantumInverseQFT(t *testing.T) {
 		}
 	}
 }
+
+// oneQubitEigenstate returns a 1-qubit state with bit flipped to |1> if set.
+func oneQubitEigenstate(t *testing.T, flip bool) quantum.QuantumState {
+	t.Helper()
+	s, err := state.New(1)
+	if err != nil {
+		t.Fatalf("state.New(1): %v", err)
+	}
+	if flip {
+		if err := s.ApplyGate(gates.NewPauliX(), 0); err != nil {
+			t.Fatalf("PauliX: %v", err)
+		}
+	}
+	return s
+}
+
+func TestEstimatePhaseExactEighths(t *testing.T) {
+	for k := 0; k < 8; k++ {
+		u := gates.NewPhase(2 * math.Pi * float64(k) / 8)
+		best, phase, err := EstimatePhase(u, oneQubitEigenstate(t, true), 3)
+		if err != nil {
+			t.Fatalf("k=%d: EstimatePhase: %v", k, err)
+		}
+		if best != k {
+			t.Errorf("k=%d: bestCount = %d", k, best)
+		}
+		if math.Abs(phase-float64(k)/8) > 1e-12 {
+			t.Errorf("k=%d: phaseTurns = %g", k, phase)
+		}
+		probs, err := PhaseProbabilities(u, oneQubitEigenstate(t, true), 3)
+		if err != nil {
+			t.Fatalf("k=%d: PhaseProbabilities: %v", k, err)
+		}
+		if probs[k] < 1-1e-9 {
+			t.Errorf("k=%d: peak probability = %g, want within 1e-9 of 1", k, probs[k])
+		}
+	}
+}
+
+func TestEstimatePhaseNonRepresentableThird(t *testing.T) {
+	u := gates.NewPhase(2 * math.Pi / 3)
+	best, _, err := EstimatePhase(u, oneQubitEigenstate(t, true), 3)
+	if err != nil {
+		t.Fatalf("EstimatePhase: %v", err)
+	}
+	// 3/8 = 0.375 is the closest eighth to 1/3 = 0.333...
+	if best != 3 {
+		t.Errorf("bestCount = %d, want 3 (closest eighth to 1/3)", best)
+	}
+}
+
+func TestEstimatePhaseZeroPhaseEigenstate(t *testing.T) {
+	u := gates.NewPhase(2 * math.Pi * 3 / 8)
+	best, phase, err := EstimatePhase(u, oneQubitEigenstate(t, false), 3)
+	if err != nil {
+		t.Fatalf("EstimatePhase: %v", err)
+	}
+	if best != 0 || phase != 0 {
+		t.Errorf("best=%d phase=%g, want 0/0 (|0> is a +1 eigenstate of any Phase gate)", best, phase)
+	}
+}
+
+func TestEstimatePhaseRejectsBadInputs(t *testing.T) {
+	u := gates.NewPhase(math.Pi / 4)
+	eig := oneQubitEigenstate(t, true)
+	if _, _, err := EstimatePhase(nil, eig, 3); err == nil {
+		t.Error("nil gate must error")
+	}
+	if _, _, err := EstimatePhase(u, nil, 3); err == nil {
+		t.Error("nil eigenstate must error")
+	}
+	if _, _, err := EstimatePhase(u, eig, 0); err == nil {
+		t.Error("numCounting < 1 must error")
+	}
+	twoQubit, err := state.New(2)
+	if err != nil {
+		t.Fatalf("state.New(2): %v", err)
+	}
+	if _, _, err := EstimatePhase(u, twoQubit, 3); err == nil {
+		t.Error("2-qubit eigenstate must error")
+	}
+}
