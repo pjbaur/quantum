@@ -431,7 +431,7 @@ func subregisterQFTOps(n int) []qftOp {
 				kind:   1,
 				ctrl:   ctrl,
 				target: q,
-				angle:  2 * math.Pi / math.Pow(2, float64(q-ctrl)),
+				angle:  math.Pi / math.Pow(2, float64(q-ctrl)),
 			})
 		}
 	}
