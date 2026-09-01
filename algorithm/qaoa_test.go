@@ -190,3 +190,69 @@ func TestQAOAInputValidation(t *testing.T) {
 		t.Error("layers < 1 must error")
 	}
 }
+
+// qaoaEnergyAt binds params, executes, and returns the energy — the same
+// evaluation path VQE uses internally, exposed for setting the demo's
+// starting point from the landscape scan.
+func qaoaEnergyAt(t *testing.T, h *Hamiltonian, tmpl *parameterized.Template, params parameterized.Params) float64 {
+	t.Helper()
+	energy, err := evaluate(h, tmpl, params)
+	if err != nil {
+		t.Fatalf("evaluate: %v", err)
+	}
+	return energy
+}
+
+func TestVQEOptimizesQAOATriangle(t *testing.T) {
+	h, err := MaxCutHamiltonian(3, triangleEdges, nil)
+	if err != nil {
+		t.Fatalf("MaxCutHamiltonian: %v", err)
+	}
+	tmpl, err := QAOATemplate(3, triangleEdges, 1)
+	if err != nil {
+		t.Fatalf("QAOATemplate: %v", err)
+	}
+
+	// Coarse scan over the symmetric slice (all gamma_e = gamma, all
+	// beta_q = beta) to find the demo's starting point. VQE then refines
+	// per-edge angles from there.
+	bestEnergy := math.Inf(1)
+	bestParams := parameterized.Params{}
+	for i := 0; i <= 12; i++ {
+		gamma := math.Pi * float64(i) / 12
+		for j := 0; j <= 6; j++ {
+			beta := math.Pi * float64(j) / 12
+			params := parameterized.Params{}
+			for _, name := range tmpl.ParamNames() {
+				if len(name) >= 7 && name[:7] == "gamma_e" {
+					params[name] = gamma
+				} else {
+					params[name] = beta
+				}
+			}
+			if e := qaoaEnergyAt(t, h, tmpl, params); e < bestEnergy {
+				bestEnergy = e
+				bestParams = params
+			}
+		}
+	}
+
+	result, err := VQE(h, tmpl, VQEOptions{InitialParams: bestParams, MaxIterations: 100})
+	if err != nil {
+		t.Fatalf("VQE on QAOA template: %v", err)
+	}
+	if result.Iterations < 1 {
+		t.Fatalf("VQE performed no accepted iterations")
+	}
+	// VQE only accepts non-increasing energies, so it can never end worse
+	// than its symmetric-slice starting point.
+	if result.Energy > bestEnergy+1e-12 {
+		t.Errorf("VQE energy %g worse than initial %g", result.Energy, bestEnergy)
+	}
+	if result.Energy > 0 {
+		t.Errorf("VQE energy %g above the |+>^3 baseline of 0", result.Energy)
+	}
+	if cut := ExpectedCut(3, result.Energy); cut < 1.5 {
+		t.Errorf("expected cut %g below the random-cut baseline 1.5", cut)
+	}
+}
