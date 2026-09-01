@@ -31,6 +31,9 @@ func usage() {
 	fmt.Fprintln(out, "  visual    - Visualization demonstrations")
 	fmt.Fprintln(out, "  noise     - Noise channel demonstrations (density matrices)")
 	fmt.Fprintln(out, "  gates     - Gate catalog and decomposition demonstrations")
+	fmt.Fprintln(out, "  chsh      - CHSH Bell inequality demonstration")
+	fmt.Fprintln(out, "  qpe       - Quantum phase estimation demonstration")
+	fmt.Fprintln(out, "  qaoa      - QAOA MaxCut demonstration")
 	fmt.Fprintln(out, "  gate      - Look up one built-in gate by name (no name lists them all)")
 	fmt.Fprintln(out, "")
 	fmt.Fprintln(out, "Examples:")
@@ -146,6 +149,12 @@ func runDemos(demoType, gateName string, noPause bool) error {
 		examples.RunAllNoiseDemos()
 	case "gates":
 		examples.RunAllGatesDemos()
+	case "chsh":
+		examples.RunAllChshDemos()
+	case "qpe":
+		examples.RunAllQpeDemos()
+	case "qaoa":
+		examples.RunAllQaoaDemos()
 	case "gate":
 		return runGate(os.Stdout, gateName)
 	case "all":
@@ -166,6 +175,12 @@ func runDemos(demoType, gateName string, noPause bool) error {
 		p.pause("algorithm demonstrations")
 
 		examples.RunAllAlgorithmDemos()
+		p.pause("CHSH demonstrations")
+		examples.RunAllChshDemos()
+		p.pause("phase estimation demonstrations")
+		examples.RunAllQpeDemos()
+		p.pause("QAOA demonstrations")
+		examples.RunAllQaoaDemos()
 		p.pause("visualization demonstrations")
 
 		examples.RunAllVisualizationDemos()
@@ -185,7 +200,7 @@ func runDemos(demoType, gateName string, noPause bool) error {
 }
 
 func main() {
-	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, visual, noise, gates, gate, all)")
+	demoFlag := flag.String("demo", "", "Demo to run (hadamard, tgate, bell, algorithm, chsh, qpe, qaoa, visual, noise, gates, gate, all)")
 	noPauseFlag := flag.Bool("no-pause", false, "Run the \"all\" demo straight through with no interactive pauses (pauses are also auto-disabled when stdin is not a terminal)")
 	flag.Usage = usage
 	flag.Parse()

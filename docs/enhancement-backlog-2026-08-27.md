@@ -10,6 +10,13 @@ quality-assessment queues. Sources: the capability ladder in
 These block the example-ideas trio (CHSH, teleportation, VQE-toy) and the
 later ladder stages (QPE, QAOA, noise-aware demos).
 
+> **Demos done (2026-08-31)**: the trio and both later algorithm stages now
+> have demos — CHSH, QPE, and QAOA in `internal/examples/{chsh,qpe,qaoa}.go`
+> (`quantum chsh|qpe|qaoa`), on protocol code in
+> `algorithm/{chsh,qpe,qaoa}.go`. Teleportation and VQE demos predate this
+> (`internal/examples/bell.go`, `algorithm/vqe.go`). Design:
+> `docs/superpowers/specs/2026-08-31-example-demos-design.md`.
+
 - [x] 1. **Shot sampling API** — `Measure(qubitIndex)` measures one qubit at
   a time and collapses the state. Add a non-destructive
   `Sample(state, shots, rng)` helper returning a bitstring histogram.

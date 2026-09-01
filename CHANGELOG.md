@@ -23,6 +23,18 @@ NaN amplitudes, so `Sample`/`Expectation`/`Fidelity` refuse them with
 one Bell circuit on both backend families and applies depolarizing
 noise.
 
+#### CHSH, QPE, and QAOA protocol demos
+
+`algorithm` gains three protocol modules with exact-value tests:
+`algorithm/chsh.go` (rotated-basis CHSH correlations, exact and sampled S
+values — the plain {Z, X} settings cannot violate the bound, the bases at
+±45° are reached by Ry pre-rotation), `algorithm/qpe.go` (`EstimatePhase` /
+`PhaseProbabilities` with a gate-level inverse QFT on the counting
+subregister, since `quantum.InverseQFT` DFTs the whole register), and
+`algorithm/qaoa.go` (`MaxCutHamiltonian`, `QAOATemplate` with per-edge
+parameters so the VQE driver's one-gate-per-parameter rule holds,
+`CutOfBitstring`). Demos: `quantum chsh`, `quantum qpe`, `quantum qaoa`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed
