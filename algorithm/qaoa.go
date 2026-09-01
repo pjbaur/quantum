@@ -86,10 +86,18 @@ func MaxCutHamiltonian(numQubits int, edges [][2]int, weights []float64) (*Hamil
 // QAOATemplate returns the QAOA ansatz for the graph on numQubits qubits
 // with the given number of layers, starting from |+...+> (Hadamards are the
 // template's fixed gates). Each layer applies, per edge (i, j), the cost
-// term e^(-i*gamma*w*Z_i Z_j) as CNOT(i,j) Rz(2*gamma) CNOT(i,j) — the
-// standard identity, with Rz(theta) = e^(-i*theta*Z/2) — followed by the
-// mixer e^(-i*beta*X_q) = Rx(2*beta) per qubit. Weights are unit; weighted
-// cost Hamiltonians can drive VQE but the template builder is unweighted.
+// term e^(-i*gamma*Z_i Z_j) as CNOT(i,j) Rz(theta) CNOT(i,j) — the standard
+// identity, with Rz(theta) = e^(-i*theta*Z/2) — followed by the mixer
+// e^(-i*beta*X_q) = Rx(theta) per qubit. Weights are unit; weighted cost
+// Hamiltonians can drive VQE but the template builder is unweighted.
+//
+// The bound value IS the rotation angle theta, not the textbook gamma/beta:
+// because e^(-i*gamma*Z_i Z_j) = Rz(2*gamma) conjugated by the CNOTs, the
+// textbook angle is half the bound value (theta = 2*gamma, theta = 2*beta).
+// Binding theta directly keeps each gate at exp(-i*theta*P/2), the form
+// VQE's parameter-shift rule assumes — rescaling inside the factory gives
+// the bound value period pi, so E(theta+pi/2) = E(theta-pi/2) for every
+// parameter and the gradient is identically zero.
 //
 // Parameters are per edge and per qubit (gamma_e<k>, beta_q<k>, suffixed
 // _l<layer> when layers > 1) because the VQE driver requires exactly one
@@ -116,9 +124,10 @@ func QAOATemplate(numQubits int, edges [][2]int, layers int) (*parameterized.Tem
 		}
 		for k, e := range normalized {
 			gammaName := fmt.Sprintf("gamma_e%d%s", k, suffix)
-			// The bound value is the rotation angle: e^(-i*gamma*Z_i Z_j)
-			// needs Rz(2*gamma) between the CNOTs.
-			costFactory := func(value float64) quantum.Gate { return gates.NewRz(2 * value) }
+			// The bound value is the Rz angle itself (textbook gamma =
+			// value/2): binding it unscaled keeps exp(-i*theta*Z/2),
+			// which the parameter-shift rule requires.
+			costFactory := func(value float64) quantum.Gate { return gates.NewRz(value) }
 			if err := t.AddGate(gates.NewCNOT(), e[0], e[1]); err != nil {
 				return nil, err
 			}
@@ -131,7 +140,8 @@ func QAOATemplate(numQubits int, edges [][2]int, layers int) (*parameterized.Tem
 		}
 		for q := 0; q < numQubits; q++ {
 			betaName := fmt.Sprintf("beta_q%d%s", q, suffix)
-			mixFactory := func(value float64) quantum.Gate { return gates.NewRx(2 * value) }
+			// Same contract as the cost gate: Rx(value) = e^(-i*value*X/2).
+			mixFactory := func(value float64) quantum.Gate { return gates.NewRx(value) }
 			if err := t.AddParamGate(betaName, mixFactory, q); err != nil {
 				return nil, err
 			}
@@ -149,8 +159,8 @@ func CutOfBitstring(edges [][2]int, weights []float64, bits []int) (float64, err
 	}
 	cut := 0.0
 	for i, e := range edges {
-		if e[0] >= len(bits) || e[1] >= len(bits) {
-			return 0, &InvalidQAOAInputError{Reason: fmt.Sprintf("edge (%d, %d) needs more than %d bits", e[0], e[1], len(bits))}
+		if e[0] < 0 || e[1] < 0 || e[0] >= len(bits) || e[1] >= len(bits) {
+			return 0, &InvalidQAOAInputError{Reason: fmt.Sprintf("edge (%d, %d) out of range for %d bits", e[0], e[1], len(bits))}
 		}
 		if bits[e[0]] != 0 && bits[e[0]] != 1 || bits[e[1]] != 0 && bits[e[1]] != 1 {
 			return 0, &InvalidQAOAInputError{Reason: fmt.Sprintf("bits must be 0 or 1, edge (%d, %d)", e[0], e[1])}

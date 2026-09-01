@@ -114,6 +114,23 @@ func TestQAOATemplateParamsDriveSingleGates(t *testing.T) {
 	if len(names) != 6 { // 3 gamma_e + 3 beta_q
 		t.Fatalf("ParamNames = %v, want 6 names", names)
 	}
+	// Single layer means no _l suffix: exactly this set and nothing else.
+	want := map[string]bool{
+		"gamma_e0": false, "gamma_e1": false, "gamma_e2": false,
+		"beta_q0": false, "beta_q1": false, "beta_q2": false,
+	}
+	for _, name := range names {
+		if _, ok := want[name]; !ok {
+			t.Errorf("unexpected parameter %q, want exactly the six single-layer names", name)
+			continue
+		}
+		want[name] = true
+	}
+	for name, seen := range want {
+		if !seen {
+			t.Errorf("ParamNames missing %q", name)
+		}
+	}
 	for name, count := range tmpl.ParamStepCounts() {
 		if count != 1 {
 			t.Errorf("parameter %q drives %d steps, VQE requires exactly 1", name, count)
@@ -156,6 +173,9 @@ func TestCutOfBitstringAndExpectedCut(t *testing.T) {
 	}
 	if c := ExpectedCut(3, -1); c != 2 {
 		t.Errorf("ExpectedCut(3, -1) = %g, want 2", c)
+	}
+	if _, err := CutOfBitstring([][2]int{{-1, 1}}, nil, []int{0, 0, 0}); err == nil {
+		t.Error("CutOfBitstring with negative vertex must error, not index negatively")
 	}
 }
 
@@ -213,21 +233,22 @@ func TestVQEOptimizesQAOATriangle(t *testing.T) {
 		t.Fatalf("QAOATemplate: %v", err)
 	}
 
-	// Coarse scan over the symmetric slice (all gamma_e = gamma, all
-	// beta_q = beta) to find the demo's starting point. VQE then refines
-	// per-edge angles from there.
+	// Coarse scan over the symmetric slice (all gamma_e = one cost angle,
+	// all beta_q = one mix angle; the bound values are the Rz/Rx angles)
+	// to find the demo's starting point. VQE then refines per-edge angles
+	// from there.
 	bestEnergy := math.Inf(1)
 	bestParams := parameterized.Params{}
 	for i := 0; i <= 12; i++ {
-		gamma := math.Pi * float64(i) / 12
+		costAngle := math.Pi * float64(i) / 12
 		for j := 0; j <= 6; j++ {
-			beta := math.Pi * float64(j) / 12
+			mixAngle := math.Pi * float64(j) / 12
 			params := parameterized.Params{}
 			for _, name := range tmpl.ParamNames() {
 				if len(name) >= 7 && name[:7] == "gamma_e" {
-					params[name] = gamma
+					params[name] = costAngle
 				} else {
-					params[name] = beta
+					params[name] = mixAngle
 				}
 			}
 			if e := qaoaEnergyAt(t, h, tmpl, params); e < bestEnergy {
@@ -244,10 +265,17 @@ func TestVQEOptimizesQAOATriangle(t *testing.T) {
 	if result.Iterations < 1 {
 		t.Fatalf("VQE performed no accepted iterations")
 	}
-	// VQE only accepts non-increasing energies, so it can never end worse
-	// than its symmetric-slice starting point.
-	if result.Energy > bestEnergy+1e-12 {
-		t.Errorf("VQE energy %g worse than initial %g", result.Energy, bestEnergy)
+	// A live gradient must strictly improve on the coarse symmetric scan;
+	// equality means the parameter-shift difference vanished (a rescaling
+	// factory bug) and VQE no-opped at its start.
+	if result.Energy > bestEnergy-1e-9 {
+		t.Errorf("VQE energy %g must improve on the scan start %g", result.Energy, bestEnergy)
+	}
+	// The exact reachable p=1 optimum is E = -1 (cut 2 of 3); VQE from
+	// the landscape best descends to it.
+	if math.Abs(result.Energy-(-1.0)) > 1e-6 {
+		t.Errorf("VQE energy %g, want the optimum -1 (expected cut %g, want 2)",
+			result.Energy, ExpectedCut(3, result.Energy))
 	}
 	if result.Energy > 0 {
 		t.Errorf("VQE energy %g above the |+>^3 baseline of 0", result.Energy)

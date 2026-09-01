@@ -2,11 +2,39 @@ package algorithm
 
 import (
 	"errors"
+	"fmt"
 	"math"
+	"reflect"
 
 	"github.com/pjbaur/quantum/gates"
 	"github.com/pjbaur/quantum/quantum"
 )
+
+// InvalidChshInputError indicates a malformed CHSH invocation.
+type InvalidChshInputError struct {
+	Reason string
+}
+
+func (e *InvalidChshInputError) Error() string {
+	return "invalid CHSH input: " + e.Reason
+}
+
+// isNilState reports whether s is nil or a typed nil — a non-nil interface
+// carrying a nil pointer, whose methods would panic if called. Same check
+// as quantum's unexported isNilQuantumState, which this package cannot
+// call, so the pattern is mirrored here.
+func isNilState(s quantum.QuantumState) bool {
+	if s == nil {
+		return true
+	}
+	v := reflect.ValueOf(s)
+	switch v.Kind() {
+	case reflect.Pointer, reflect.Interface, reflect.Map, reflect.Slice, reflect.Chan, reflect.Func:
+		return v.IsNil()
+	default:
+		return false
+	}
+}
 
 // chshZZ is the Pauli string both correlation helpers measure after rotating
 // each half into the measurement basis.
@@ -18,8 +46,11 @@ var chshZZ = []quantum.PauliAxis{quantum.PauliZ, quantum.PauliZ}
 // S = 2 on a Bell state — no violation — so the CHSH bases at +-45 degrees
 // have to be reached by pre-rotation. The original state is never modified.
 func chshRotated(s quantum.QuantumState, thetaA, thetaB float64) (quantum.QuantumState, error) {
-	if s == nil {
+	if isNilState(s) {
 		return nil, errors.New("state must not be nil")
+	}
+	if s.NumQubits() != 2 {
+		return nil, &InvalidChshInputError{Reason: fmt.Sprintf("CHSH needs exactly 2 qubits (one per party), got %d", s.NumQubits())}
 	}
 	rotated := s.Clone()
 	if err := rotated.ApplyGate(gates.NewRy(-thetaA), 0); err != nil {

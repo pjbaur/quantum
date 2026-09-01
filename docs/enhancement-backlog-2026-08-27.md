@@ -228,3 +228,7 @@ later ladder stages (QPE, QAOA, noise-aware demos).
 1 and 2 and 5 first — small, additive, unlock the CHSH demo end to end.
 Then 3 for teleportation. Items 4 and 6 are larger; do them when VQE or
 QPE is actually wanted.
+
+- [ ] 13. **`parameterShiftGradient` precondition doc** — `vqe.go` should
+  state that the bound value must enter the gate as exp(-i*theta*P/2); the
+  driver cannot detect a rescaling factory. First occurrence: QAOA template.

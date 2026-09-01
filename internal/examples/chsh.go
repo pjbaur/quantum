@@ -4,7 +4,9 @@ inequality:
 
 1. `ChshDemo()` - Prepares a Bell pair, measures the four CHSH correlations
    both exactly and from shots, and assembles the S value that violates the
-   classical bound of 2 while staying under the Tsirelson bound 2*sqrt(2).
+   classical bound of 2. The exact S sits at the Tsirelson bound
+   2*sqrt(2); a finite-shot estimate carries statistical noise and can
+   land above that bound (as with seed 7) without new physics.
 2. `RunAllChshDemos()` - Runs the demonstration with its banner.
 
 The protocol code lives in `algorithm/chsh.go`; this file is presentation.
@@ -86,7 +88,7 @@ func ChshDemo() {
 	fmt.Printf("\nS = E00 + E01 + E10 - E11\n")
 	fmt.Printf("S (exact)   = %.4f\n", sExact)
 	fmt.Printf("S (sampled) = %.4f\n", sSampled)
-	fmt.Printf("Classical bound: 2     Tsirelson bound: %.4f\n", tsirelson)
+	fmt.Printf("Classical bound: 2     Tsirelson bound: %.4f (exact limit; shot noise can put a sampled S past it)\n", tsirelson)
 	if sSampled > 2 {
 		fmt.Println("Verdict: classical bound violated - no local hidden variable model explains this.")
 	} else {

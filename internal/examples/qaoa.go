@@ -3,9 +3,11 @@ This `internal/examples/qaoa.go` file demonstrates QAOA for MaxCut on a
 triangle:
 
 1. `QaoaDemo()` - Builds the MaxCut Hamiltonian and the per-edge-parameter
-   QAOA template, scans the symmetric (gamma, beta) slice of the
-   landscape, hands the best symmetric point to the VQE driver, compares
-   against the brute-force optimum, and samples the final circuit.
+   QAOA template, scans the symmetric (cost angle, mix angle) slice of the
+   landscape (bound values are the Rz/Rx rotation angles; the textbook
+   gamma/beta is half the angle), hands the best symmetric point to the
+   VQE driver, compares against the brute-force optimum, and samples the
+   final circuit.
 2. `RunAllQaoaDemos()` - Runs the demonstration with its banner.
 
 The builders live in `algorithm/qaoa.go`; this file is presentation.
@@ -43,15 +45,16 @@ func qaoaEnergyAt(h *algorithm.Hamiltonian, tmpl *parameterized.Template, params
 	return h.Energy(s)
 }
 
-// qaoaSymmetricParams expands one (gamma, beta) pair to per-parameter
-// values: every gamma_e gets gamma, every beta_q gets beta.
-func qaoaSymmetricParams(tmpl *parameterized.Template, gamma, beta float64) parameterized.Params {
+// qaoaSymmetricParams expands one (cost angle, mix angle) pair — the Rz/Rx
+// rotation angles the template binds directly — to per-parameter values:
+// every gamma_e gets costAngle, every beta_q gets mixAngle.
+func qaoaSymmetricParams(tmpl *parameterized.Template, costAngle, mixAngle float64) parameterized.Params {
 	params := parameterized.Params{}
 	for _, name := range tmpl.ParamNames() {
 		if len(name) >= 7 && name[:7] == "gamma_e" {
-			params[name] = gamma
+			params[name] = costAngle
 		} else {
-			params[name] = beta
+			params[name] = mixAngle
 		}
 	}
 	return params
@@ -77,37 +80,39 @@ func QaoaDemo() {
 	fmt.Printf("Template parameters (one gate each, the VQE driver's precondition):\n  %v\n",
 		tmpl.ParamNames())
 
-	// Landscape over the symmetric slice of the 6-parameter space.
-	fmt.Println("\nLandscape: expected cut on the symmetric slice (gamma, beta),")
-	fmt.Println("           all gamma_e = gamma, all beta_q = beta:")
-	bestGamma, bestBeta, bestEnergy := 0.0, 0.0, math.Inf(1)
-	fmt.Printf("%-8s", "g\\b")
+	// Landscape over the symmetric slice of the 6-parameter space. The
+	// scanned numbers are Rz/Rx angles, not textbook gamma/beta (which
+	// would be half these values).
+	fmt.Println("\nLandscape: expected cut on the symmetric slice (cost angle, mix angle),")
+	fmt.Println("           all gamma_e = cost angle, all beta_q = mix angle:")
+	bestCostAngle, bestMixAngle, bestEnergy := 0.0, 0.0, math.Inf(1)
+	fmt.Printf("%-8s", "cost\\mix")
 	for j := 0; j <= 8; j++ {
 		fmt.Printf(" %6.2f", math.Pi*float64(j)/32)
 	}
 	fmt.Println()
 	for i := 0; i <= 8; i++ {
-		gamma := math.Pi * float64(i) / 16
-		fmt.Printf("%-8.4f", gamma)
+		costAngle := math.Pi * float64(i) / 16
+		fmt.Printf("%-8.4f", costAngle)
 		for j := 0; j <= 8; j++ {
-			beta := math.Pi * float64(j) / 32
-			energy, err := qaoaEnergyAt(h, tmpl, qaoaSymmetricParams(tmpl, gamma, beta))
+			mixAngle := math.Pi * float64(j) / 32
+			energy, err := qaoaEnergyAt(h, tmpl, qaoaSymmetricParams(tmpl, costAngle, mixAngle))
 			if err != nil {
-				fmt.Printf("Error at (gamma=%g, beta=%g): %v\n", gamma, beta, err)
+				fmt.Printf("Error at (cost angle=%g, mix angle=%g): %v\n", costAngle, mixAngle, err)
 				return
 			}
 			if energy < bestEnergy {
-				bestGamma, bestBeta, bestEnergy = gamma, beta, energy
+				bestCostAngle, bestMixAngle, bestEnergy = costAngle, mixAngle, energy
 			}
 			fmt.Printf(" %6.2f", algorithm.ExpectedCut(3, energy))
 		}
 		fmt.Println()
 	}
-	fmt.Printf("Best symmetric point: gamma = %.4f, beta = %.4f, cut = %.4f\n",
-		bestGamma, bestBeta, algorithm.ExpectedCut(3, bestEnergy))
+	fmt.Printf("Best symmetric point: cost angle = %.4f, mix angle = %.4f, cut = %.4f\n",
+		bestCostAngle, bestMixAngle, algorithm.ExpectedCut(3, bestEnergy))
 
 	result, err := algorithm.VQE(h, tmpl, algorithm.VQEOptions{
-		InitialParams: qaoaSymmetricParams(tmpl, bestGamma, bestBeta),
+		InitialParams: qaoaSymmetricParams(tmpl, bestCostAngle, bestMixAngle),
 		MaxIterations: 100,
 	})
 	if err != nil {

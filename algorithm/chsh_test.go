@@ -106,11 +106,22 @@ func TestChshCorrelationRejectsBadStates(t *testing.T) {
 	if _, err := ChshCorrelation(nil, 0, 0); err == nil {
 		t.Error("ChshCorrelation(nil) must error")
 	}
+	var typedNil *state.State
+	if _, err := ChshCorrelation(typedNil, 0, 0); err == nil {
+		t.Error("ChshCorrelation(typed nil) must error, not panic")
+	}
 	oneQubit, err := state.New(1)
 	if err != nil {
 		t.Fatalf("state.New(1): %v", err)
 	}
 	if _, err := ChshCorrelation(oneQubit, 0, 0); err == nil {
 		t.Error("ChshCorrelation on 1-qubit state must error")
+	}
+	threeQubit, err := state.New(3)
+	if err != nil {
+		t.Fatalf("state.New(3): %v", err)
+	}
+	if _, err := ChshCorrelation(threeQubit, 0, 0); err == nil {
+		t.Error("ChshCorrelation on 3-qubit state must error: CHSH needs exactly 2")
 	}
 }
