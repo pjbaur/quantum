@@ -232,3 +232,66 @@ QPE is actually wanted.
 - [ ] 13. **`parameterShiftGradient` precondition doc** — `vqe.go` should
   state that the bound value must enter the gate as exp(-i*theta*P/2); the
   driver cannot detect a rescaling factory. First occurrence: QAOA template.
+- [ ] 14. **VQE input validation and error taxonomy** — `VQE` validates only
+  nil inputs, the one-gate-per-parameter rule, and undeclared initial
+  parameter names; everything else it either runs with or reports through
+  another package's error type. Observed: a negative `StepSize` climbs once
+  and is then clamped to +1e-6 by the floor, a negative `MaxIterations`
+  returns unconverged after zero iterations, a negative or NaN `Tolerance`
+  can never converge, and a NaN or Inf `StepSize` or `InitialParams` value
+  surfaces as `parameterized.InvalidParameterValueError`. A Hamiltonian
+  whose Pauli strings do not match the template's qubit count, or a factory
+  returning a gate wider than its target list, surfaces as
+  `quantum.IncompatibleQubitCountError` or
+  `quantum.InvalidGateApplicationError` from inside the first evaluation.
+  A NaN or Inf Hamiltonian coefficient yields a NaN gradient and a NaN
+  step, and again `InvalidParameterValueError` blames a parameter the
+  caller supplied finite. Expected contract: out-of-domain options,
+  Hamiltonian/template structural mismatches, and non-finite Hamiltonian
+  coefficients are `InvalidVQEInputError`, and no error attributes the
+  failure to a parameter that was finite on entry.
+  > **Red tests**: `TestRedVQEOptionValidation`,
+  > `TestRedVQEStructuralMismatchIsInvalidInput`, and
+  > `TestRedVQENonFiniteHamiltonianIsNotBlamedOnParams` in
+  > `algorithm/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./algorithm -run '^TestRedVQE(Option|Structural|NonFinite)'`.
+- [ ] 15. **Empty parameter name defeats the one-gate-per-parameter check**
+  — `parameterized.Template.AddParamGate` accepts `""` as a parameter name,
+  but `ParamStepCounts` treats the empty string as its fixed-step marker and
+  never counts it. Observed: a `""` parameter driving two `Ry` gates is
+  listed by `ParamNames`, absent from `ParamStepCounts`, and passes `VQE`'s
+  precondition check, so `VQE` optimizes it against the higher-harmonic
+  gradient the check exists to prevent and reports Converged. Expected
+  contract: the one-gate-per-parameter rule stated on `VQE` and
+  `parameterShiftGradient` holds for every declared name, so a `""`
+  parameter that drives several steps is rejected with
+  `InvalidVQEInputError` like any other.
+  > **Red tests**: `TestRedVQEEmptyNameParameterEscapesStepCountCheck` in
+  > `algorithm/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./algorithm -run '^TestRedVQEEmptyName'`.
+- [ ] 16. **`parameterShiftGradient` shifts missing parameters from an
+  implicit zero** — when `params` lacks a name that appears in `names`, the
+  shifted copies read the map's zero value, so the helper evaluates the
+  +/- pi/2 points as if that parameter were 0 and returns a gradient with a
+  nil error. Observed: with `params = {a: 0.3}` on a template declaring `a`
+  and `b`, `names = [b]` returns `{b: 0}` and no error, while any `names`
+  that shifts `a` errors because `Bind` then sees `b` missing; whether the
+  call fails depends on the order of `names`. `VQE` always passes complete
+  params, so nothing reaches this today, but the helper's contract is
+  silent. Expected contract: a name in `names` absent from `params` is an
+  error regardless of order, or the helper states that callers must pass
+  every declared parameter.
+  > **Red tests**: `TestRedParameterShiftMissingParamIsRejected` in
+  > `algorithm/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftMissing'`.
+- [ ] 17. **`parameterShiftGradient` undercounts evaluations on failure** —
+  the helper adds two to its evaluation count only after both shifted
+  evaluations succeed. Observed: when the +pi/2 evaluation succeeds and the
+  -pi/2 evaluation fails, it returns 0 evaluations consumed though one ran.
+  `VQE` discards the count on error, so the miscount is invisible today,
+  but the doc promises "the number of energy evaluations consumed".
+  Expected contract: the returned count includes every evaluation that ran,
+  on the error path as well.
+  > **Red tests**: `TestRedParameterShiftCountsEvaluationsBeforeFailure` in
+  > `algorithm/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftCounts'`.
