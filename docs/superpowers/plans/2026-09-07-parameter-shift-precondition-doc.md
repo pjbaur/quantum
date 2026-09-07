@@ -4,7 +4,7 @@
 
 **Goal:** Close backlog item 13 by documenting, on `parameterShiftGradient` in `algorithm/vqe.go`, the precondition that a bound value must enter its gate as exp(-i*theta*P/2), why the driver cannot detect a factory that rescales, and that `QAOATemplate` is the precedent; pin the documented failure mode with one characterization test.
 
-**Architecture:** Documentation-only change to `algorithm/vqe.go` (the doc comment on `parameterShiftGradient`, lines 28-37, is replaced; no code changes). One new test in `algorithm/vqe_test.go` builds a two-parameter template whose factories bind `2*value` and asserts the parameter-shift gradient is identically zero while the finite difference is not, and that VQE reports `Converged` after a one-iteration no-op. Backlog item 13 in `docs/enhancement-backlog-2026-08-27.md` is ticked with a Done note in the file's existing style.
+**Architecture:** Documentation-only change to `algorithm/vqe.go` (the doc comment on `parameterShiftGradient`, lines 28-37, is replaced; no code changes). One new test in `algorithm/vqe_test.go` builds a two-parameter template whose factories bind `2*value` and asserts the parameter-shift gradient is identically zero while the finite difference is not, and that VQE reports `Converged` after a one-iteration no-op.
 
 **Tech Stack:** Go standard library only. No new dependencies.
 
@@ -26,21 +26,20 @@ Background the implementer needs (from commit `cf09732`, "bind QAOA angles direc
 
 - Doc comments match the codebase voice: explain the why, cite conventions (exp(-i*theta*P/2), `gates.NewRx/NewRy/NewRz`, `parameterized.Factory`), no filler.
 - Never edit a failing test to make code pass. The new test is a characterization test of behavior that already holds; if it fails, the doc comment is wrong about the code, not the other way round. Report the failure.
-- `algorithm/vqe.go` changes are comment-only. The diff of that file must contain no non-comment lines (verified in Step 6).
-- No changes to `parameterized/`, `gates/`, `algorithm/qaoa.go`, or any file outside the three listed in Task 1.
+- `algorithm/vqe.go` changes are comment-only. The diff of that file must contain no non-comment lines (verified in Step 5).
+- No changes to `parameterized/`, `gates/`, `algorithm/qaoa.go`, or any file outside the two listed in Task 1.
 - No new dependencies. Go standard library only.
 - Every task: `gofmt -l` clean on edited files, `go vet ./algorithm`, `go build ./...`, `go test ./...` green, then commit.
-- Do not edit `.superpowers/backlog/` (the run's ledger belongs to the run lead); tick the item in `docs/enhancement-backlog-2026-08-27.md`, which is the repository's record.
+- Do not edit `.superpowers/backlog/` or `docs/enhancement-backlog-2026-08-27.md`; the run lead closes the backlog item after this task passes its QA gate.
 
 ---
 
 ### Task 1: Document the exp(-i*theta*P/2) precondition on `parameterShiftGradient` and pin its failure mode
 
-**Sizing estimate:** about 550 lines of existing code to read (`algorithm/vqe.go` 198, `algorithm/vqe_test.go` 91, `algorithm/qaoa.go` lines 85-150, `parameterized/parameterized.go` lines 1-110, `gates/gates.go` lines 110-160, `docs/enhancement-backlog-2026-08-27.md` lines 194-235); 2 non-test files modified (`algorithm/vqe.go`, `docs/enhancement-backlog-2026-08-27.md`) plus 1 test file; net diff about 135 lines (+25 doc comment, +15 backlog note, +95 test); one test cycle. Well under a quarter of a context window.
+**Sizing estimate:** about 550 lines of existing code to read (`algorithm/vqe.go` 198, `algorithm/vqe_test.go` 91, `algorithm/qaoa.go` lines 85-150, `parameterized/parameterized.go` lines 1-110, `gates/gates.go` lines 110-160); 1 non-test file modified (`algorithm/vqe.go`) plus 1 test file; net diff about 120 lines (+25 doc comment, +95 test); one test cycle. Well under a quarter of a context window.
 
 **Files:**
 - Modify: `algorithm/vqe.go:28-37` (the doc comment on `parameterShiftGradient`; nothing else)
-- Modify: `docs/enhancement-backlog-2026-08-27.md:232-234` (item 13 checkbox and Done note)
 - Test: `algorithm/vqe_test.go` (append one helper and one test; add one import)
 
 **Interfaces:**
@@ -64,7 +63,6 @@ Read these, in this order, so the comment you write is grounded in the code's ow
 3. `gates/gates.go` lines 110-160: `NewRx`/`NewRy`/`NewRz` are `cos(θ/2)·I − i·sin(θ/2)·P`, i.e. exp(-i*theta*P/2); `NewPhase(φ)` is `Rz(φ)` up to a global phase (stated on `NewRz`).
 4. `algorithm/qaoa.go` lines 85-150: the `QAOATemplate` doc comment states the contract from the template's side; the two factory closures bind `value` unscaled with comments saying why.
 5. `algorithm/vqe_test.go` in full: `gradientTargetTemplate` and `TestParameterShiftMatchesFiniteDifference` are the positive test (convention-following factories agree with finite difference). The new test is its negative twin.
-6. `docs/enhancement-backlog-2026-08-27.md` lines 194-235: the `> **Done (date)**:` blockquote style every closed item uses.
 
 - [ ] **Step 2: Write the characterization test**
 
@@ -228,31 +226,7 @@ In `algorithm/vqe.go`, replace exactly lines 28-37 (the comment block that curre
 
 This text is already gofmt-clean (prose paragraphs only, no doc-comment lists, so gofmt has nothing to reflow). Do not reword it: the phrases "exp(-i*theta*P/2)", "period pi", "identically zero", and the `QAOATemplate` cross-reference are the requirement.
 
-- [ ] **Step 5: Tick backlog item 13**
-
-In `docs/enhancement-backlog-2026-08-27.md`, replace the three lines of item 13 (currently lines 232-234, beginning `- [ ] 13.`) with:
-
-```markdown
-- [x] 13. **`parameterShiftGradient` precondition doc** — `vqe.go` should
-  state that the bound value must enter the gate as exp(-i*theta*P/2); the
-  driver cannot detect a rescaling factory. First occurrence: QAOA template.
-  > **Done (2026-09-07)**: the doc comment on `parameterShiftGradient` now
-  > states both preconditions in the codebase's terms — one gate per
-  > parameter (enforced by VQE via `ParamStepCounts`) and the bound value
-  > entering its gate as exp(-i*theta*P/2), the `gates.NewRx/NewRy/NewRz`
-  > convention the `parameterized` factories inherit — and explains why
-  > the second cannot be checked: a `parameterized.Factory` is an opaque
-  > `func(value) Gate`, and a rescaled factory's zero shift difference
-  > looks exactly like a stationary point. `QAOATemplate` is cited as the
-  > precedent (fixed in cf09732). `TestParameterShiftIsBlindToRescaledFactory`
-  > pins the failure mode: zero parameter-shift gradient against a
-  > non-zero finite difference, and VQE reporting Converged after a
-  > one-iteration no-op.
-```
-
-The em dashes and blockquote form match every other closed item in that file; keep them.
-
-- [ ] **Step 6: Verify formatting, the comment-only diff, and the full suite**
+- [ ] **Step 5: Verify formatting, the comment-only diff, and the full suite**
 
 Run:
 
@@ -266,10 +240,10 @@ git diff algorithm/vqe.go | grep '^[+-]' | grep -v '^+++' | grep -v '^---' | gre
 
 Expected: `gofmt -l` prints nothing; vet, build, and the full test run are clean; the last command prints nothing, proving the `vqe.go` diff is comment lines only. If it prints anything, a code line was touched by mistake; restore it.
 
-- [ ] **Step 7: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
-git add algorithm/vqe.go algorithm/vqe_test.go docs/enhancement-backlog-2026-08-27.md
+git add algorithm/vqe.go algorithm/vqe_test.go
 git commit -m "docs(algorithm): state the exp(-i*theta*P/2) precondition on parameterShiftGradient
 
 The parameter-shift rule needs the bound value to enter its gate as
@@ -279,15 +253,15 @@ no-ops while reporting Converged. The driver cannot detect this because
 a parameterized.Factory is opaque, so the contract is documented where
 the rule lives, with QAOATemplate (cf09732) as the precedent.
 
-TestParameterShiftIsBlindToRescaledFactory pins the failure mode. Closes
-backlog item 13."
+TestParameterShiftIsBlindToRescaledFactory pins the failure mode.
+Backlog item 13."
 ```
 
 ---
 
 ## Self-Review
 
-- **Requirement coverage.** "`vqe.go` should state that the bound value must enter the gate as exp(-i*theta*P/2)": Step 4, second paragraph of the comment. "The driver cannot detect a rescaling factory": Step 4, the sentence beginning "Neither this function nor VQE can detect that", with the reason (opaque `Factory`, zero difference looks like a stationary point). "First occurrence: QAOA template": Step 4 cites `QAOATemplate` and its bound-value convention; the backlog note cites cf09732.
+- **Requirement coverage.** "`vqe.go` should state that the bound value must enter the gate as exp(-i*theta*P/2)": Step 4, second paragraph of the comment. "The driver cannot detect a rescaling factory": Step 4, the sentence beginning "Neither this function nor VQE can detect that", with the reason (opaque `Factory`, zero difference looks like a stationary point). "First occurrence: QAOA template": Step 4 cites `QAOATemplate` and its bound-value convention (fixed in cf09732).
 - **Test decision.** A test is included because the doc comment makes three concrete, checkable claims and no existing test states them: `TestParameterShiftMatchesFiniteDifference` covers only convention-following factories, and `TestVQEOptimizesQAOATriangle` catches a rescale in `QAOATemplate` end to end but says nothing about the general failure mode. The test passes on first run by design (Step 3 explains why there is no red phase).
 - **Placeholder scan.** No TBD/TODO; every code step carries its full text; every command names its expected result.
 - **Type consistency.** `parameterShiftGradient(h, tmpl, params, tmpl.ParamNames())` returns `(map[string]float64, int, error)`, matching `algorithm/vqe.go:38`. `VQEOptions{InitialParams, MaxIterations}` and `VQEResult{Energy, Params, Iterations, Converged}` match lines 65-85. The helper and test names in Step 2 match the names cited in Step 4 and Step 5.
