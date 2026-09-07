@@ -229,9 +229,29 @@ later ladder stages (QPE, QAOA, noise-aware demos).
 Then 3 for teleportation. Items 4 and 6 are larger; do them when VQE or
 QPE is actually wanted.
 
-- [ ] 13. **`parameterShiftGradient` precondition doc** — `vqe.go` should
+- [x] 13. **`parameterShiftGradient` precondition doc** — `vqe.go` should
   state that the bound value must enter the gate as exp(-i*theta*P/2); the
   driver cannot detect a rescaling factory. First occurrence: QAOA template.
+  > **Done (2026-09-07)**: `parameterShiftGradient` and `VQE` doc comments in
+  > `algorithm/vqe.go` (lines 28–37 and 118–149) state both preconditions: each
+  > parameter drives exactly one gate (enforced by VQE via
+  > `parameterized.Template.ParamStepCounts`), and bound value enters its gate as
+  > exp(-i*theta*P/2) per `gates.NewRx/NewRy/NewRz` and inherited
+  > `parameterized.Rx/Ry/Rz/Phase` convention. Second precondition uncheckable:
+  > `parameterized.Factory` is opaque; rescaled factory (e.g.
+  > `gates.NewRz(2*value)`) yields E periodic with period pi, so the shift
+  > difference E(theta+pi/2) − E(theta−pi/2) vanishes—indistinguishable from a
+  > true stationary point—and `parameterShiftGradient` returns zero while the
+  > true dE/dtheta is nonzero. `VQE` doc also states what `Converged` certifies
+  > and does not (|delta E| < Tolerance, not a minimum; rounding can shift
+  > parameters and energy in their last bits; parameterless templates accepted),
+  > and cites `QAOATemplate` (cf09732) as precedent. `TestParameterShiftIsBlindToRescaledFactory`
+  > in `algorithm/vqe_test.go` pins the failure mode: zero shift gradient
+  > against nonzero finite difference across four base points, and VQE Converged
+  > after one-iteration no-op. Edits to `vqe.go` are comment-only. Red testing
+  > during QA gate found six pre-existing driver defects, preserved as tests
+  > under `redtests` build tag and queued as items 14–17 in
+  > `algorithm/backlog_red_test.go`.
 - [ ] 14. **VQE input validation and error taxonomy** — `VQE` validates only
   nil inputs, the one-gate-per-parameter rule, and undeclared initial
   parameter names; everything else it either runs with or reports through
