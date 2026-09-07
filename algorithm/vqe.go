@@ -27,14 +27,36 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 
 // parameterShiftGradient computes dE/dtheta per parameter via the exact
 // parameter-shift rule: dE/dtheta = (E(theta+pi/2) - E(theta-pi/2)) / 2.
-// Valid because every parameterized factory is a generators-of-Pauli
-// rotation (Rx/Ry/Rz/Phase in parameterized all are), and only when each
-// parameter drives exactly one template step: the rule rests on E(theta)
-// having two eigenvalues per parameter, and shifting a name that feeds
-// several gates moves all of them at once, adding higher harmonics
-// (cos(k*theta)) to which the +/- pi/2 difference is blind. VQE rejects
-// such templates up front. Returns the gradient keyed by name plus the
-// number of energy evaluations consumed.
+// The rule is exact only when, with every other parameter held fixed,
+// E(theta) = a + b*cos(theta) + c*sin(theta). That shape needs two things
+// from the template, and this function checks neither.
+//
+// First, each parameter must drive exactly one template step. Shifting a
+// name that feeds several gates moves all of them at once, adding higher
+// harmonics (cos(k*theta)) to which the +/- pi/2 difference is blind. VQE
+// enforces this up front through Template.ParamStepCounts, so such a
+// template never reaches here.
+//
+// Second, the bound value must enter its gate as exp(-i*theta*P/2) with P a
+// Pauli (eigenvalues +/-1): the convention of gates.NewRx/NewRy/NewRz and
+// hence of the parameterized.Rx/Ry/Rz/Phase factories (Phase is Rz up to a
+// global phase, which expectation values ignore). A parameterized.Factory
+// is an arbitrary func(value) Gate, though, so a caller can break this by
+// rescaling inside the factory. A factory returning NewRz(2*value) makes E
+// periodic in the bound value with period pi, so E(theta+pi/2) equals
+// E(theta-pi/2) at every theta and this function returns an identically
+// zero gradient while the true dE/dtheta is not zero. Neither this
+// function nor VQE can detect that: the template exposes only the opaque
+// factory, and a vanishing shift difference is indistinguishable from a
+// genuine stationary point, so VQE takes a zero step and reports Converged
+// at its starting parameters. Factories must bind the value unscaled and
+// leave any textbook rescaling to how callers read the parameter, as
+// QAOATemplate does (its bound value is the Rz/Rx angle; textbook
+// gamma/beta is half of it). TestParameterShiftIsBlindToRescaledFactory
+// pins this failure mode.
+//
+// Returns the gradient keyed by name plus the number of energy evaluations
+// consumed.
 func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params parameterized.Params, names []string) (map[string]float64, int, error) {
 	grad := make(map[string]float64, len(names))
 	evals := 0
