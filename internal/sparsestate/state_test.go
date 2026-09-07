@@ -14,27 +14,6 @@ import (
 
 const tolerance = 1e-10
 
-// mockThreeQubitGate is a test gate that operates on 3 qubits.
-type mockThreeQubitGate struct{}
-
-func newMockThreeQubitGate() *mockThreeQubitGate {
-	return &mockThreeQubitGate{}
-}
-
-func (g *mockThreeQubitGate) Name() string {
-	return "Mock3Qubit"
-}
-
-func (g *mockThreeQubitGate) Matrix() [][]complex128 {
-	// 8x8 identity matrix (3-qubit gate)
-	matrix := make([][]complex128, 8)
-	for i := range matrix {
-		matrix[i] = make([]complex128, 8)
-		matrix[i][i] = 1
-	}
-	return matrix
-}
-
 func TestSparseSingleQubitMatchesDense(t *testing.T) {
 	tests := []struct {
 		name      string
