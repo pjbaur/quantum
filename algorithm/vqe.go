@@ -83,17 +83,24 @@ func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params pa
 	return grad, evals, nil
 }
 
-// VQEOptions configures the VQE loop. Zero values select defaults.
+// VQEOptions configures the VQE loop. Zero values select defaults. Values
+// outside a field's domain are rejected with InvalidVQEInputError rather
+// than run with: a negative StepSize climbs, a negative or NaN Tolerance
+// can never be met, and a non-finite value reaches every parameter
+// through the first update.
 type VQEOptions struct {
 	// InitialParams names starting angles. Missing declared parameters
-	// default to 0. Unknown names are rejected.
+	// default to 0. Unknown names and non-finite values are rejected.
 	InitialParams parameterized.Params
-	// StepSize is the initial gradient-descent step (default 0.3).
+	// StepSize is the initial gradient-descent step (default 0.3). Must
+	// be finite and positive; zero selects the default.
 	StepSize float64
-	// MaxIterations caps the loop (default 200).
+	// MaxIterations caps the loop (default 200). Must not be negative;
+	// zero selects the default.
 	MaxIterations int
 	// Tolerance is the convergence threshold on |delta E| between
-	// consecutive iterations (default 1e-10).
+	// consecutive iterations (default 1e-10). Must be finite and
+	// positive; zero selects the default.
 	Tolerance float64
 }
 
@@ -113,6 +120,32 @@ type InvalidVQEInputError struct {
 
 func (e *InvalidVQEInputError) Error() string {
 	return "invalid VQE input: " + e.Reason
+}
+
+// isFinite reports whether v is neither NaN nor infinite.
+func isFinite(v float64) bool {
+	return !math.IsNaN(v) && !math.IsInf(v, 0)
+}
+
+// validateVQEOptions checks the scalar option domains. Zero is the
+// "use the default" sentinel for every field, so the checks reject only
+// values that are neither zero nor usable: a negative StepSize ascends
+// (and the loop's 1e-6 floor would then silently clamp it positive), a
+// negative MaxIterations is meaningless, a negative or NaN Tolerance can
+// never be met, and a non-finite StepSize or Tolerance turns the first
+// update or the convergence test into NaN arithmetic. InitialParams needs
+// the template's declared names and is checked in VQE itself.
+func validateVQEOptions(opts VQEOptions) error {
+	if !isFinite(opts.StepSize) || opts.StepSize < 0 {
+		return &InvalidVQEInputError{Reason: fmt.Sprintf("StepSize must be finite and positive (zero selects the default 0.3), got %v", opts.StepSize)}
+	}
+	if opts.MaxIterations < 0 {
+		return &InvalidVQEInputError{Reason: fmt.Sprintf("MaxIterations must not be negative (zero selects the default 200), got %d", opts.MaxIterations)}
+	}
+	if !isFinite(opts.Tolerance) || opts.Tolerance < 0 {
+		return &InvalidVQEInputError{Reason: fmt.Sprintf("Tolerance must be finite and positive (zero selects the default 1e-10), got %v", opts.Tolerance)}
+	}
+	return nil
 }
 
 // VQE minimizes <psi(params)|H|psi(params)> with parameter-shift gradients
@@ -154,6 +187,9 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 	if t == nil {
 		return nil, &InvalidVQEInputError{Reason: "template must not be nil"}
 	}
+	if err := validateVQEOptions(opts); err != nil {
+		return nil, err
+	}
 
 	step := opts.StepSize
 	if step == 0 {
@@ -182,6 +218,9 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 	for name, value := range opts.InitialParams {
 		if _, ok := params[name]; !ok {
 			return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("initial parameter %q is not declared in the template", name)}
+		}
+		if !isFinite(value) {
+			return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("initial parameter %q has non-finite value %v", name, value)}
 		}
 		params[name] = value
 	}

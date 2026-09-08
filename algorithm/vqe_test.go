@@ -1,6 +1,7 @@
 package algorithm
 
 import (
+	"errors"
 	"math"
 	"testing"
 
@@ -164,5 +165,70 @@ func TestParameterShiftIsBlindToRescaledFactory(t *testing.T) {
 				t.Errorf("base=%v: VQE moved %s from %v to %v despite a zero gradient", base, name, v, result.Params[name])
 			}
 		}
+	}
+}
+
+// TestVQEOptionValidation pins the option domains (backlog item 14).
+// Before validation existed, a negative StepSize ascended once and was
+// then clamped to +1e-6 by the floor, a negative MaxIterations returned
+// unconverged after zero iterations, a negative or NaN Tolerance ran to
+// MaxIterations, and a non-finite StepSize or InitialParams value
+// surfaced as parameterized.InvalidParameterValueError from the first
+// Bind. All are the caller's option literal, so all are
+// InvalidVQEInputError.
+func TestVQEOptionValidation(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := H2Ansatz()
+
+	cases := []struct {
+		name string
+		opts VQEOptions
+	}{
+		{"negative StepSize", VQEOptions{StepSize: -0.3, InitialParams: parameterized.Params{"theta": 0.1}}},
+		{"NaN StepSize", VQEOptions{StepSize: math.NaN(), InitialParams: parameterized.Params{"theta": 0.1}}},
+		{"Inf StepSize", VQEOptions{StepSize: math.Inf(1), InitialParams: parameterized.Params{"theta": 0.1}}},
+		{"negative MaxIterations", VQEOptions{MaxIterations: -1}},
+		{"negative Tolerance", VQEOptions{Tolerance: -1, MaxIterations: 5}},
+		{"NaN Tolerance", VQEOptions{Tolerance: math.NaN(), MaxIterations: 5}},
+		{"NaN InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.NaN()}}},
+		{"Inf InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.Inf(-1)}}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var e *InvalidVQEInputError
+			res, err := VQE(h, tmpl, c.opts)
+			if !errors.As(err, &e) {
+				t.Errorf("VQE(%+v): err = %v, result = %+v; want InvalidVQEInputError", c.opts, err, res)
+			}
+		})
+	}
+}
+
+// TestVQEOptionErrorNamesTheField pins the Reason wording: each message
+// names the offending field and its value, so a caller reading the error
+// can go straight to the option literal, and says that zero would have
+// selected the default.
+func TestVQEOptionErrorNamesTheField(t *testing.T) {
+	cases := []struct {
+		name string
+		opts VQEOptions
+		want string
+	}{
+		{"StepSize", VQEOptions{StepSize: -0.3}, "StepSize must be finite and positive (zero selects the default 0.3), got -0.3"},
+		{"MaxIterations", VQEOptions{MaxIterations: -1}, "MaxIterations must not be negative (zero selects the default 200), got -1"},
+		{"Tolerance", VQEOptions{Tolerance: math.NaN()}, "Tolerance must be finite and positive (zero selects the default 1e-10), got NaN"},
+		{"InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.Inf(-1)}}, `initial parameter "theta" has non-finite value -Inf`},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var e *InvalidVQEInputError
+			_, err := VQE(H2Hamiltonian(), H2Ansatz(), c.opts)
+			if !errors.As(err, &e) {
+				t.Fatalf("VQE(%+v): err = %v (%T); want InvalidVQEInputError", c.opts, err, err)
+			}
+			if e.Reason != c.want {
+				t.Fatalf("Reason = %q, want %q", e.Reason, c.want)
+			}
+		})
 	}
 }

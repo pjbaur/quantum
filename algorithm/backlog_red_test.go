@@ -82,40 +82,6 @@ func TestRedParameterShiftMissingParamIsRejected(t *testing.T) {
 
 // Backlog item 14: VQE input validation and error taxonomy.
 //
-// VQE(out-of-domain options) × missing option validation → the run
-// proceeds silently (a negative StepSize ascends once, then the floor clamp
-// turns it into +1e-6; a negative MaxIterations returns at once) or a
-// parameterized error leaks in place of InvalidVQEInputError.
-func TestRedVQEOptionValidation(t *testing.T) {
-	h := H2Hamiltonian()
-	tmpl := H2Ansatz()
-
-	cases := []struct {
-		name string
-		opts VQEOptions
-	}{
-		{"negative StepSize", VQEOptions{StepSize: -0.3, InitialParams: parameterized.Params{"theta": 0.1}}},
-		{"NaN StepSize", VQEOptions{StepSize: math.NaN(), InitialParams: parameterized.Params{"theta": 0.1}}},
-		{"Inf StepSize", VQEOptions{StepSize: math.Inf(1), InitialParams: parameterized.Params{"theta": 0.1}}},
-		{"negative MaxIterations", VQEOptions{MaxIterations: -1}},
-		{"negative Tolerance", VQEOptions{Tolerance: -1, MaxIterations: 5}},
-		{"NaN Tolerance", VQEOptions{Tolerance: math.NaN(), MaxIterations: 5}},
-		{"NaN InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.NaN()}}},
-		{"Inf InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.Inf(-1)}}},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			var e *InvalidVQEInputError
-			res, err := VQE(h, tmpl, c.opts)
-			if !errors.As(err, &e) {
-				t.Errorf("VQE(%+v): err = %v, result = %+v; want InvalidVQEInputError", c.opts, err, res)
-			}
-		})
-	}
-}
-
-// Backlog item 14: VQE input validation and error taxonomy.
-//
 // VQE(Hamiltonian or factory structurally incompatible with the
 // template register) × late detection → the error surfaces from
 // quantum/circuit inside the loop after evaluations were spent, not as
