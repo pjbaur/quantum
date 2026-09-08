@@ -376,3 +376,23 @@ QPE is actually wanted.
   > **Red tests**: `TestRedAddParamGateRejectsNoTargets` in
   > `parameterized/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./parameterized -run '^TestRedAddParamGateRejectsNoTargets'`.
+- [ ] 20. **`parameterShiftGradient` returns an exactly zero gradient where
+  the +/- pi/2 shift is not representable** — the helper computes
+  `theta + pi/2` and `theta - pi/2` in float64. From about 2^54 the spacing
+  between adjacent float64 values exceeds pi, so both shifted values round
+  back to `theta`, the two evaluations bind the same circuit, and the half
+  difference is exactly 0 with a nil error; at somewhat smaller magnitudes
+  the shift is rounded to a multiple of the spacing, so the rule is applied
+  at the wrong offset. The energy is 2*pi-periodic in every angle, so the
+  slope at the same angle reduced mod 2*pi is the true one. Observed:
+  `a = 2^60`, `b = 0.1` on a template declaring `a` and `b` returns
+  `{a: 0}` after 2 evaluations, where the reduced angle (about 4.1219) has
+  slope 0.1019. Reachable through `VQE`: a huge finite `InitialParams`
+  value passes the finiteness guard, that parameter then never moves, and
+  the run reports `Converged` with it frozen at its start. Expected
+  contract: either an error for a parameter whose shift is not
+  representable, or a documented reduction of angles into a representable
+  range before shifting; which one is not prescribed here.
+  > **Red tests**: `TestRedParameterShiftAtHugeAngleMatchesReducedAngle` in
+  > `algorithm/backlog_red_numeric_test.go`; reproduce with
+  > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftAtHugeAngle'`.
