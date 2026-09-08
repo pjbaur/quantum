@@ -84,8 +84,12 @@ slope at an implicit 0 with a nil error, while the same gap left unshifted
 failed in `Bind`, so whether the call errored depended on which names were
 passed. The helper now checks that every declared parameter is bound
 before any evaluation and reports the first missing one, in declaration
-order, as `parameterized.MissingParameterError`, the error `Bind` returns
-for the same gap. `VQE` binds every declared parameter itself and is
+order, as `parameterized.MissingParameterError`, the error `Bind` itself
+returns for an absent declared name. The check guarantees completeness
+only, the one `Bind` rule a shift can hide; a non-finite value or an
+undeclared key in `Params`, or an undeclared name among those to
+differentiate, stays `Bind`'s to reject when the first shifted evaluation
+reaches it. `VQE` binds every declared parameter itself and is
 unaffected; no exported behavior changes. Design:
 `docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`.
 

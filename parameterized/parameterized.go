@@ -163,7 +163,8 @@ func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
 	return c, nil
 }
 
-// MissingParameterError indicates Bind was called without a declared name.
+// MissingParameterError indicates that a declared parameter is absent from
+// the values a template is bound with.
 type MissingParameterError struct {
 	Name string
 }

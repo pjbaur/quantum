@@ -60,7 +60,15 @@ delegating to the existing `gates.NewRx` etc. No new gate types.
 
 ### Errors (typed, package-local)
 
-- `MissingParameterError` — `Bind` called without a declared name.
+- `MissingParameterError` — `Bind` called without a declared name. Amended
+  2026-09-08 (backlog item 16): `algorithm.parameterShiftGradient` also
+  returns this error, ahead of and without calling `Bind`, because its
+  +/- pi/2 shift would otherwise write a missing shifted name into the
+  binding and hide it from `Bind`
+  (`docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`,
+  Decisions 1 and 2); the type's doc comment now states the condition (a
+  declared parameter absent from the bind values) rather than `Bind` as its
+  sole producer.
 - `UnknownParameterError` — `Bind` given a name the template never declared
   (typo detection).
 - `InvalidParameterValueError` — non-finite value (NaN, ±Inf).
