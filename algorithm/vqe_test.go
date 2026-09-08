@@ -3,6 +3,7 @@ package algorithm
 import (
 	"errors"
 	"math"
+	"strings"
 	"testing"
 
 	"github.com/pjbaur/quantum/gates"
@@ -230,5 +231,151 @@ func TestVQEOptionErrorNamesTheField(t *testing.T) {
 				t.Fatalf("Reason = %q, want %q", e.Reason, c.want)
 			}
 		})
+	}
+}
+
+// TestVQEStructuralMismatchIsInvalidInput pins the structural contract
+// (backlog item 14): a Hamiltonian whose Pauli strings do not match the
+// template's register, or a factory returning a gate wider than its
+// target list, is InvalidVQEInputError. Before the check existed the
+// first two surfaced as quantum.IncompatibleQubitCountError and the third
+// as quantum.InvalidGateApplicationError from inside the first
+// evaluation.
+func TestVQEStructuralMismatchIsInvalidInput(t *testing.T) {
+	twoQubitFactory := func(v float64) quantum.Gate { return gates.NewCNOT() }
+	wideFactoryTemplate := parameterized.NewTemplate(2)
+	if err := wideFactoryTemplate.AddParamGate("theta", twoQubitFactory, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	cases := []struct {
+		name string
+		h    *Hamiltonian
+		tmpl *parameterized.Template
+	}{
+		{"three-axis term on two-qubit template", NewHamiltonian().AddTerm(1, quantum.PauliZ, quantum.PauliZ, quantum.PauliZ), H2Ansatz()},
+		{"one-axis term on two-qubit template", NewHamiltonian().AddTerm(1, quantum.PauliZ), H2Ansatz()},
+		{"factory gate wider than its target list", H2Hamiltonian(), wideFactoryTemplate},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var e *InvalidVQEInputError
+			res, err := VQE(c.h, c.tmpl, VQEOptions{})
+			if !errors.As(err, &e) {
+				t.Errorf("VQE: err = %v (%T), result = %+v; want InvalidVQEInputError", err, err, res)
+			}
+		})
+	}
+}
+
+// TestVQENonFiniteHamiltonianIsNotBlamedOnParams pins the attribution
+// contract (backlog item 14): a NaN or Inf coefficient is the
+// Hamiltonian's fault. Before the check existed the non-finite energy
+// flowed into a NaN gradient and a NaN step, and parameterized.Bind
+// rejected the stepped parameter by name although the caller supplied it
+// finite.
+func TestVQENonFiniteHamiltonianIsNotBlamedOnParams(t *testing.T) {
+	cases := []struct {
+		name string
+		h    *Hamiltonian
+	}{
+		{"NaN Pauli term", NewHamiltonian().AddTerm(math.NaN(), quantum.PauliZ, quantum.PauliI)},
+		{"Inf identity term", NewHamiltonian().AddTerm(math.Inf(1))},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			res, err := VQE(c.h, H2Ansatz(), VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}})
+			if err == nil {
+				t.Fatalf("VQE returned %+v with no error for a non-finite Hamiltonian", res)
+			}
+			var pe *parameterized.InvalidParameterValueError
+			if errors.As(err, &pe) {
+				t.Fatalf("VQE blamed parameter %q (value %v) for a non-finite Hamiltonian coefficient: %v", pe.Name, pe.Value, err)
+			}
+		})
+	}
+}
+
+// TestVQEStructuralErrorReasons pins the Reason wording for problems
+// found before any evaluation: the message names the term by index and
+// states the mismatch or the value, and nothing is wrapped because VQE
+// detected the problem itself.
+func TestVQEStructuralErrorReasons(t *testing.T) {
+	cases := []struct {
+		name string
+		h    *Hamiltonian
+		want string
+	}{
+		{"axes length", NewHamiltonian().AddTerm(1, quantum.PauliZ), "Hamiltonian term 0 has 1 Pauli axes but the template has 2 qubits"},
+		{"NaN coefficient", NewHamiltonian().AddTerm(1, quantum.PauliZ, quantum.PauliI).AddTerm(math.NaN()), "Hamiltonian term 1 has non-finite coefficient NaN"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var e *InvalidVQEInputError
+			res, err := VQE(c.h, H2Ansatz(), VQEOptions{})
+			if !errors.As(err, &e) {
+				t.Fatalf("err = %v (%T), result = %+v; want InvalidVQEInputError", err, err, res)
+			}
+			if e.Reason != c.want {
+				t.Fatalf("Reason = %q, want %q", e.Reason, c.want)
+			}
+			if cause := errors.Unwrap(err); cause != nil {
+				t.Fatalf("errors.Unwrap(err) = %v, want nil for a problem detected before any evaluation", cause)
+			}
+		})
+	}
+}
+
+// TestVQEEvaluationErrorKeepsItsCause pins the wrapping contract for
+// problems only running the template can reveal: the caller sees
+// InvalidVQEInputError, and errors.As still reaches the error type of the
+// package that detected the problem. The wide-factory case fails inside
+// parameterized.Bind (circuit.AddGate rejects a 2-qubit gate on 1 target);
+// the bad-axis case fails inside quantum.Expectation, whose axis domain
+// VQE deliberately does not duplicate.
+func TestVQEEvaluationErrorKeepsItsCause(t *testing.T) {
+	wide := parameterized.NewTemplate(2)
+	if err := wide.AddParamGate("theta", func(v float64) quantum.Gate { return gates.NewCNOT() }, 0); err != nil {
+		t.Fatal(err)
+	}
+	var ve *InvalidVQEInputError
+	var ge *quantum.InvalidGateApplicationError
+	_, err := VQE(H2Hamiltonian(), wide, VQEOptions{})
+	if !errors.As(err, &ve) || !errors.As(err, &ge) {
+		t.Fatalf("VQE(wide factory): err = %v (%T); want InvalidVQEInputError wrapping InvalidGateApplicationError", err, err)
+	}
+	if !strings.Contains(ve.Reason, "initial energy evaluation") || !strings.Contains(ve.Reason, ge.Error()) {
+		t.Fatalf("Reason = %q, want the evaluation phase and the cause %q", ve.Reason, ge.Error())
+	}
+
+	badAxis := NewHamiltonian().AddTerm(1, quantum.PauliAxis(7), quantum.PauliI)
+	var ae *quantum.InvalidPauliAxisError
+	_, err = VQE(badAxis, H2Ansatz(), VQEOptions{})
+	if !errors.As(err, &ve) || !errors.As(err, &ae) {
+		t.Fatalf("VQE(bad axis): err = %v (%T); want InvalidVQEInputError wrapping InvalidPauliAxisError", err, err)
+	}
+}
+
+// TestVQEOverflowingHamiltonianIsNotBlamedOnParams covers the gap the
+// up-front coefficient check leaves: coefficients that are each finite
+// but whose sum passes float64. The energy is +Inf at the start and at
+// one of the two shifted points, so the parameter-shift difference is
+// -Inf and the descent step would carry theta to +Inf, where
+// parameterized.Bind would reject it by name. The contract is that no
+// error blames a parameter that was finite on entry, so VQE must stop at
+// the non-finite gradient instead.
+func TestVQEOverflowingHamiltonianIsNotBlamedOnParams(t *testing.T) {
+	h := NewHamiltonian().AddTerm(math.MaxFloat64).AddTerm(math.MaxFloat64, quantum.PauliZ, quantum.PauliI)
+	var ve *InvalidVQEInputError
+	var pe *parameterized.InvalidParameterValueError
+	res, err := VQE(h, H2Ansatz(), VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}})
+	if errors.As(err, &pe) {
+		t.Fatalf("VQE blamed parameter %q (value %v) for an overflowing Hamiltonian: %v", pe.Name, pe.Value, err)
+	}
+	if !errors.As(err, &ve) {
+		t.Fatalf("VQE: err = %v (%T), result = %+v; want InvalidVQEInputError", err, err, res)
+	}
+	if !strings.Contains(ve.Reason, `"theta"`) || !strings.Contains(ve.Reason, "non-finite") {
+		t.Fatalf("Reason = %q, want it to name the non-finite gradient of %q", ve.Reason, "theta")
 	}
 }

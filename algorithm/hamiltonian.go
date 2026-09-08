@@ -28,7 +28,9 @@ func NewHamiltonian() *Hamiltonian {
 // AddTerm appends coeff * (axes as a Pauli string) and returns h for
 // chaining. Empty axes denote the identity, contributing coeff directly.
 // Coefficients are not validated: NaN and Inf flow into Energy results,
-// where they surface as non-finite energies the caller can detect.
+// where they surface as non-finite energies the caller can detect. VQE is
+// such a caller and rejects them up front with InvalidVQEInputError, along
+// with a Pauli string whose length is not the template's qubit count.
 func (h *Hamiltonian) AddTerm(coeff float64, axes ...quantum.PauliAxis) *Hamiltonian {
 	h.terms = append(h.terms, HamiltonianTerm{Coeff: coeff, Axes: axes})
 	return h

@@ -113,14 +113,26 @@ type VQEResult struct {
 	Converged   bool
 }
 
-// InvalidVQEInputError indicates a malformed VQE invocation.
+// InvalidVQEInputError indicates a malformed VQE invocation: an option
+// outside its domain, a template or Hamiltonian VQE cannot optimize, or
+// an evaluation failure that traces back to one of them. Reason is the
+// complete message. Err is set only when another package detected the
+// problem during an evaluation (parameterized, circuit, quantum); Unwrap
+// exposes it so errors.As still reaches that package's type, the same
+// contract fmt.Errorf's %w gives callers elsewhere in this module
+// (gates/matrix.go, circuit/parallel.go).
 type InvalidVQEInputError struct {
 	Reason string
+	Err    error
 }
 
 func (e *InvalidVQEInputError) Error() string {
 	return "invalid VQE input: " + e.Reason
 }
+
+// Unwrap returns the evaluation error this input error carries, or nil
+// for problems VQE detected itself before the first evaluation.
+func (e *InvalidVQEInputError) Unwrap() error { return e.Err }
 
 // isFinite reports whether v is neither NaN nor infinite.
 func isFinite(v float64) bool {
@@ -146,6 +158,54 @@ func validateVQEOptions(opts VQEOptions) error {
 		return &InvalidVQEInputError{Reason: fmt.Sprintf("Tolerance must be finite and positive (zero selects the default 1e-10), got %v", opts.Tolerance)}
 	}
 	return nil
+}
+
+// validateVQEStructure checks that the template and the Hamiltonian can
+// be optimized against each other before any evaluation is paid for.
+// The one-gate-per-parameter rule is the template-side precondition of
+// the parameter-shift gradient (see parameterShiftGradient). A term whose
+// Pauli string is not the register's length would fail inside
+// quantum.Expectation on the first evaluation as
+// IncompatibleQubitCountError; an identity term (no axes) is exempt
+// because Energy adds its coefficient without consulting the state. A
+// non-finite coefficient would flow through Energy into a non-finite
+// gradient and then a non-finite parameter that parameterized.Bind
+// rejects by name, blaming a value the caller supplied finite. All three
+// are properties of the inputs, so all are InvalidVQEInputError here.
+//
+// Axis validity (each axis one of PauliI..PauliZ) is deliberately left to
+// quantum.Expectation, which owns that domain and reports
+// InvalidPauliAxisError; VQE wraps it at the first evaluation rather than
+// duplicating the enum's range.
+func validateVQEStructure(h *Hamiltonian, t *parameterized.Template) error {
+	stepCounts := t.ParamStepCounts()
+	for _, name := range t.ParamNames() {
+		if count := stepCounts[name]; count > 1 {
+			return &InvalidVQEInputError{Reason: fmt.Sprintf("parameter %q drives %d template steps; the parameter-shift gradient requires exactly one gate per parameter", name, count)}
+		}
+	}
+	for i, term := range h.terms {
+		if !isFinite(term.Coeff) {
+			return &InvalidVQEInputError{Reason: fmt.Sprintf("Hamiltonian term %d has non-finite coefficient %v", i, term.Coeff)}
+		}
+		if len(term.Axes) != 0 && len(term.Axes) != t.NumQubits() {
+			return &InvalidVQEInputError{Reason: fmt.Sprintf("Hamiltonian term %d has %d Pauli axes but the template has %d qubits", i, len(term.Axes), t.NumQubits())}
+		}
+	}
+	return nil
+}
+
+// wrapEvaluationError converts an error from evaluate or
+// parameterShiftGradient into InvalidVQEInputError. By the time an
+// evaluation runs, VQE has checked every option, every initial parameter,
+// the template's parameter structure, and the Hamiltonian's terms, and it
+// hands each evaluation a complete, declared, finite parameter set. What
+// can still fail is what only running the template reveals: a factory
+// returning a gate of the wrong width or with a malformed matrix, or a
+// Pauli axis outside the enum. Those are input properties, so the caller
+// sees the VQE type, with the detecting package's error kept in Err.
+func wrapEvaluationError(where string, err error) error {
+	return &InvalidVQEInputError{Reason: where + " failed: " + err.Error(), Err: err}
 }
 
 // VQE minimizes <psi(params)|H|psi(params)> with parameter-shift gradients
@@ -180,6 +240,19 @@ func validateVQEOptions(opts VQEOptions) error {
 // gradient that is identically zero, so VQE takes no step and reports
 // Converged at its starting parameters, indistinguishable from a genuine
 // stationary point. See parameterShiftGradient.
+//
+// Inputs are validated before the first evaluation: nil arguments, option
+// values outside their domains (see VQEOptions), initial parameters that
+// are undeclared or non-finite, a parameter driving several gates, a
+// Hamiltonian term whose Pauli string does not match the template's qubit
+// count, and a non-finite Hamiltonian coefficient are all rejected with
+// InvalidVQEInputError. Problems only running the template can reveal,
+// such as a factory returning a gate wider than its target list, surface
+// from the first evaluation and are wrapped in the same type with the
+// detecting package's error reachable through errors.As. Coefficients
+// that are each finite but whose sum overflows float64 give a non-finite
+// gradient, also reported as InvalidVQEInputError; no error names a
+// parameter that was finite on entry.
 func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult, error) {
 	if h == nil {
 		return nil, &InvalidVQEInputError{Reason: "Hamiltonian must not be nil"}
@@ -188,6 +261,9 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 		return nil, &InvalidVQEInputError{Reason: "template must not be nil"}
 	}
 	if err := validateVQEOptions(opts); err != nil {
+		return nil, err
+	}
+	if err := validateVQEStructure(h, t); err != nil {
 		return nil, err
 	}
 
@@ -205,12 +281,6 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 	}
 
 	names := t.ParamNames()
-	stepCounts := t.ParamStepCounts()
-	for _, name := range names {
-		if count := stepCounts[name]; count > 1 {
-			return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("parameter %q drives %d template steps; the parameter-shift gradient requires exactly one gate per parameter", name, count)}
-		}
-	}
 	params := parameterized.Params{}
 	for _, name := range names {
 		params[name] = 0
@@ -228,7 +298,7 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 	evals := 0
 	energy, err := evaluate(h, t, params)
 	if err != nil {
-		return nil, err
+		return nil, wrapEvaluationError("initial energy evaluation", err)
 	}
 	evals++
 
@@ -237,9 +307,19 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 	for iter := 0; iter < maxIter; iter++ {
 		grad, gradEvals, err := parameterShiftGradient(h, t, params, names)
 		if err != nil {
-			return nil, err
+			return nil, wrapEvaluationError(fmt.Sprintf("gradient evaluation at iteration %d", iter), err)
 		}
 		evals += gradEvals
+		// Coefficients are finite (validateVQEStructure) and every Pauli
+		// expectation is bounded by 1, so a non-finite gradient means the
+		// energy sum overflowed float64. Stop here: the step would carry a
+		// non-finite value into a parameter, and Bind would then blame that
+		// parameter although the caller supplied it finite.
+		for _, name := range names {
+			if !isFinite(grad[name]) {
+				return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("gradient of parameter %q is non-finite (%v) at iteration %d: the Hamiltonian's energy overflows float64", name, grad[name], iter)}
+			}
+		}
 
 		steps := parameterized.Params{}
 		for _, name := range names {
@@ -247,7 +327,7 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 		}
 		newEnergy, err := evaluate(h, t, steps)
 		if err != nil {
-			return nil, err
+			return nil, wrapEvaluationError(fmt.Sprintf("step evaluation at iteration %d", iter), err)
 		}
 		evals++
 

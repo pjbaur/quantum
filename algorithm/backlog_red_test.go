@@ -15,7 +15,6 @@ package algorithm
 
 import (
 	"errors"
-	"math"
 	"testing"
 
 	"github.com/pjbaur/quantum/gates"
@@ -75,67 +74,6 @@ func TestRedParameterShiftMissingParamIsRejected(t *testing.T) {
 			grad, evals, err := parameterShiftGradient(h, tmpl, incomplete, c.names)
 			if err == nil {
 				t.Fatalf("names=%v with params=%v (declared %v): grad = %v, evals = %d, err = nil; want an error for a missing declared parameter", c.names, incomplete, tmpl.ParamNames(), grad, evals)
-			}
-		})
-	}
-}
-
-// Backlog item 14: VQE input validation and error taxonomy.
-//
-// VQE(Hamiltonian or factory structurally incompatible with the
-// template register) × late detection → the error surfaces from
-// quantum/circuit inside the loop after evaluations were spent, not as
-// InvalidVQEInputError up front.
-func TestRedVQEStructuralMismatchIsInvalidInput(t *testing.T) {
-	twoQubitFactory := func(v float64) quantum.Gate { return gates.NewCNOT() }
-	wideFactoryTemplate := parameterized.NewTemplate(2)
-	if err := wideFactoryTemplate.AddParamGate("theta", twoQubitFactory, 0); err != nil {
-		t.Fatal(err)
-	}
-
-	cases := []struct {
-		name string
-		h    *Hamiltonian
-		tmpl *parameterized.Template
-	}{
-		{"three-axis term on two-qubit template", NewHamiltonian().AddTerm(1, quantum.PauliZ, quantum.PauliZ, quantum.PauliZ), H2Ansatz()},
-		{"one-axis term on two-qubit template", NewHamiltonian().AddTerm(1, quantum.PauliZ), H2Ansatz()},
-		{"factory gate wider than its target list", H2Hamiltonian(), wideFactoryTemplate},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			var e *InvalidVQEInputError
-			res, err := VQE(c.h, c.tmpl, VQEOptions{})
-			if !errors.As(err, &e) {
-				t.Errorf("VQE: err = %v (%T), result = %+v; want InvalidVQEInputError", err, err, res)
-			}
-		})
-	}
-}
-
-// Backlog item 14: VQE input validation and error taxonomy.
-//
-// VQE(Hamiltonian with a non-finite coefficient) × non-finite energy
-// propagation → the failure is attributed to a template parameter
-// (parameterized.InvalidParameterValueError) although every parameter is
-// finite; the Hamiltonian doc delegates non-finite detection to the caller.
-func TestRedVQENonFiniteHamiltonianIsNotBlamedOnParams(t *testing.T) {
-	cases := []struct {
-		name string
-		h    *Hamiltonian
-	}{
-		{"NaN Pauli term", NewHamiltonian().AddTerm(math.NaN(), quantum.PauliZ, quantum.PauliI)},
-		{"Inf identity term", NewHamiltonian().AddTerm(math.Inf(1))},
-	}
-	for _, c := range cases {
-		t.Run(c.name, func(t *testing.T) {
-			res, err := VQE(c.h, H2Ansatz(), VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}})
-			if err == nil {
-				t.Fatalf("VQE returned %+v with no error for a non-finite Hamiltonian", res)
-			}
-			var pe *parameterized.InvalidParameterValueError
-			if errors.As(err, &pe) {
-				t.Fatalf("VQE blamed parameter %q (value %v) for a non-finite Hamiltonian coefficient: %v", pe.Name, pe.Value, err)
 			}
 		})
 	}
