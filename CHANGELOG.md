@@ -35,6 +35,28 @@ subregister, since `quantum.InverseQFT` DFTs the whole register), and
 parameters so the VQE driver's one-gate-per-parameter rule holds,
 `CutOfBitstring`). Demos: `quantum chsh`, `quantum qpe`, `quantum qaoa`.
 
+#### `algorithm.VQE` validates its inputs and reports every input problem as `InvalidVQEInputError`
+
+The VQE driver checks its inputs before the first evaluation: `StepSize`
+and `Tolerance` must be finite and non-negative and `MaxIterations`
+non-negative (zero still selects each default); `InitialParams` must be
+declared and finite; each parameter must drive one template gate; each
+Hamiltonian term must be finite and, unless it is the identity, as long as
+the template's qubit count. Problems only running the template reveals (a
+factory returning a gate wider than its target list or with a malformed
+matrix, a Pauli axis outside the enum) are wrapped in the same type:
+`InvalidVQEInputError` gains `Err` and `Unwrap`, so `errors.As` still
+reaches `quantum.InvalidGateApplicationError` and the like. An energy,
+gradient, or descent step that overflows float64 is reported the same way,
+blaming the Hamiltonian or `StepSize`; no error blames a parameter the
+caller supplied finite. Inputs that used to run silently (negative
+`StepSize`, negative `MaxIterations`, negative or non-finite `Tolerance`,
+an overflowing Hamiltonian) now error; inputs that used to fail as
+`parameterized.InvalidParameterValueError` (non-finite `StepSize` or
+`InitialParams`) or `quantum.IncompatibleQubitCountError` (Pauli-length
+mismatch) are now `InvalidVQEInputError` with a nil cause. Design:
+`docs/superpowers/specs/2026-09-08-vqe-input-validation-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed

@@ -169,7 +169,13 @@ res, err := algorithm.VQE(h, tmpl, algorithm.VQEOptions{
   the gradient rests on; measured as a near-zero gradient with `Converged`
   reported immediately.
 - `Bind`/`Execute`/`Energy` errors propagate unwrapped-in-meaning: the first
-  failure aborts the loop and returns.
+  failure aborts the loop and returns. Superseded 2026-09-08 by
+  `docs/superpowers/specs/2026-09-08-vqe-input-validation-design.md`
+  (Decision 2, backlog item 14): `VQE` now wraps every such failure in
+  `InvalidVQEInputError`, whose `Err`/`Unwrap` keep the detecting
+  package's error reachable through `errors.As`; the first failure still
+  aborts the loop. Direct callers of `Bind`, `Execute`, and `Energy` are
+  unaffected.
 
 ## Testing
 
