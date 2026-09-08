@@ -58,7 +58,12 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 //
 // params must bind every parameter the template declares, the precondition
 // Bind states; names selects which of those to differentiate and may list
-// any subset in any order. Completeness is checked here rather than left
+// any subset in any order, and repeats: the loop shifts and counts each
+// element of names as it is reached, not each unique name, so a name
+// listed twice runs its pair of evaluations twice while grad still ends
+// up with one entry for it, the last occurrence's slope. VQE never
+// repeats a name; it calls with t.ParamNames(), which returns declared
+// names without duplicates. Completeness is checked here rather than left
 // to Bind because the shift would hide the gap: a name in names that
 // params lacks reads as 0 from the map, so the plus and minus copies carry
 // it at +/- pi/2, Bind sees a complete binding, and the slope at an

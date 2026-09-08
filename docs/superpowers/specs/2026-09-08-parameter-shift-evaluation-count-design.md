@@ -93,6 +93,24 @@ an energy with a nil error or a non-nil error with a zero energy; there is
 no completed-but-failed outcome to distinguish, so the two readings
 coincide and the doc comment uses "returns its energy" to name the event.
 
+Amended 2026-09-08 (round 1 fix): a black-box red test
+(`TestRedParameterShiftDuplicateNameCostsOnePair`) called the helper with
+`names=[a,a]` and asserted `evals == 2` for the one gradient component
+returned, reading the `names` parameter's doc comment ("may list any
+subset ... in any order") as promising deduplication. It does not: the
+loop shifts and counts each element of names as it is reached, not each
+unique name, so a repeated name runs its pair of evaluations again and
+`evals == 4` is the count this decision requires (two evaluations
+completed, once per occurrence). The doc comment's `names` sentence in
+`algorithm/vqe.go` is amended to say so: "names selects which of those to
+differentiate and may list any subset in any order, and repeats: the loop
+shifts and counts each element of names as it is reached, not each unique
+name, so a name listed twice runs its pair of evaluations twice while
+grad still ends up with one entry for it, the last occurrence's slope.
+VQE never repeats a name; it calls with t.ParamNames(), which returns
+declared names without duplicates." Test deleted; ruling recorded in
+`.superpowers/backlog/enhancement-backlog-2026-08-27/item-17-round-1-fix.md`.
+
 ## Decision 2: the count is returned alongside the error, and is exact
 
 The helper already returns `evals` with every error out of the loop; the
