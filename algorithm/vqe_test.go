@@ -701,3 +701,63 @@ func TestVQEEvaluationErrorNamesThePhase(t *testing.T) {
 		})
 	}
 }
+
+// TestVQEEmptyNameParameterIsCheckedLikeAnyOther pins the
+// one-gate-per-parameter rule for a parameter named "" (backlog item 15).
+// The empty string is a declared name like any other: AddParamGate
+// accepts it and ParamNames lists it. Before the fix ParamStepCounts
+// mistook it for its fixed-step marker and never counted it, so a ""
+// parameter driving two gates passed validateVQEStructure and VQE
+// optimized it against the higher-harmonic gradient the check exists to
+// prevent, reporting Converged.
+func TestVQEEmptyNameParameterIsCheckedLikeAnyOther(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := parameterized.NewTemplate(2)
+	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if got := tmpl.ParamNames(); len(got) != 1 || got[0] != "" {
+		t.Fatalf("ParamNames = %q, want the single declared name %q", got, "")
+	}
+
+	var e *InvalidVQEInputError
+	res, err := VQE(h, tmpl, VQEOptions{})
+	if !errors.As(err, &e) {
+		t.Fatalf("VQE with parameter %q driving 2 template steps: err = %v, result = %+v; want InvalidVQEInputError (the doc says VQE enforces one gate per parameter through ParamStepCounts, whose counts are %v)", "", err, res, tmpl.ParamStepCounts())
+	}
+}
+
+// TestVQEAcceptsEmptyNameDrivingOneGate pins the other half of "like any
+// other": a parameter named "" that drives exactly one gate satisfies
+// the rule, so VQE optimizes it and reaches the same energy as the same
+// ansatz with the parameter called "theta". The name is an opaque map key
+// to every part of the driver; this test passes before and after the
+// ParamStepCounts fix and guards against rejecting "" outright.
+func TestVQEAcceptsEmptyNameDrivingOneGate(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := parameterized.NewTemplate(2)
+	if err := tmpl.AddGate(gates.NewPauliX(), 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpl.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
+
+	ref, err := VQE(h, H2Ansatz(), VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}})
+	if err != nil {
+		t.Fatalf("reference VQE: %v", err)
+	}
+	res, err := VQE(h, tmpl, VQEOptions{InitialParams: parameterized.Params{"": 0.1}})
+	if err != nil {
+		t.Fatalf("VQE with parameter %q driving one gate: %v; want it accepted like any other name", "", err)
+	}
+	if res.Energy != ref.Energy || res.Iterations != ref.Iterations || res.Params[""] != ref.Params["theta"] {
+		t.Fatalf("VQE with parameter %q: energy %v after %d iterations at %v, want the same run as with %q: energy %v after %d iterations at %v", "", res.Energy, res.Iterations, res.Params[""], "theta", ref.Energy, ref.Iterations, ref.Params["theta"])
+	}
+}

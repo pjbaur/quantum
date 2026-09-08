@@ -216,6 +216,22 @@ func TestParamStepCounts(t *testing.T) {
 	if err := multi.AddParamGate("theta", parameterized.Rz, 1); err != nil {
 		t.Fatal(err)
 	}
+	// The empty string is a declared name like any other; a fixed gate in
+	// between must not be mistaken for a step it drives, nor it for one.
+	empty := parameterized.NewTemplate(2)
+	if err := empty.AddParamGate("", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := empty.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := empty.AddParamGate("", parameterized.Rz, 1); err != nil {
+		t.Fatal(err)
+	}
+	fixedOnly := parameterized.NewTemplate(2)
+	if err := fixedOnly.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
 
 	tests := []struct {
 		name string
@@ -225,6 +241,8 @@ func TestParamStepCounts(t *testing.T) {
 		{"single-use names", single, map[string]int{"theta": 1, "phi": 1}},
 		{"name driving two gates", multi, map[string]int{"theta": 2}},
 		{"no declared parameters", parameterized.NewTemplate(2), map[string]int{}},
+		{"empty name driving two gates around a fixed gate", empty, map[string]int{"": 2}},
+		{"fixed gates only", fixedOnly, map[string]int{}},
 	}
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {

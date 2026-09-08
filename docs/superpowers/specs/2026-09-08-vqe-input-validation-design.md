@@ -216,7 +216,10 @@ implicit zero; evaluation undercount on failure) and are untouched: the
 wrap in `VQE` passes the gradient's error and count straight through, so a
 later fix to the count needs no change here. Their red tests stay under
 the `redtests` tag; the prototype of this design leaves all three still
-failing.
+failing. Amended 2026-09-08 (item 15): the empty-name defect was in
+`ParamStepCounts`'s fixed-step sentinel, not in this loop, and was fixed
+there (`docs/superpowers/specs/2026-09-08-empty-parameter-name-step-count-design.md`);
+the loop needed no extension and must not gain an empty-name check.
 
 ## Effect on callers
 

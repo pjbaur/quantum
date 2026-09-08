@@ -31,8 +31,11 @@ func Rz(value float64) quantum.Gate { return gates.NewRz(value) }
 
 func Phase(value float64) quantum.Gate { return gates.NewPhase(value) }
 
-// step is one template instruction: either a fixed gate (param == "") or a
-// parameter-driven factory.
+// step is one template instruction: either a fixed gate (factory == nil,
+// param unused) or a parameter-driven factory (factory != nil; param is
+// the declared name, which may be any string, "" included). The factory,
+// not the name, is what tells the two kinds apart: Bind and
+// ParamStepCounts both test it, so no name can collide with a sentinel.
 type step struct {
 	param   string
 	factory Factory
@@ -70,11 +73,15 @@ func (t *Template) ParamNames() []string {
 
 // ParamStepCounts returns, per declared parameter name, how many template
 // steps consume it. A name driving exactly one gate counts 1; a name driving
-// several gates counts one per step. Names never declared are absent.
+// several gates counts one per step. Names never declared are absent, and
+// every declared name is present: a step is parameter-driven when it
+// carries a factory (AddParamGate rejects a nil one), the same test Bind
+// applies, so a parameter named "" is counted like any other rather than
+// mistaken for a fixed step.
 func (t *Template) ParamStepCounts() map[string]int {
 	counts := make(map[string]int, len(t.paramOrder))
 	for _, s := range t.steps {
-		if s.param != "" {
+		if s.factory != nil {
 			counts[s.param]++
 		}
 	}

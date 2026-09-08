@@ -57,6 +57,23 @@ an overflowing Hamiltonian) now error; inputs that used to fail as
 mismatch) are now `InvalidVQEInputError` with a nil cause. Design:
 `docs/superpowers/specs/2026-09-08-vqe-input-validation-design.md`.
 
+### Fixed
+
+#### `parameterized.Template.ParamStepCounts` counts a parameter named `""`
+
+`ParamStepCounts` used a non-empty name as its test for a parameter-driven
+step, so a parameter declared as `""` (accepted by `AddParamGate`, listed
+by `ParamNames`, bound by `Bind`) was never counted. `algorithm.VQE` reads
+those counts for its one-gate-per-parameter rule, so a `""` parameter
+driving several gates passed the check and was optimized against a
+parameter-shift gradient that is wrong for such a template, reporting
+`Converged`. Steps are now classified by whether they carry a factory, the
+test `Bind` already applied, so `""` is counted like any other name and
+`VQE` rejects it with `InvalidVQEInputError` when it drives more than one
+gate. `AddParamGate("")` remains accepted; a `""` parameter driving one
+gate optimizes as before. Design:
+`docs/superpowers/specs/2026-09-08-empty-parameter-name-step-count-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed

@@ -14,39 +14,12 @@ package algorithm
 // suite and drop it from here.
 
 import (
-	"errors"
 	"testing"
 
 	"github.com/pjbaur/quantum/gates"
 	"github.com/pjbaur/quantum/parameterized"
 	"github.com/pjbaur/quantum/quantum"
 )
-
-// Backlog item 15: empty parameter name defeats the one-gate-per-parameter
-// check.
-//
-// VQE(template whose parameter is named "") × sentinel collision with the
-// fixed-step marker in Template.ParamStepCounts → a "" parameter driving
-// several gates passes the up-front check and reaches parameterShiftGradient.
-func TestRedVQEEmptyNameParameterEscapesStepCountCheck(t *testing.T) {
-	h := H2Hamiltonian()
-	tmpl := parameterized.NewTemplate(2)
-	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
-		t.Fatal(err)
-	}
-	if got := tmpl.ParamNames(); len(got) != 1 || got[0] != "" {
-		t.Fatalf("ParamNames = %q, want the single declared name %q", got, "")
-	}
-
-	var e *InvalidVQEInputError
-	res, err := VQE(h, tmpl, VQEOptions{})
-	if !errors.As(err, &e) {
-		t.Fatalf("VQE with parameter %q driving 2 template steps: err = %v, result = %+v; want InvalidVQEInputError (the doc says VQE enforces one gate per parameter through ParamStepCounts, whose counts are %v)", "", err, res, tmpl.ParamStepCounts())
-	}
-}
 
 // Backlog item 16: parameterShiftGradient shifts missing parameters from an
 // implicit zero.
