@@ -333,3 +333,28 @@ QPE is actually wanted.
   > **Red tests**: `TestRedParameterShiftCountsEvaluationsBeforeFailure` in
   > `algorithm/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftCounts'`.
+- [ ] 18. **Zero-value `Template` panics in `AddParamGate`** — a
+  `Template` declared without `NewTemplate` (so its `seen` map is nil)
+  panics on the first `AddParamGate` call instead of returning an error,
+  because the call writes to `seen` unconditionally. Observed:
+  `var tmpl parameterized.Template` then
+  `tmpl.AddParamGate("", parameterized.Ry)` panics with "assignment to
+  entry in nil map". Expected contract: `Template`'s exported methods
+  never panic on a value the caller constructed with the zero value;
+  either `NewTemplate` becomes a documented requirement enforced by every
+  method, or a zero-value `Template` is a valid, safely usable state.
+  > **Red tests**: `TestRedZeroValueTemplateAddParamGateDoesNotPanic` in
+  > `parameterized/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./parameterized -run '^TestRedZeroValueTemplate'`.
+- [ ] 19. **`AddParamGate` and `AddGate` accept an empty target list** —
+  `checkTargets` loops over the given targets, so a call with none passes
+  vacuously: the step is appended and later reported by `ParamNames` and
+  `ParamStepCounts`, but `Bind` fails deep inside `circuit.AddGate` with
+  "at least one target is required" instead of at the call that declared
+  the gate. `AddGate` has the same gap as `AddParamGate` — neither method
+  checks that at least one target was given. Expected contract: a gate
+  declared with zero targets is rejected at the `Add*Gate` call, with an
+  error naming the gate, not deferred to `Bind`.
+  > **Red tests**: `TestRedAddParamGateRejectsNoTargets` in
+  > `parameterized/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./parameterized -run '^TestRedAddParamGateRejectsNoTargets'`.
