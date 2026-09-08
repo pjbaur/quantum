@@ -3,6 +3,7 @@ package algorithm
 import (
 	"fmt"
 	"math"
+	"strings"
 
 	"github.com/pjbaur/quantum/parameterized"
 	"github.com/pjbaur/quantum/state"
@@ -199,13 +200,48 @@ func validateVQEStructure(h *Hamiltonian, t *parameterized.Template) error {
 // parameterShiftGradient into InvalidVQEInputError. By the time an
 // evaluation runs, VQE has checked every option, every initial parameter,
 // the template's parameter structure, and the Hamiltonian's terms, and it
-// hands each evaluation a complete, declared, finite parameter set. What
+// hands each evaluation a complete, declared, finite parameter set (the
+// step guard in VQE keeps an overflowing update from reaching Bind). What
 // can still fail is what only running the template reveals: a factory
 // returning a gate of the wrong width or with a malformed matrix, or a
 // Pauli axis outside the enum. Those are input properties, so the caller
 // sees the VQE type, with the detecting package's error kept in Err.
 func wrapEvaluationError(where string, err error) error {
 	return &InvalidVQEInputError{Reason: where + " failed: " + err.Error(), Err: err}
+}
+
+// formatPoint renders the parameter values VQE evaluated at, in the
+// template's declaration order so the text is deterministic, with names
+// quoted the way every other Reason quotes them.
+func formatPoint(names []string, params parameterized.Params) string {
+	parts := make([]string, len(names))
+	for i, name := range names {
+		parts[i] = fmt.Sprintf("%q=%v", name, params[name])
+	}
+	return strings.Join(parts, ", ")
+}
+
+// checkEnergy rejects a non-finite energy that VQE evaluated at a finite
+// point. Coefficients are finite (validateVQEStructure) and every Pauli
+// expectation is bounded by 1, so a non-finite energy can only mean the
+// term sum overflowed float64: a property of the Hamiltonian, which the
+// Reason blames. Stopping here matters twice over: the accept/revert
+// comparison cannot order infinities, so an infinite baseline accepts any
+// finite step and VQE would report a result it never minimized; and a
+// template with no parameters has no gradient for the gradient guard to
+// catch, so an overflowing Hamiltonian would return Energy +Inf with a nil
+// error. The point is named because a stepped point is not one the caller
+// chose or can reconstruct; a template with no parameters has no point to
+// name.
+func checkEnergy(where string, energy float64, names []string, params parameterized.Params) error {
+	if isFinite(energy) {
+		return nil
+	}
+	at := ""
+	if len(names) > 0 {
+		at = " with " + formatPoint(names, params)
+	}
+	return &InvalidVQEInputError{Reason: fmt.Sprintf("%s is non-finite (%v)%s: the Hamiltonian's energy overflows float64", where, energy, at)}
 }
 
 // VQE minimizes <psi(params)|H|psi(params)> with parameter-shift gradients
@@ -251,8 +287,11 @@ func wrapEvaluationError(where string, err error) error {
 // from the first evaluation and are wrapped in the same type with the
 // detecting package's error reachable through errors.As. Coefficients
 // that are each finite but whose sum overflows float64 give a non-finite
-// gradient, also reported as InvalidVQEInputError; no error names a
-// parameter that was finite on entry.
+// energy or gradient, and a StepSize large enough that a step overflows
+// gives a non-finite parameter; VQE checks each energy it evaluates, each
+// gradient component, and each stepped value, and reports all three as
+// InvalidVQEInputError blaming the Hamiltonian or StepSize. No error
+// blames a parameter that was finite on entry.
 func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult, error) {
 	if h == nil {
 		return nil, &InvalidVQEInputError{Reason: "Hamiltonian must not be nil"}
@@ -301,6 +340,9 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 		return nil, wrapEvaluationError("initial energy evaluation", err)
 	}
 	evals++
+	if err := checkEnergy("initial energy", energy, names, params); err != nil {
+		return nil, err
+	}
 
 	converged := false
 	accepted := 0
@@ -310,26 +352,41 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 			return nil, wrapEvaluationError(fmt.Sprintf("gradient evaluation at iteration %d", iter), err)
 		}
 		evals += gradEvals
+		// The shifted energies are evaluated inside parameterShiftGradient
+		// and not checked there; any non-finite one makes the gradient
+		// non-finite, and so does a difference of two finite energies that
+		// overflows (a MaxFloat64 term at theta = pi/2 gives -M and +M).
 		// Coefficients are finite (validateVQEStructure) and every Pauli
-		// expectation is bounded by 1, so a non-finite gradient means the
-		// energy sum overflowed float64. Stop here: the step would carry a
-		// non-finite value into a parameter, and Bind would then blame that
-		// parameter although the caller supplied it finite.
+		// expectation is bounded by 1, so either way the cause is overflow.
+		// Stop here: the step would carry a non-finite value into a
+		// parameter, and Bind would then blame that parameter although the
+		// caller supplied it finite.
 		for _, name := range names {
 			if !isFinite(grad[name]) {
-				return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("gradient of parameter %q is non-finite (%v) at iteration %d: the Hamiltonian's energy overflows float64", name, grad[name], iter)}
+				return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("gradient of parameter %q is non-finite (%v) at iteration %d: the Hamiltonian's energy at a shifted point or the shift difference overflows float64", name, grad[name], iter)}
 			}
 		}
 
+		// A finite gradient times an in-domain but huge StepSize (1e308 is
+		// finite and positive) still overflows the update, and Bind would
+		// again blame the parameter. The current step is at most the
+		// StepSize option (halving only shrinks it; the 1e-6 floor cannot
+		// overflow anything), so an overflowing step is StepSize's fault.
 		steps := parameterized.Params{}
 		for _, name := range names {
 			steps[name] = params[name] - step*grad[name]
+			if !isFinite(steps[name]) {
+				return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("StepSize is too large: the step of parameter %q overflows float64 at iteration %d (step size %v times gradient %v)", name, iter, step, grad[name])}
+			}
 		}
 		newEnergy, err := evaluate(h, t, steps)
 		if err != nil {
 			return nil, wrapEvaluationError(fmt.Sprintf("step evaluation at iteration %d", iter), err)
 		}
 		evals++
+		if err := checkEnergy(fmt.Sprintf("step energy at iteration %d", iter), newEnergy, names, steps); err != nil {
+			return nil, err
+		}
 
 		if newEnergy > energy {
 			// Revert; shrink the step and retry next iteration.

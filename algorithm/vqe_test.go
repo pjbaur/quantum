@@ -2,6 +2,7 @@ package algorithm
 
 import (
 	"errors"
+	"fmt"
 	"math"
 	"strings"
 	"testing"
@@ -359,11 +360,12 @@ func TestVQEEvaluationErrorKeepsItsCause(t *testing.T) {
 // TestVQEOverflowingHamiltonianIsNotBlamedOnParams covers the gap the
 // up-front coefficient check leaves: coefficients that are each finite
 // but whose sum passes float64. The energy is +Inf at the start and at
-// one of the two shifted points, so the parameter-shift difference is
-// -Inf and the descent step would carry theta to +Inf, where
-// parameterized.Bind would reject it by name. The contract is that no
-// error blames a parameter that was finite on entry, so VQE must stop at
-// the non-finite gradient instead.
+// one of the two shifted points, so without a guard the parameter-shift
+// difference is -Inf and the descent step would carry theta to +Inf,
+// where parameterized.Bind would reject it by name. The contract is that
+// no error blames a parameter that was finite on entry, so VQE must stop
+// at the first non-finite value it sees, here the initial energy, whose
+// Reason names the point ("theta") it was evaluated at.
 func TestVQEOverflowingHamiltonianIsNotBlamedOnParams(t *testing.T) {
 	h := NewHamiltonian().AddTerm(math.MaxFloat64).AddTerm(math.MaxFloat64, quantum.PauliZ, quantum.PauliI)
 	var ve *InvalidVQEInputError
@@ -377,5 +379,325 @@ func TestVQEOverflowingHamiltonianIsNotBlamedOnParams(t *testing.T) {
 	}
 	if !strings.Contains(ve.Reason, `"theta"`) || !strings.Contains(ve.Reason, "non-finite") {
 		t.Fatalf("Reason = %q, want it to name the non-finite gradient of %q", ve.Reason, "theta")
+	}
+}
+
+// zOnQubit0 returns coeff * Z0 (identity on qubit 1). On H2Ansatz qubit 0
+// is Ry(theta)|0>, untouched by the CNOT's control role, so
+// E(theta) = coeff*cos(theta) and dE/dtheta = -coeff*sin(theta), which the
+// parameter shift reproduces exactly.
+func zOnQubit0(coeff float64) *Hamiltonian {
+	return NewHamiltonian().AddTerm(coeff, quantum.PauliZ, quantum.PauliI)
+}
+
+// TestVQEHugeStepSizeDoesNotBlameFiniteParameter pins the step guard
+// (backlog item 14, round 1). StepSize 1e308 is finite and positive, so
+// validateVQEOptions accepts it, but the update params - step*grad
+// overflows to +Inf and parameterized.Bind would reject the stepped value
+// by name. The contract is that no error blames a parameter the caller
+// supplied finite, so VQE must stop at the overflowing step and blame
+// StepSize.
+func TestVQEHugeStepSizeDoesNotBlameFiniteParameter(t *testing.T) {
+	h := zOnQubit0(4) // E = 4 cos(theta); gradient at theta=1 is -4 sin(1)
+	tmpl := H2Ansatz()
+	opts := VQEOptions{
+		InitialParams: parameterized.Params{"theta": 1},
+		StepSize:      1e308, // finite and positive: inside the documented domain
+	}
+	if err := validateVQEOptions(opts); err != nil {
+		t.Fatalf("setup: StepSize 1e308 is finite and positive but validateVQEOptions rejected it: %v", err)
+	}
+
+	res, err := VQE(h, tmpl, opts)
+	var pe *parameterized.InvalidParameterValueError
+	if errors.As(err, &pe) {
+		t.Fatalf("VQE blamed parameter %q (value %v), which the caller supplied finite: %v", pe.Name, pe.Value, err)
+	}
+	var ve *InvalidVQEInputError
+	if err != nil && !errors.As(err, &ve) {
+		t.Fatalf("err = %v (%T), want nil or InvalidVQEInputError", err, err)
+	}
+	if err == nil {
+		for name, v := range res.Params {
+			if !isFinite(v) {
+				t.Fatalf("result parameter %q = %v, want finite", name, v)
+			}
+		}
+	}
+}
+
+// TestVQEStepOverflowReasonBlamesStepSize pins the step guard's Reason:
+// it leads with the field at fault and carries the step size and gradient
+// whose product overflowed. The gradient is read back from
+// parameterShiftGradient so the expected text is exact without pinning a
+// float literal.
+func TestVQEStepOverflowReasonBlamesStepSize(t *testing.T) {
+	h := zOnQubit0(2)
+	tmpl := H2Ansatz()
+	params := parameterized.Params{"theta": math.Pi / 2}
+	grad, _, err := parameterShiftGradient(h, tmpl, params, tmpl.ParamNames())
+	if err != nil {
+		t.Fatalf("setup gradient: %v", err)
+	}
+	if !isFinite(grad["theta"]) || grad["theta"] == 0 {
+		t.Fatalf("setup: gradient = %v, want finite and non-zero so the step overflows", grad["theta"])
+	}
+
+	var ve *InvalidVQEInputError
+	_, err = VQE(h, tmpl, VQEOptions{StepSize: 1e308, MaxIterations: 3, InitialParams: params})
+	if !errors.As(err, &ve) {
+		t.Fatalf("err = %v (%T), want InvalidVQEInputError", err, err)
+	}
+	want := fmt.Sprintf("StepSize is too large: the step of parameter %q overflows float64 at iteration 0 (step size %v times gradient %v)", "theta", 1e308, grad["theta"])
+	if ve.Reason != want {
+		t.Fatalf("Reason = %q, want %q", ve.Reason, want)
+	}
+	if cause := errors.Unwrap(err); cause != nil {
+		t.Fatalf("errors.Unwrap(err) = %v, want nil for a problem VQE detected itself", cause)
+	}
+}
+
+// TestVQENoParameterTemplateReportsOverflowingHamiltonian pins the
+// initial-energy guard on the path the gradient guard cannot see (backlog
+// item 14, round 1): a template with no parameters has no gradient, so an
+// overflowing Hamiltonian used to return Energy +Inf with a nil error.
+func TestVQENoParameterTemplateReportsOverflowingHamiltonian(t *testing.T) {
+	tmpl := parameterized.NewTemplate(1)
+	if err := tmpl.AddGate(gates.NewPauliX(), 0); err != nil {
+		t.Fatal(err)
+	}
+	h := NewHamiltonian().AddTerm(math.MaxFloat64).AddTerm(math.MaxFloat64)
+	if err := validateVQEStructure(h, tmpl); err != nil {
+		t.Fatalf("setup: both coefficients are finite but validateVQEStructure rejected them: %v", err)
+	}
+
+	res, err := VQE(h, tmpl, VQEOptions{})
+	var ve *InvalidVQEInputError
+	if !errors.As(err, &ve) {
+		t.Fatalf("VQE: err = %v, result = %+v; want InvalidVQEInputError for a Hamiltonian whose energy overflows float64", err, res)
+	}
+}
+
+// TestVQEOverflowingStartEnergyWithFiniteGradientIsReported pins the
+// initial-energy guard where the gradient guard passes (backlog item 14,
+// round 1): the start energy overflows while both shifted energies stay
+// finite, so the gradient is finite and, without the guard, VQE
+// optimized from +Inf and returned a nil error.
+func TestVQEOverflowingStartEnergyWithFiniteGradientIsReported(t *testing.T) {
+	// E(theta) = 0.95M + 0.1M cos(theta). At theta = 0.1 the sum is 1.0495M
+	// (+Inf). At theta = 0.1 +/- pi/2 it is 0.95M -/+ 0.00998M, both finite.
+	m := math.MaxFloat64
+	h := NewHamiltonian().AddTerm(0.95*m).AddTerm(0.1*m, quantum.PauliZ, quantum.PauliI)
+	tmpl := H2Ansatz()
+	params := parameterized.Params{"theta": 0.1}
+
+	start, err := evaluate(h, tmpl, params)
+	if err != nil {
+		t.Fatalf("setup evaluate: %v", err)
+	}
+	if !math.IsInf(start, 1) {
+		t.Fatalf("setup: start energy = %v, want +Inf", start)
+	}
+	grad, _, err := parameterShiftGradient(h, tmpl, params, tmpl.ParamNames())
+	if err != nil {
+		t.Fatalf("setup gradient: %v", err)
+	}
+	if !isFinite(grad["theta"]) {
+		t.Fatalf("setup: gradient = %v, want finite so the gradient guard does not fire", grad["theta"])
+	}
+
+	res, err := VQE(h, tmpl, VQEOptions{InitialParams: params, MaxIterations: 1})
+	var pe *parameterized.InvalidParameterValueError
+	if errors.As(err, &pe) {
+		t.Fatalf("VQE blamed parameter %q (value %v), which the caller supplied finite: %v", pe.Name, pe.Value, err)
+	}
+	var ve *InvalidVQEInputError
+	if !errors.As(err, &ve) {
+		t.Fatalf("VQE: err = %v, result = %+v; want InvalidVQEInputError: the starting energy overflowed float64", err, res)
+	}
+}
+
+// TestVQEEnergyGuardReasons pins the initial-energy Reason: it blames the
+// Hamiltonian, names the point when the template has parameters (a
+// stepped point is not one the caller chose, and the initial one reads
+// the same way), omits it otherwise, and wraps nothing because VQE
+// detected the overflow itself.
+func TestVQEEnergyGuardReasons(t *testing.T) {
+	fixed := parameterized.NewTemplate(1)
+	if err := fixed.AddGate(gates.NewPauliX(), 0); err != nil {
+		t.Fatal(err)
+	}
+	cases := []struct {
+		name string
+		h    *Hamiltonian
+		tmpl *parameterized.Template
+		opts VQEOptions
+		want string
+	}{
+		{
+			"with parameters",
+			NewHamiltonian().AddTerm(math.MaxFloat64).AddTerm(math.MaxFloat64, quantum.PauliZ, quantum.PauliI),
+			H2Ansatz(),
+			VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}},
+			`initial energy is non-finite (+Inf) with "theta"=0.1: the Hamiltonian's energy overflows float64`,
+		},
+		{
+			"no parameters",
+			NewHamiltonian().AddTerm(math.MaxFloat64).AddTerm(math.MaxFloat64),
+			fixed,
+			VQEOptions{},
+			"initial energy is non-finite (+Inf): the Hamiltonian's energy overflows float64",
+		},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var ve *InvalidVQEInputError
+			res, err := VQE(c.h, c.tmpl, c.opts)
+			if !errors.As(err, &ve) {
+				t.Fatalf("err = %v (%T), result = %+v; want InvalidVQEInputError", err, err, res)
+			}
+			if ve.Reason != c.want {
+				t.Fatalf("Reason = %q, want %q", ve.Reason, c.want)
+			}
+			if cause := errors.Unwrap(err); cause != nil {
+				t.Fatalf("errors.Unwrap(err) = %v, want nil for a problem VQE detected itself", cause)
+			}
+		})
+	}
+}
+
+// TestVQENonFiniteStepEnergyIsReported pins the step-energy guard: every
+// energy up to the step is finite, the step lands where the Hamiltonian
+// overflows, and VQE reports it rather than comparing an infinity. With
+// E(theta) = 0.95M + 0.1M cos(theta) and theta = pi - 0.1 the start
+// (0.85M) and both shifted energies (0.95M -/+ 0.00998M) are finite and the
+// gradient is -0.1M sin(0.1); a StepSize of (pi + 0.1)/|gradient| steps
+// to 2 pi, where the energy is 1.05M.
+func TestVQENonFiniteStepEnergyIsReported(t *testing.T) {
+	m := math.MaxFloat64
+	h := NewHamiltonian().AddTerm(0.95*m).AddTerm(0.1*m, quantum.PauliZ, quantum.PauliI)
+	tmpl := H2Ansatz()
+	theta := math.Pi - 0.1
+	params := parameterized.Params{"theta": theta}
+
+	start, err := evaluate(h, tmpl, params)
+	if err != nil {
+		t.Fatalf("setup evaluate: %v", err)
+	}
+	if !isFinite(start) {
+		t.Fatalf("setup: start energy = %v, want finite", start)
+	}
+	grad, _, err := parameterShiftGradient(h, tmpl, params, tmpl.ParamNames())
+	if err != nil {
+		t.Fatalf("setup gradient: %v", err)
+	}
+	if !isFinite(grad["theta"]) || grad["theta"] >= 0 {
+		t.Fatalf("setup: gradient = %v, want finite and negative", grad["theta"])
+	}
+	step := (math.Pi + 0.1) / -grad["theta"]
+	stepped := theta - step*grad["theta"]
+	if e, err := evaluate(h, tmpl, parameterized.Params{"theta": stepped}); err != nil || !math.IsInf(e, 1) {
+		t.Fatalf("setup: energy at the stepped point %v = %v, %v; want +Inf", stepped, e, err)
+	}
+
+	var ve *InvalidVQEInputError
+	var pe *parameterized.InvalidParameterValueError
+	res, err := VQE(h, tmpl, VQEOptions{InitialParams: params, StepSize: step, MaxIterations: 1})
+	if errors.As(err, &pe) {
+		t.Fatalf("VQE blamed parameter %q (value %v), which the caller supplied finite: %v", pe.Name, pe.Value, err)
+	}
+	if !errors.As(err, &ve) {
+		t.Fatalf("VQE: err = %v (%T), result = %+v; want InvalidVQEInputError from the step-energy guard", err, err, res)
+	}
+	want := fmt.Sprintf("step energy at iteration 0 is non-finite (+Inf) with %q=%v: the Hamiltonian's energy overflows float64", "theta", stepped)
+	if ve.Reason != want {
+		t.Fatalf("Reason = %q, want %q", ve.Reason, want)
+	}
+}
+
+// TestVQEGradientOverflowMessageMatchesFiniteEnergies pins the gradient
+// guard's wording on the case it must not misdescribe (backlog item 14,
+// round 1): a single MaxFloat64 term keeps every evaluated energy finite,
+// and only the difference of the two shifted energies (-M and +M)
+// overflows, so the Reason must not claim the energy overflows.
+func TestVQEGradientOverflowMessageMatchesFiniteEnergies(t *testing.T) {
+	h := zOnQubit0(math.MaxFloat64) // E = M cos(theta): finite for every theta
+	tmpl := H2Ansatz()
+	const theta = math.Pi / 2
+	for _, shift := range []float64{0, math.Pi / 2, -math.Pi / 2} {
+		e, err := evaluate(h, tmpl, parameterized.Params{"theta": theta + shift})
+		if err != nil {
+			t.Fatalf("setup evaluate(shift %v): %v", shift, err)
+		}
+		if !isFinite(e) {
+			t.Fatalf("setup: energy at shift %v = %v, want finite", shift, e)
+		}
+	}
+
+	res, err := VQE(h, tmpl, VQEOptions{InitialParams: parameterized.Params{"theta": theta}})
+	var ve *InvalidVQEInputError
+	if !errors.As(err, &ve) {
+		t.Fatalf("VQE: err = %v, result = %+v; want InvalidVQEInputError from the gradient guard", err, res)
+	}
+	if strings.Contains(ve.Reason, "energy overflows") {
+		t.Fatalf("Reason = %q says the energy overflows, but the energy at the start and at both shifted points is finite; only the shift difference overflowed", ve.Reason)
+	}
+}
+
+// TestVQEGradientGuardReason pins the gradient guard's exact Reason on the
+// shift-difference case, so the spec's Decision 3 literal stays tied to
+// the code.
+func TestVQEGradientGuardReason(t *testing.T) {
+	var ve *InvalidVQEInputError
+	_, err := VQE(zOnQubit0(math.MaxFloat64), H2Ansatz(), VQEOptions{InitialParams: parameterized.Params{"theta": math.Pi / 2}})
+	if !errors.As(err, &ve) {
+		t.Fatalf("err = %v (%T), want InvalidVQEInputError", err, err)
+	}
+	const want = `gradient of parameter "theta" is non-finite (-Inf) at iteration 0: the Hamiltonian's energy at a shifted point or the shift difference overflows float64`
+	if ve.Reason != want {
+		t.Fatalf("Reason = %q, want %q", ve.Reason, want)
+	}
+}
+
+// TestVQEEvaluationErrorNamesThePhase pins the two later wrap phrases,
+// reachable only through a factory that fails for some values: one that
+// returns a two-qubit gate (which parameterized.Bind rejects on a single
+// target) once its value passes 10. Starting at 9 the +pi/2 shift crosses
+// it during the gradient; starting at 0.1 with a StepSize of 100 the
+// descent step does.
+func TestVQEEvaluationErrorNamesThePhase(t *testing.T) {
+	failsPastTen := func(v float64) quantum.Gate {
+		if v > 10 {
+			return gates.NewCNOT()
+		}
+		return gates.NewRy(v)
+	}
+	newTemplate := func() *parameterized.Template {
+		tmpl := parameterized.NewTemplate(2)
+		if err := tmpl.AddParamGate("theta", failsPastTen, 0); err != nil {
+			t.Fatal(err)
+		}
+		return tmpl
+	}
+	cases := []struct {
+		name  string
+		opts  VQEOptions
+		phase string
+	}{
+		{"gradient", VQEOptions{InitialParams: parameterized.Params{"theta": 9}}, "gradient evaluation at iteration 0"},
+		{"step", VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}, StepSize: 100}, "step evaluation at iteration 0"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			var ve *InvalidVQEInputError
+			var ge *quantum.InvalidGateApplicationError
+			_, err := VQE(zOnQubit0(4), newTemplate(), c.opts)
+			if !errors.As(err, &ve) || !errors.As(err, &ge) {
+				t.Fatalf("err = %v (%T); want InvalidVQEInputError wrapping InvalidGateApplicationError", err, err)
+			}
+			if want := c.phase + " failed: " + ge.Error(); ve.Reason != want {
+				t.Fatalf("Reason = %q, want %q", ve.Reason, want)
+			}
+		})
 	}
 }
