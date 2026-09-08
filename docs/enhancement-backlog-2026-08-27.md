@@ -363,7 +363,7 @@ QPE is actually wanted.
   > gradient), preserved under `algorithm/backlog_red_numeric_test.go`
   > (`redtests` tag) and queued as item 20. Commits: 21626ff, 2079f68,
   > 84da0b7, 00529b9.
-- [ ] 17. **`parameterShiftGradient` undercounts evaluations on failure** —
+- [x] 17. **`parameterShiftGradient` undercounts evaluations on failure** —
   the helper adds two to its evaluation count only after both shifted
   evaluations succeed. Observed: when the +pi/2 evaluation succeeds and the
   -pi/2 evaluation fails, it returns 0 evaluations consumed though one ran.
@@ -374,6 +374,26 @@ QPE is actually wanted.
   > **Red tests**: `TestRedParameterShiftCountsEvaluationsBeforeFailure` in
   > `algorithm/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftCounts'`.
+  > **Done (2026-09-08)**: `parameterShiftGradient` in `algorithm/vqe.go`
+  > (lines 93–102 at 21626ff) now counts each shifted evaluation the moment
+  > `evaluate` returns nil (`evals++` after each nil-error check, replacing
+  > the single `evals += 2`), so the count returned with an error includes
+  > every evaluation that completed and excludes the failing one. The count
+  > is returned exact alongside the error rather than zeroed, because the
+  > doc promises it and zeroing would turn an undercount into a larger one
+  > (Decision 2, io.Reader precedent). `VQE` unchanged — it discards the
+  > count on error and sums it on success, where the total is unchanged;
+  > `go run ./cmd/quantum -demo qaoa` still reports 378 evaluations. Item 16's
+  > early return of 0 stays exact since it precedes any evaluation. Doc
+  > comment states the count contract and, after red round 1, that a repeated
+  > name in `names` is evaluated and counted per occurrence (Amendment to
+  > Decision 1). `algorithm/backlog_red_test.go` deleted since its last test
+  > moved to the regular suite; item 20's test stays tagged in
+  > `algorithm/backlog_red_numeric_test.go`. CHANGELOG Unreleased entry;
+  > item 14 spec amendment. Tests: moved
+  > `TestParameterShiftCountsEvaluationsBeforeFailure`, plus four-row
+  > `TestParameterShiftEvaluationCountOnFailure` pinning counts 0/1/2/3
+  > across failure positions. Commits: 9a0c2c0, 7828e60, 49445e7.
 - [ ] 18. **Zero-value `Template` panics in `AddParamGate`** — a
   `Template` declared without `NewTemplate` (so its `seen` map is nil)
   panics on the first `AddParamGate` call instead of returning an error,
