@@ -195,6 +195,45 @@ func TestSameParamDrivesTwoGates(t *testing.T) {
 	}
 }
 
+// TestBindWithEmptyNameParameter pins the Bind half of "the same test
+// Bind applies" (see ParamStepCounts's doc comment) directly in this
+// package, rather than only transitively through algorithm's VQE tests:
+// "" is an ordinary map key to Bind, driving two gates around a fixed
+// gate, the same shape as TestParamStepCounts's "empty" fixture.
+func TestBindWithEmptyNameParameter(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpl.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpl.AddParamGate("", parameterized.Rz, 1); err != nil {
+		t.Fatal(err)
+	}
+	bound, err := tmpl.Bind(parameterized.Params{"": 0.7})
+	if err != nil {
+		t.Fatalf("Bind: %v", err)
+	}
+	dense, _ := state.New(2)
+	if err := bound.Execute(dense); err != nil {
+		t.Fatalf("Execute: %v", err)
+	}
+	manual, _ := circuit.New(2)
+	_ = manual.AddGate(gates.NewRy(0.7), 0)
+	_ = manual.AddGate(gates.NewCNOT(), 0, 1)
+	_ = manual.AddGate(gates.NewRz(0.7), 1)
+	ref, _ := state.New(2)
+	_ = manual.Execute(ref)
+	for i := 0; i < 4; i++ {
+		a := dense.Amplitude(i)
+		b := ref.Amplitude(i)
+		if a != b {
+			t.Fatalf("amplitude %d: %v != %v", i, a, b)
+		}
+	}
+}
+
 func TestNumQubits(t *testing.T) {
 	if got := parameterized.NewTemplate(5).NumQubits(); got != 5 {
 		t.Fatalf("NumQubits() = %d, want 5", got)

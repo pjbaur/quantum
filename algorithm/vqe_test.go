@@ -730,6 +730,24 @@ func TestVQEEmptyNameParameterIsCheckedLikeAnyOther(t *testing.T) {
 	}
 }
 
+// h2AnsatzNamed builds H2Ansatz's three-gate structure (X on qubit 1,
+// Ry(name) on qubit 0, CNOT 0->1) with a caller-chosen parameter name, so
+// a test can compare two names on the identical shape without hand-
+// copying the ansatz and risking drift from a future H2Ansatz change.
+func h2AnsatzNamed(name string) *parameterized.Template {
+	t := parameterized.NewTemplate(2)
+	if err := t.AddGate(gates.NewPauliX(), 1); err != nil {
+		panic(err)
+	}
+	if err := t.AddParamGate(name, parameterized.Ry, 0); err != nil {
+		panic(err)
+	}
+	if err := t.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		panic(err)
+	}
+	return t
+}
+
 // TestVQEAcceptsEmptyNameDrivingOneGate pins the other half of "like any
 // other": a parameter named "" that drives exactly one gate satisfies
 // the rule, so VQE optimizes it and reaches the same energy as the same
@@ -738,18 +756,9 @@ func TestVQEEmptyNameParameterIsCheckedLikeAnyOther(t *testing.T) {
 // ParamStepCounts fix and guards against rejecting "" outright.
 func TestVQEAcceptsEmptyNameDrivingOneGate(t *testing.T) {
 	h := H2Hamiltonian()
-	tmpl := parameterized.NewTemplate(2)
-	if err := tmpl.AddGate(gates.NewPauliX(), 1); err != nil {
-		t.Fatal(err)
-	}
-	if err := tmpl.AddParamGate("", parameterized.Ry, 0); err != nil {
-		t.Fatal(err)
-	}
-	if err := tmpl.AddGate(gates.NewCNOT(), 0, 1); err != nil {
-		t.Fatal(err)
-	}
+	tmpl := h2AnsatzNamed("")
 
-	ref, err := VQE(h, H2Ansatz(), VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}})
+	ref, err := VQE(h, h2AnsatzNamed("theta"), VQEOptions{InitialParams: parameterized.Params{"theta": 0.1}})
 	if err != nil {
 		t.Fatalf("reference VQE: %v", err)
 	}

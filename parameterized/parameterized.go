@@ -98,7 +98,9 @@ func (t *Template) checkTargets(targets []int) error {
 }
 
 // AddParamGate adds a gate built by factory from the named parameter's
-// value at Bind time. The same name may drive several gates.
+// value at Bind time. The same name may drive several gates. The name is
+// an opaque key: any string is accepted, the empty string included, and
+// it is what Bind and ParamStepCounts key on.
 func (t *Template) AddParamGate(name string, factory Factory, targets ...int) error {
 	if factory == nil {
 		return fmt.Errorf("parameter %q: factory must not be nil", name)
