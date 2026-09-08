@@ -805,9 +805,10 @@ func TestParameterShiftRejectsMissingParam(t *testing.T) {
 // TestParameterShiftMissingParamErrorMatchesBind pins what the rejection
 // looks like: the error is parameterized.MissingParameterError naming the
 // first missing parameter in declaration order, the same error with the
-// same text that Bind returns for the unshifted params, whatever the order
-// of names and even when names is empty; and nothing is evaluated first,
-// so the returned gradient is nil and the count is zero.
+// same text that Bind returns for the unshifted params (every value here
+// is finite, so Bind's own first complaint is the absent name), whatever
+// the order of names and even when names is empty; and nothing is
+// evaluated first, so the returned gradient is nil and the count is zero.
 func TestParameterShiftMissingParamErrorMatchesBind(t *testing.T) {
 	h := H2Hamiltonian()
 	tmpl := gradientTargetTemplate() // declares a and b
@@ -850,7 +851,8 @@ func TestParameterShiftMissingParamErrorMatchesBind(t *testing.T) {
 // completeness check leaves to Bind on purpose: a name in names that the
 // template never declared is written into the shifted copies, but no
 // shift can hide it, so Bind rejects it as UnknownParameterError at the
-// first evaluation with nothing consumed.
+// first evaluation that shifts it; with names=[c] that is the first
+// evaluation of the call, so nothing is consumed.
 func TestParameterShiftUndeclaredNameIsRejectedByBind(t *testing.T) {
 	h := H2Hamiltonian()
 	tmpl := gradientTargetTemplate() // declares a and b

@@ -66,10 +66,19 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // not shifted stays absent and Bind rejects it, so whether the call failed
 // depended on which names were shifted. The check reports the first
 // missing name in declaration order as parameterized.MissingParameterError,
-// the error Bind returns for the unshifted params, and consumes no
-// evaluation. A name in names that the template never declared needs no
-// check here: no shift can hide it from Bind, which rejects it as
-// UnknownParameterError at the first evaluation.
+// the error Bind returns when a declared name is absent, and consumes no
+// evaluation. It guarantees completeness only: that is the one rule of
+// Bind's a shift can hide, since the copies keep every key of params, a
+// non-finite value stays non-finite when shifted, and a name in names that
+// the template never declared is written into the copies where Bind sees
+// it. Everything else is left to Bind, which rejects it at the first
+// shifted evaluation that reaches it. So a non-finite value ahead of a
+// missing name in declaration order is reported here as the missing name,
+// where Bind would report the value; a name in names that the template
+// never declared is rejected as UnknownParameterError when its own shift
+// is evaluated, after the names before it have cost their evaluations; and
+// with names empty no evaluation runs and nothing beyond completeness is
+// checked.
 //
 // Returns the gradient keyed by name plus the number of energy evaluations
 // consumed.

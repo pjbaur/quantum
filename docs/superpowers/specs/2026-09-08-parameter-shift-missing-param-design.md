@@ -96,7 +96,13 @@ but no shift can hide it, and `Bind` rejects it as
 Likewise an undeclared key in `params`: the copies keep every key, so
 `Bind` sees it. Duplicating either check would restate `Bind`'s rule with
 no change in outcome. Pinned by
-`TestParameterShiftUndeclaredNameIsRejectedByBind`.
+`TestParameterShiftUndeclaredNameIsRejectedByBind`. Amended 2026-09-08
+(round 1 fix): "at the first evaluation with nothing consumed" is exact
+only when the undeclared name is first in `names`; `Bind` rejects it when
+its own shift is evaluated, after the names before it have cost their
+evaluations, and "no change in outcome" is therefore true of the error
+and the nil gradient but not of the count. The check guarantees
+completeness only; Decision 5 states the boundary and why it falls there.
 
 ## Decision 2: the error is `*parameterized.MissingParameterError`, not wrapped
 
@@ -108,7 +114,10 @@ detecting package's error unchanged, and `VQE` wraps whatever they return
 at its boundary through `wrapEvaluationError`, keeping the cause behind
 `Unwrap`. The helper here stands in for `Bind`, catching a gap the shift
 would otherwise hide from it, so it returns what `Bind` would have
-returned: `&parameterized.MissingParameterError{Name: name}`.
+returned for an absent declared name:
+`&parameterized.MissingParameterError{Name: name}`. Amended 2026-09-08
+(round 1 fix): the parity is with `Bind`'s presence rule, not with `Bind`
+as a whole; Decision 5 records where it stops.
 
 Constructing another package's exported error type has precedent in the
 module: `algorithm/backend.go:32` and `algorithm/qpe.go:126` build
@@ -173,6 +182,67 @@ the items that follow" paragraph of
 recording where item 16 landed, that `VQE` and the wrap are unchanged,
 and that item 17 stays open in the loop body.
 
+## Decision 5 (round 1 fix): the check guarantees completeness only
+
+Round 1's black-box red tests
+(`.superpowers/backlog/enhancement-backlog-2026-08-27/item-16-round-1-red.md`)
+read three claims in the doc comment as promising more than the check
+does. "The error Bind returns for the unshifted params" is false when a
+non-finite value sits ahead of the gap in declaration order: `Bind` walks
+each declared name checking presence and then finiteness before moving
+on, so for `params = {a: NaN}` on a template declaring `a` then `b` it
+reports `InvalidParameterValueError{a}` while the check reports
+`MissingParameterError{b}`. "Rejects it as UnknownParameterError at the
+first evaluation" is exact only when the undeclared name is first in
+`names`: with `names = [a, c]` the two evaluations of `a` run before `c`'s
+copy reaches `Bind`. And "the precondition Bind states" reads as full
+`Bind` parity, which fails with `names` empty: no evaluation runs, so an
+undeclared key or a non-finite value in `params` is never seen by `Bind`
+and the helper returns an empty gradient, 0, nil.
+
+Two resolutions were weighed for each claim.
+
+**Tighten the check until the claims hold.** Exact `Bind` parity for
+`params` needs either `Bind`'s three rules restated in the helper
+(presence, finiteness, unknown keys), which Decision 1's "deliberately
+not checked" and the run lead's constraint against duplicating `Bind`
+wholesale both exclude, or the probe `t.Bind(params)` that the round 1
+review's Recommendation 1 describes, which builds a circuit per gradient
+and changes the shape item 17's approved design and plan describe as the
+untouched check ahead of the loop. Rejecting an undeclared name in
+`names` before the loop needs a set built from `ParamNames` and a fourth
+rule of the helper's own. Each partial tightening also lengthens the
+contract: "completeness and finiteness of declared names, but not unknown
+keys", or "everything `Bind` checks plus a rule for `names`".
+
+**Narrow the claims to what the check does.** Chosen. The contract is one
+sentence: the check guarantees completeness only. The boundary is not
+arbitrary; completeness is the one rule of `Bind`'s a shift can hide. The
+copies keep every key of `params`, so an undeclared key reaches `Bind`
+whenever `Bind` runs; a non-finite value stays non-finite under `+/- pi/2`
+(`NaN + pi/2` is `NaN`, `+Inf - pi/2` is `+Inf`), so it reaches `Bind`
+too; and an undeclared name in `names` is written into the copies of its
+own iteration, where `Bind` sees it. None of those can reproduce the
+item's defect, a plausible slope with a nil error: each ends in `Bind`'s
+own error with a nil gradient or, with `names` empty, in an empty
+gradient that cost nothing and asserts nothing. The doc comment now says
+so in three sentences, quoted in the round 1 rulings below, and the
+CHANGELOG entry carries the same "completeness only" sentence.
+
+Closed by the same change: Minor 1 of the round 1 review (the
+`Bind`-parity phrase, now "the error Bind returns when a declared name is
+absent" plus the precedence sentence), Minor 3 ("at the first evaluation",
+now "when its own shift is evaluated, after the names before it have cost
+their evaluations"), and Minor 2 together with the docs review's two
+findings: `MissingParameterError`'s doc comment in
+`parameterized/parameterized.go` now states the condition (a declared
+parameter absent from the values a template is bound with) instead of
+naming `Bind` as the actor, the style of `quantum`'s cross-package error
+types, and the 2026-08-30 spec's error taxonomy carries an amendment note
+pointing here. The comments of `TestParameterShiftMissingParamErrorMatchesBind`
+and `TestParameterShiftUndeclaredNameIsRejectedByBind` were reworded to
+match; no assertion changed.
+
 ## Item 17 follows on locally
 
 Item 17 (evaluation undercount on failure): the loop body does
@@ -199,7 +269,18 @@ run of `algorithm` lists exactly that one failure.
   as `Bind` does. Pinned by both "both missing" rows.
 - **Non-finite values in `params`** are not checked here; `Bind` rejects
   them at the first evaluation as `InvalidParameterValueError`, and `VQE`
-  guards them earlier. Unchanged.
+  guards them earlier. Unchanged. Amended 2026-09-08 (round 1 fix): when a
+  non-finite value sits ahead of a missing name in declaration order, the
+  check reports the missing name where `Bind` would report the value
+  (Decision 5).
+- **Empty `names` with a binding `Bind` would reject for another reason**
+  (an undeclared key, a non-finite value): no evaluation runs and nothing
+  beyond completeness is checked, so the helper returns an empty
+  gradient, 0, nil (Decision 5).
+- **An undeclared name later in `names`** is rejected as
+  `UnknownParameterError` when its own shift is evaluated; the names
+  before it have cost their evaluations and the count says so
+  (Decision 5).
 - **Duplicates in `names`** each cost two evaluations and write the same
   component. No caller does it; unchanged and out of scope.
 
@@ -215,7 +296,10 @@ run of `algorithm` lists exactly that one failure.
   unaffected.
 - `internal/examples/qaoa.go` and `cmd/quantum/main.go` call `VQE` only.
 - No Go file outside `algorithm/` changes. `CHANGELOG.md` and item 14's
-  spec gain text.
+  spec gain text. Amended 2026-09-08 (round 1 fix):
+  `parameterized/parameterized.go` gains a reworded doc comment on
+  `MissingParameterError` (no code change), and the 2026-08-30 spec's
+  error taxonomy an amendment note (Decision 5).
 
 ## Backward compatibility (ADR-style note)
 
@@ -259,6 +343,46 @@ reported name, the zero evaluation count, the nil gradient, and equality
 with `Bind`'s own error text alongside it, rather than editing the moved
 test.
 
+### Round 1 red tests
+
+Four tests survived round 1's black-box pass
+(`algorithm/backlog_item16_red_test.go`, uncommitted, deleted by the round
+1 fix). The run lead ruled the first three in scope (they target sentences
+this item's doc comment added) and the fourth out of scope.
+
+- `TestRedParameterShiftEmptyNamesAcceptsBindRejectedParams`: deleted.
+  Ruling: out of contract under Decision 5. The doc comment now says "with
+  names empty no evaluation runs and nothing beyond completeness is
+  checked." The test asserted `Bind`'s error for an undeclared key or a
+  non-finite value with `names = []`; the helper returns an empty
+  gradient, 0, nil, the correct answer to "differentiate nothing", and
+  hides no slope.
+- `TestRedParameterShiftErrorMatchesBindWhenAnEarlierValueIsNonFinite`:
+  deleted. Ruling: out of contract under Decision 5. The doc comment now
+  says "a non-finite value ahead of a missing name in declaration order is
+  reported here as the missing name, where Bind would report the value."
+  Both are true diagnoses of an input `Bind` rejects; the check does not
+  copy `Bind`'s precedence between them. The test's third row (`b`
+  missing, `c` undeclared, `a` shifted) passed before and after and is the
+  "b missing, a shifted" row of `TestParameterShiftMissingParamErrorMatchesBind`
+  with an extra key.
+- `TestRedParameterShiftUndeclaredNameConsumesNothing`: deleted. Ruling:
+  out of contract under Decision 5. The doc comment now says "a name in
+  names that the template never declared is rejected as
+  UnknownParameterError when its own shift is evaluated, after the names
+  before it have cost their evaluations." The count is exact accounting of
+  evaluations that ran, the rule item 17 applies inside the loop, not a
+  defect. `TestParameterShiftUndeclaredNameIsRejectedByBind` keeps pinning
+  `names = [c]`, where the rejection is the call's first evaluation and
+  the count is 0; its comment now says so.
+- `TestRedParameterShiftAtHugeAngleMatchesReducedAngle`: routed to
+  backlog item 20 and kept under the `redtests` tag in
+  `algorithm/backlog_red_numeric_test.go` (a new tagged file, since
+  `algorithm/backlog_red_test.go` is item 17's and its plan deletes it).
+  The defect is float64 spacing swallowing the `+/- pi/2` shift at
+  `a = 2^60`, inside the loop body this item did not touch and unrelated
+  to parameter completeness.
+
 ## Testing
 
 All in `algorithm/vqe_test.go` (package `algorithm`, which can call the
@@ -286,6 +410,9 @@ helper):
 - `go test -tags redtests ./algorithm -run '^TestRed'` must list exactly
   `TestRedParameterShiftCountsEvaluationsBeforeFailure` (item 17) as
   failing. The `parameterized` red tests (items 18 and 19) are untouched.
+  Amended 2026-09-08 (round 1 fix): the run also lists
+  `TestRedParameterShiftAtHugeAngleMatchesReducedAngle` (item 20,
+  `algorithm/backlog_red_numeric_test.go`), and nothing else.
 
 Prototype: every code and test change in the plan was applied to a
 scratch copy of the repository at `23d60a1`; the red results above were
@@ -298,6 +425,7 @@ QAOA demo all as stated.
 ## Out of scope
 
 Item 17 (evaluation count on failure). Items 18 and 19 (`AddParamGate`
-gaps in `parameterized`). Any change to `VQE`'s body or to any exported
-API. Duplicate names in `names`. Rewording `MissingParameterError`'s
-message.
+gaps in `parameterized`). Item 20 (the `+/- pi/2` shift lost to float64
+spacing at huge angles; routed from round 1, Decision 5). Any change to
+`VQE`'s body or to any exported API. Duplicate names in `names`. Rewording
+`MissingParameterError`'s message.
