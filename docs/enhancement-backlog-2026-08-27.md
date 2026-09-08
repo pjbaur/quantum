@@ -325,7 +325,7 @@ QPE is actually wanted.
   > found two pre-existing `AddParamGate` gaps, preserved under
   > `parameterized/backlog_red_test.go` (`redtests` tag) and queued as items
   > 18 and 19. Commits: 5f185dc, add554f, e47e46a.
-- [ ] 16. **`parameterShiftGradient` shifts missing parameters from an
+- [x] 16. **`parameterShiftGradient` shifts missing parameters from an
   implicit zero** — when `params` lacks a name that appears in `names`, the
   shifted copies read the map's zero value, so the helper evaluates the
   +/- pi/2 points as if that parameter were 0 and returns a gradient with a
@@ -340,6 +340,29 @@ QPE is actually wanted.
   > **Red tests**: `TestRedParameterShiftMissingParamIsRejected` in
   > `algorithm/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftMissing'`.
+  > **Done (2026-09-08)**: `parameterShiftGradient` in `algorithm/vqe.go`
+  > begins with a completeness check over `t.ParamNames()` returning
+  > `*parameterized.MissingParameterError{Name}` with 0 evaluations, in
+  > declaration order like `Bind`, so a missing declared parameter is an
+  > error regardless of `names` order. The check lives in the helper because
+  > the shift itself hides the gap from `Bind` (a missing name reads as 0 and
+  > is written into the ±π/2 copies). `names` stays a parameter (selects
+  > which parameters to differentiate). `VQE` and the loop body untouched.
+  > Doc comment states the contract as completeness-only, with value
+  > validity and undeclared keys left to `Bind` at the first shifted
+  > evaluation that reaches it (spec Decision 5, adopted after the gate's red
+  > round). `MissingParameterError`'s doc in `parameterized/parameterized.go`
+  > now states the condition rather than naming `Bind`; CHANGELOG Unreleased
+  > entry; amendment notes in the 2026-08-30 spec and item 14's spec. Tests:
+  > moved `TestParameterShiftRejectsMissingParam`, plus
+  > `TestParameterShiftMissingParamErrorMatchesBind`,
+  > `TestParameterShiftUndeclaredNameIsRejectedByBind`,
+  > `TestParameterShiftDifferentiatesOnlyNamedParams` in
+  > `algorithm/vqe_test.go`. Red round found a pre-existing float64 limit
+  > (θ ± π/2 unrepresentable at huge magnitudes gives an exactly zero
+  > gradient), preserved under `algorithm/backlog_red_numeric_test.go`
+  > (`redtests` tag) and queued as item 20. Commits: 21626ff, 2079f68,
+  > 84da0b7, 00529b9.
 - [ ] 17. **`parameterShiftGradient` undercounts evaluations on failure** —
   the helper adds two to its evaluation count only after both shifted
   evaluations succeed. Observed: when the +pi/2 evaluation succeeds and the
