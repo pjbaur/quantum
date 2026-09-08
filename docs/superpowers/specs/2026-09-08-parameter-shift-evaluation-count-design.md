@@ -257,6 +257,14 @@ leaves the package as it is for the default build.
 `go test -tags redtests ./algorithm -run '^TestRed'` then reports
 `ok ... [no tests to run]`, which is the expected outcome, not a failure.
 
+Amended 2026-09-08 (round 1 fix): item 20's tagged file
+(`algorithm/backlog_red_numeric_test.go`) was added after this design was
+written, so the prediction above no longer holds:
+`go test -tags redtests ./algorithm -run '^TestRed'` now lists and fails
+exactly that one test, not `[no tests to run]`. `go vet -tags redtests
+./algorithm` still passes, because it is item 20's file, not this design's
+deleted `backlog_red_test.go`, that carries the tag.
+
 ## Effect on callers
 
 - `algorithm/vqe.go` `VQE`: no code change. On success the helper's count

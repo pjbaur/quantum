@@ -232,8 +232,9 @@ an energy
 (`docs/superpowers/specs/2026-09-08-parameter-shift-evaluation-count-design.md`);
 `VQE` and the wrap are unchanged, as this paragraph anticipated, because
 `VQE` discards the count with the error and sums it only on success, where
-the total is the same, and with both `algorithm` red tests in the regular
-suite `algorithm/backlog_red_test.go` is deleted.
+the total is the same. With its last test moved into the regular suite,
+`algorithm/backlog_red_test.go` is deleted; item 20's red test stays
+tagged in `algorithm/backlog_red_numeric_test.go`.
 
 ## Effect on callers
 

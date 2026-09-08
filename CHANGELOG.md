@@ -105,8 +105,9 @@ rule `VQE` applies to its own evaluations, so the count returned with an
 error covers every evaluation that completed before the failure; the
 failing evaluation is not counted. `VQE` discards the count with the
 error and sums it only on success, where the total is unchanged; no
-exported behavior changes. With both `algorithm` red tests now in the
-regular suite, `algorithm/backlog_red_test.go` is removed. Design:
+exported behavior changes. With its last test moved into the regular
+suite, `algorithm/backlog_red_test.go` is removed; item 20's red test
+stays tagged in `algorithm/backlog_red_numeric_test.go`. Design:
 `docs/superpowers/specs/2026-09-08-parameter-shift-evaluation-count-design.md`.
 
 ### Breaking
