@@ -74,6 +74,21 @@ gate. `AddParamGate("")` remains accepted; a `""` parameter driving one
 gate optimizes as before. Design:
 `docs/superpowers/specs/2026-09-08-empty-parameter-name-step-count-design.md`.
 
+#### `algorithm`'s parameter-shift gradient rejects an incomplete parameter binding
+
+The unexported `parameterShiftGradient` helper behind `VQE` shifted each
+named parameter in a copy of the caller's `Params`, so a declared name the
+caller had left out was written into the shifted copies at +/- pi/2 by the
+shift itself: `Bind` saw a complete binding and the helper returned the
+slope at an implicit 0 with a nil error, while the same gap left unshifted
+failed in `Bind`, so whether the call errored depended on which names were
+passed. The helper now checks that every declared parameter is bound
+before any evaluation and reports the first missing one, in declaration
+order, as `parameterized.MissingParameterError`, the error `Bind` returns
+for the same gap. `VQE` binds every declared parameter itself and is
+unaffected; no exported behavior changes. Design:
+`docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed

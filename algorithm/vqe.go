@@ -56,9 +56,29 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // textbook gamma/beta is half of it).
 // TestParameterShiftIsBlindToRescaledFactory pins this failure mode.
 //
+// params must bind every parameter the template declares, the precondition
+// Bind states; names selects which of those to differentiate and may list
+// any subset in any order. Completeness is checked here rather than left
+// to Bind because the shift would hide the gap: a name in names that
+// params lacks reads as 0 from the map, so the plus and minus copies carry
+// it at +/- pi/2, Bind sees a complete binding, and the slope at an
+// implicit 0 comes back with a nil error, whereas a missing name that is
+// not shifted stays absent and Bind rejects it, so whether the call failed
+// depended on which names were shifted. The check reports the first
+// missing name in declaration order as parameterized.MissingParameterError,
+// the error Bind returns for the unshifted params, and consumes no
+// evaluation. A name in names that the template never declared needs no
+// check here: no shift can hide it from Bind, which rejects it as
+// UnknownParameterError at the first evaluation.
+//
 // Returns the gradient keyed by name plus the number of energy evaluations
 // consumed.
 func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params parameterized.Params, names []string) (map[string]float64, int, error) {
+	for _, name := range t.ParamNames() {
+		if _, ok := params[name]; !ok {
+			return nil, 0, &parameterized.MissingParameterError{Name: name}
+		}
+	}
 	grad := make(map[string]float64, len(names))
 	evals := 0
 	for _, name := range names {

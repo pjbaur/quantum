@@ -770,3 +770,136 @@ func TestVQEAcceptsEmptyNameDrivingOneGate(t *testing.T) {
 		t.Fatalf("VQE with parameter %q: energy %v after %d iterations at %v, want the same run as with %q: energy %v after %d iterations at %v", "", res.Energy, res.Iterations, res.Params[""], "theta", ref.Energy, ref.Iterations, ref.Params["theta"])
 	}
 }
+
+// TestParameterShiftRejectsMissingParam pins that a declared parameter
+// absent from params is an error whatever names asks to shift (backlog
+// item 16). Before the check, the shift wrote a missing name into the
+// plus and minus copies at +/- pi/2, so Bind saw a complete binding and
+// the helper returned the slope at an implicit 0 with a nil error when
+// that name was the only one shifted, while any names that left the gap
+// unshifted failed in Bind.
+func TestParameterShiftRejectsMissingParam(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := gradientTargetTemplate() // declares a and b
+	incomplete := parameterized.Params{"a": 0.3}
+
+	cases := []struct {
+		name  string
+		names []string
+	}{
+		{"a only", []string{"a"}},
+		{"b only", []string{"b"}},
+		{"a then b", []string{"a", "b"}},
+		{"b then a", []string{"b", "a"}},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			grad, evals, err := parameterShiftGradient(h, tmpl, incomplete, c.names)
+			if err == nil {
+				t.Fatalf("names=%v with params=%v (declared %v): grad = %v, evals = %d, err = nil; want an error for a missing declared parameter", c.names, incomplete, tmpl.ParamNames(), grad, evals)
+			}
+		})
+	}
+}
+
+// TestParameterShiftMissingParamErrorMatchesBind pins what the rejection
+// looks like: the error is parameterized.MissingParameterError naming the
+// first missing parameter in declaration order, the same error with the
+// same text that Bind returns for the unshifted params, whatever the order
+// of names and even when names is empty; and nothing is evaluated first,
+// so the returned gradient is nil and the count is zero.
+func TestParameterShiftMissingParamErrorMatchesBind(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := gradientTargetTemplate() // declares a and b
+
+	cases := []struct {
+		name   string
+		params parameterized.Params
+		names  []string
+		want   string
+	}{
+		{"b missing, b shifted", parameterized.Params{"a": 0.3}, []string{"b"}, "b"},
+		{"a missing, a shifted", parameterized.Params{"b": 0.1}, []string{"a"}, "a"},
+		{"b missing, a shifted", parameterized.Params{"a": 0.3}, []string{"a"}, "b"},
+		{"b missing, b then a", parameterized.Params{"a": 0.3}, []string{"b", "a"}, "b"},
+		{"both missing, b then a", parameterized.Params{}, []string{"b", "a"}, "a"},
+		{"both missing, nothing shifted", parameterized.Params{}, nil, "a"},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			grad, evals, err := parameterShiftGradient(h, tmpl, c.params, c.names)
+			var me *parameterized.MissingParameterError
+			if !errors.As(err, &me) {
+				t.Fatalf("names=%v with params=%v: grad = %v, evals = %d, err = %v; want parameterized.MissingParameterError", c.names, c.params, grad, evals, err)
+			}
+			if me.Name != c.want {
+				t.Errorf("missing parameter named %q, want %q (first missing in declaration order, not in names order)", me.Name, c.want)
+			}
+			if grad != nil || evals != 0 {
+				t.Errorf("grad = %v, evals = %d, want nil and 0: an incomplete binding is rejected before any evaluation", grad, evals)
+			}
+			_, bindErr := tmpl.Bind(c.params)
+			if bindErr == nil || err.Error() != bindErr.Error() {
+				t.Errorf("err = %q, want Bind's own error for the same params, %q", err, bindErr)
+			}
+		})
+	}
+}
+
+// TestParameterShiftUndeclaredNameIsRejectedByBind pins the case the
+// completeness check leaves to Bind on purpose: a name in names that the
+// template never declared is written into the shifted copies, but no
+// shift can hide it, so Bind rejects it as UnknownParameterError at the
+// first evaluation with nothing consumed.
+func TestParameterShiftUndeclaredNameIsRejectedByBind(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := gradientTargetTemplate() // declares a and b
+	complete := parameterized.Params{"a": 0.3, "b": 0.1}
+
+	grad, evals, err := parameterShiftGradient(h, tmpl, complete, []string{"c"})
+	var ue *parameterized.UnknownParameterError
+	if !errors.As(err, &ue) {
+		t.Fatalf("names=[c] on a template declaring %v: grad = %v, evals = %d, err = %v; want parameterized.UnknownParameterError", tmpl.ParamNames(), grad, evals, err)
+	}
+	if ue.Name != "c" {
+		t.Errorf("unknown parameter named %q, want %q", ue.Name, "c")
+	}
+	if grad != nil || evals != 0 {
+		t.Errorf("grad = %v, evals = %d, want nil and 0", grad, evals)
+	}
+}
+
+// TestParameterShiftDifferentiatesOnlyNamedParams pins the other half of
+// the names contract: with a complete binding, names may be any subset in
+// any order, the returned map holds exactly those names, each component
+// equals the same component of the full gradient, and only the named
+// parameters cost evaluations.
+func TestParameterShiftDifferentiatesOnlyNamedParams(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := gradientTargetTemplate() // declares a and b
+	params := parameterized.Params{"a": 0.45, "b": 0.325}
+
+	full, fullEvals, err := parameterShiftGradient(h, tmpl, params, []string{"a", "b"})
+	if err != nil {
+		t.Fatalf("full gradient: %v", err)
+	}
+	if fullEvals != 4 || len(full) != 2 {
+		t.Fatalf("full gradient: %d evaluations over %d components, want 4 over 2", fullEvals, len(full))
+	}
+
+	reversed, evals, err := parameterShiftGradient(h, tmpl, params, []string{"b", "a"})
+	if err != nil {
+		t.Fatalf("reversed names: %v", err)
+	}
+	if evals != 4 || reversed["a"] != full["a"] || reversed["b"] != full["b"] {
+		t.Errorf("names=[b a]: grad = %v after %d evaluations, want %v after 4: order must not change the result", reversed, evals, full)
+	}
+
+	only, evals, err := parameterShiftGradient(h, tmpl, params, []string{"b"})
+	if err != nil {
+		t.Fatalf("names=[b]: %v", err)
+	}
+	if evals != 2 || len(only) != 1 || only["b"] != full["b"] {
+		t.Errorf("names=[b]: grad = %v after %d evaluations, want map[b:%v] after 2: only the named parameter is shifted", only, evals, full["b"])
+	}
+}

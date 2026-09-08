@@ -220,6 +220,12 @@ failing. Amended 2026-09-08 (item 15): the empty-name defect was in
 `ParamStepCounts`'s fixed-step sentinel, not in this loop, and was fixed
 there (`docs/superpowers/specs/2026-09-08-empty-parameter-name-step-count-design.md`);
 the loop needed no extension and must not gain an empty-name check.
+Amended 2026-09-08 (item 16): the missing-parameter shift was closed
+inside `parameterShiftGradient` by a completeness check ahead of its loop
+(`docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`);
+`VQE` and the wrap are unchanged, and no Decision 3 row is added because
+`VQE` binds every declared name before calling the helper and cannot
+reach the check. Item 17 stays open in the helper's loop body.
 
 ## Effect on callers
 
