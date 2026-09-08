@@ -252,7 +252,7 @@ QPE is actually wanted.
   > during QA gate found six pre-existing driver defects, preserved as tests
   > under `redtests` build tag and queued as items 14–17 in
   > `algorithm/backlog_red_test.go`.
-- [ ] 14. **VQE input validation and error taxonomy** — `VQE` validates only
+- [x] 14. **VQE input validation and error taxonomy** — `VQE` validates only
   nil inputs, the one-gate-per-parameter rule, and undeclared initial
   parameter names; everything else it either runs with or reports through
   another package's error type. Observed: a negative `StepSize` climbs once
@@ -275,6 +275,24 @@ QPE is actually wanted.
   > `TestRedVQENonFiniteHamiltonianIsNotBlamedOnParams` in
   > `algorithm/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedVQE(Option|Structural|NonFinite)'`.
+  > **Done (2026-09-08)**: `VQE` in `algorithm/vqe.go` validates option domains
+  > (`StepSize`, `MaxIterations`, `Tolerance`), initial-parameter finiteness,
+  > Hamiltonian/template qubit-count structure, and non-finite coefficients up front
+  > through `validateVQEOptions` and `validateVQEStructure` (which absorbs the
+  > one-gate-per-parameter check and serves as item 15's extension point);
+  > `InvalidVQEInputError` gained `Err` field and `Unwrap`, so evaluation-time
+  > errors (wide factory gate, bad axis) wrap through `wrapEvaluationError` and
+  > stay reachable via `errors.As`. Finiteness guards on every evaluated energy,
+  > gradient, and step ensure no error blames a parameter that was finite on
+  > entry, with Reasons naming the Hamiltonian or `StepSize` and the evaluation
+  > point instead. `Tolerance: +Inf` now rejected (previously accepted; recorded
+  > in the spec's backward-compatibility note and in CHANGELOG Unreleased); the
+  > 2026-08-30 parameter-binding spec carries a supersession note for "errors
+  > propagate unwrapped". Tests: the three red tests moved from `redtests` file
+  > plus four found by this item's own red round, all now in `algorithm/vqe_test.go`
+  > as `TestVQE...`, plus Reason-literal and wrap-phase tests; `evaluate` and
+  > `parameterShiftGradient` untouched. Commits: c195317, 7c589c3, cd17d0a,
+  > f4cdbe6, 2691726.
 - [ ] 15. **Empty parameter name defeats the one-gate-per-parameter check**
   — `parameterized.Template.AddParamGate` accepts `""` as a parameter name,
   but `ParamStepCounts` treats the empty string as its fixed-step marker and
