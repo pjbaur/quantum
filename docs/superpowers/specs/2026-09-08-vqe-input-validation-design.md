@@ -226,6 +226,14 @@ inside `parameterShiftGradient` by a completeness check ahead of its loop
 `VQE` and the wrap are unchanged, and no Decision 3 row is added because
 `VQE` binds every declared name before calling the helper and cannot
 reach the check. Item 17 stays open in the helper's loop body.
+Amended 2026-09-08 (item 17): the evaluation undercount was closed inside
+the helper's loop body by counting each shifted evaluation as it returns
+an energy
+(`docs/superpowers/specs/2026-09-08-parameter-shift-evaluation-count-design.md`);
+`VQE` and the wrap are unchanged, as this paragraph anticipated, because
+`VQE` discards the count with the error and sums it only on success, where
+the total is the same, and with both `algorithm` red tests in the regular
+suite `algorithm/backlog_red_test.go` is deleted.
 
 ## Effect on callers
 

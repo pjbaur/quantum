@@ -93,6 +93,22 @@ reaches it. `VQE` binds every declared parameter itself and is
 unaffected; no exported behavior changes. Design:
 `docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`.
 
+#### `algorithm`'s parameter-shift gradient counts every completed evaluation on failure
+
+The unexported `parameterShiftGradient` helper behind `VQE` added two to
+its evaluation count only after both shifted evaluations of a parameter
+had succeeded, so when the +pi/2 evaluation completed and the -pi/2 one
+failed, the count returned with the error omitted the evaluation that had
+run, although the helper promises "the number of energy evaluations
+consumed". Each evaluation is now counted as it returns an energy, the
+rule `VQE` applies to its own evaluations, so the count returned with an
+error covers every evaluation that completed before the failure; the
+failing evaluation is not counted. `VQE` discards the count with the
+error and sums it only on success, where the total is unchanged; no
+exported behavior changes. With both `algorithm` red tests now in the
+regular suite, `algorithm/backlog_red_test.go` is removed. Design:
+`docs/superpowers/specs/2026-09-08-parameter-shift-evaluation-count-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed

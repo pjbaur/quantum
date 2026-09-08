@@ -905,3 +905,87 @@ func TestParameterShiftDifferentiatesOnlyNamedParams(t *testing.T) {
 		t.Errorf("names=[b]: grad = %v after %d evaluations, want map[b:%v] after 2: only the named parameter is shifted", only, evals, full["b"])
 	}
 }
+
+// TestParameterShiftCountsEvaluationsBeforeFailure pins that the count
+// returned with an error includes every evaluation that completed before
+// the failing one (backlog item 17). The loop used to add two only after
+// both shifted evaluations of a name had succeeded, so a failure on the
+// -pi/2 evaluation lost the +pi/2 evaluation that had already run.
+func TestParameterShiftCountsEvaluationsBeforeFailure(t *testing.T) {
+	h := H2Hamiltonian()
+	// Valid single-qubit gate for non-negative values, a two-qubit gate (a
+	// dimension mismatch Bind rejects) for negative ones: the +pi/2 shift
+	// evaluates, the -pi/2 shift fails.
+	factory := func(v float64) quantum.Gate {
+		if v < 0 {
+			return gates.NewCNOT()
+		}
+		return gates.NewRy(v)
+	}
+	tmpl := parameterized.NewTemplate(2)
+	if err := tmpl.AddParamGate("a", factory, 0); err != nil {
+		t.Fatal(err)
+	}
+
+	grad, evals, err := parameterShiftGradient(h, tmpl, parameterized.Params{"a": 0.3}, []string{"a"})
+	if err == nil {
+		t.Fatalf("grad = %v, evals = %d, err = nil; want the -pi/2 evaluation to fail", grad, evals)
+	}
+	if evals != 1 {
+		t.Fatalf("evals = %d after one successful and one failed evaluation, want 1 (evaluations consumed); err = %v", evals, err)
+	}
+}
+
+// TestParameterShiftEvaluationCountOnFailure pins the count at each point
+// a shifted evaluation can fail: it is the number of evaluations that
+// completed, in the order the loop runs them (+pi/2 then -pi/2 for each
+// name in names), and the failing evaluation itself is not counted, the
+// rule VQE applies to its own evaluations. The gradient is nil on every
+// error, and the error is the one Bind returned, unwrapped.
+func TestParameterShiftEvaluationCountOnFailure(t *testing.T) {
+	h := H2Hamiltonian()
+	// Valid single-qubit gate within [-10, 10], a two-qubit gate (a
+	// dimension mismatch Bind rejects) beyond it: a parameter at 9 fails
+	// on its +pi/2 shift, one at -9 on its -pi/2 shift, one at 0 on
+	// neither.
+	failsBeyondTen := func(v float64) quantum.Gate {
+		if math.Abs(v) > 10 {
+			return gates.NewCNOT()
+		}
+		return gates.NewRy(v)
+	}
+	tmpl := parameterized.NewTemplate(2)
+	if err := tmpl.AddParamGate("a", failsBeyondTen, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := tmpl.AddParamGate("b", failsBeyondTen, 1); err != nil {
+		t.Fatal(err)
+	}
+	names := []string{"a", "b"}
+
+	cases := []struct {
+		name   string
+		params parameterized.Params
+		want   int
+	}{
+		{"first name, plus shift", parameterized.Params{"a": 9, "b": 0}, 0},
+		{"first name, minus shift", parameterized.Params{"a": -9, "b": 0}, 1},
+		{"second name, plus shift", parameterized.Params{"a": 0, "b": 9}, 2},
+		{"second name, minus shift", parameterized.Params{"a": 0, "b": -9}, 3},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			grad, evals, err := parameterShiftGradient(h, tmpl, c.params, names)
+			var ge *quantum.InvalidGateApplicationError
+			if !errors.As(err, &ge) {
+				t.Fatalf("params=%v: grad = %v, evals = %d, err = %v; want quantum.InvalidGateApplicationError from Bind", c.params, grad, evals, err)
+			}
+			if grad != nil {
+				t.Errorf("grad = %v, want nil on error", grad)
+			}
+			if evals != c.want {
+				t.Errorf("evals = %d, want %d: every evaluation that completed before the failure, and not the failure itself", evals, c.want)
+			}
+		})
+	}
+}

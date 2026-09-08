@@ -81,7 +81,15 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // checked.
 //
 // Returns the gradient keyed by name plus the number of energy evaluations
-// consumed.
+// consumed: two per name in names. On error the gradient is nil and the
+// count is still exact: each evaluation is counted as evaluate returns its
+// energy, the rule VQE applies to its own evaluations, so the count covers
+// every evaluation that completed before the failure and not the failing
+// one, which returned no energy (how far into evaluate it got is not
+// something a count of energies can express). Like io.Reader's n, the
+// count is meaningful alongside a non-nil error; VQE discards it with the
+// error, so only a direct caller sees it. The completeness check above
+// returns 0 because it precedes the first evaluation.
 func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params parameterized.Params, names []string) (map[string]float64, int, error) {
 	for _, name := range t.ParamNames() {
 		if _, ok := params[name]; !ok {
@@ -103,11 +111,12 @@ func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params pa
 		if err != nil {
 			return nil, evals, err
 		}
+		evals++
 		eMinus, err := evaluate(h, t, minus)
 		if err != nil {
 			return nil, evals, err
 		}
-		evals += 2
+		evals++
 		grad[name] = (ePlus - eMinus) / 2
 	}
 	return grad, evals, nil
