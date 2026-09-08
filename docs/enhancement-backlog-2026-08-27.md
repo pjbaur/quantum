@@ -293,7 +293,7 @@ QPE is actually wanted.
   > as `TestVQE...`, plus Reason-literal and wrap-phase tests; `evaluate` and
   > `parameterShiftGradient` untouched. Commits: c195317, 7c589c3, cd17d0a,
   > f4cdbe6, 2691726.
-- [ ] 15. **Empty parameter name defeats the one-gate-per-parameter check**
+- [x] 15. **Empty parameter name defeats the one-gate-per-parameter check**
   — `parameterized.Template.AddParamGate` accepts `""` as a parameter name,
   but `ParamStepCounts` treats the empty string as its fixed-step marker and
   never counts it. Observed: a `""` parameter driving two `Ry` gates is
@@ -307,6 +307,24 @@ QPE is actually wanted.
   > **Red tests**: `TestRedVQEEmptyNameParameterEscapesStepCountCheck` in
   > `algorithm/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedVQEEmptyName'`.
+  > **Done (2026-09-08)**: root cause was a sentinel collision — `ParamStepCounts`
+  > used `s.param != ""` while `Bind` used `s.factory != nil` to discriminate
+  > parameter-driven steps from fixed steps. Fix switches `ParamStepCounts` to
+  > the factory test (`parameterized/parameterized.go:77`, one expression) and
+  > documents the invariant on the `step` type so `validateVQEStructure`'s
+  > existing loop rejects a `""` parameter driving multiple gates with the
+  > existing Reason; `algorithm/vqe.go` untouched. Rejecting `""` at
+  > `AddParamGate` or in `VQE` was ruled out (would invent a name rule the
+  > package does not have, or be dead code). `""` remains a legal name, now
+  > documented on `AddParamGate`'s godoc. Backward compatibility: `VQE` on
+  > such a template now errors where it previously ran and reported Converged,
+  > recorded in CHANGELOG Unreleased. Tests: moved red test
+  > `TestVQEEmptyNameParameterIsCheckedLikeAnyOther`, accept-pin
+  > `TestVQEAcceptsEmptyNameDrivingOneGate` (via `h2AnsatzNamed`), two
+  > `TestParamStepCounts` cases, `TestBindWithEmptyNameParameter`. Red round
+  > found two pre-existing `AddParamGate` gaps, preserved under
+  > `parameterized/backlog_red_test.go` (`redtests` tag) and queued as items
+  > 18 and 19. Commits: 5f185dc, add554f, e47e46a.
 - [ ] 16. **`parameterShiftGradient` shifts missing parameters from an
   implicit zero** — when `params` lacks a name that appears in `names`, the
   shifted copies read the map's zero value, so the helper evaluates the
