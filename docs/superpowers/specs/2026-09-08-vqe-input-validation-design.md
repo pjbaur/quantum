@@ -1,7 +1,9 @@
 # VQE Input Validation and Error Taxonomy — Design
 
 Date: 2026-09-08
-Status: Approved (backlog item text plus run-lead dispatch; no brainstorming gate)
+Status: Approved (backlog item text plus run-lead dispatch; no brainstorming gate).
+Amended 2026-09-08 after round 1 review and red testing: energy guards,
+step guard, revised gradient Reason (marked inline).
 Resolves: backlog item 14 (`.superpowers/backlog/enhancement-backlog-2026-08-27/item-14.md`)
 
 ## Context
@@ -21,6 +23,16 @@ Observed today (`go test -tags redtests ./algorithm -run '^TestRedVQE(Option|Str
 | Hamiltonian term with 1 or 3 axes on a 2-qubit template | `quantum.IncompatibleQubitCountError` from the first evaluation | `InvalidVQEInputError` |
 | factory returning a 2-qubit gate on 1 target | `quantum.InvalidGateApplicationError` from the first evaluation | `InvalidVQEInputError` |
 | coefficient `NaN` or `+Inf` | NaN gradient, NaN step, then `InvalidParameterValueError` blaming `theta`, which the caller supplied finite | `InvalidVQEInputError`; no error names a finite-on-entry parameter |
+
+Amended 2026-09-08 after round 1 review and red testing of the first
+implementation, which had the up-front checks and the gradient guard below:
+
+| Input | First implementation | Contract |
+|---|---|---|
+| `StepSize: 1e308` (finite, in domain) with a finite gradient | `params - step*grad` overflows; `Bind` blames `theta` inside the step-evaluation wrap | `InvalidVQEInputError` blaming `StepSize` |
+| template with no parameters, two `MaxFloat64` identity terms | no gradient for the guard to check; returns `Energy: +Inf` with a nil error | `InvalidVQEInputError` blaming the Hamiltonian |
+| `0.95M + 0.1M Z0` at `theta = 0.1` (start energy `+Inf`, both shifted energies finite) | gradient finite, guard passes; optimizes from `+Inf`, returns a nil error | `InvalidVQEInputError` blaming the Hamiltonian |
+| single `MaxFloat64 Z0` term at `theta = pi/2` (every energy finite, shift difference `-Inf`) | gradient guard fires, but its Reason says the energy overflows | Reason accurate: the shift difference overflowed |
 
 The item's contract: out-of-domain options, Hamiltonian/template
 structural mismatches, and non-finite Hamiltonian coefficients are
@@ -67,7 +79,8 @@ from `VQE` right after the nil checks):
 `wrapEvaluationError(where string, err error) error`, which returns
 `&InvalidVQEInputError{Reason: where + " failed: " + err.Error(), Err: err}`.
 Reasoning: once the up-front checks pass, the driver hands every
-evaluation a complete, declared, finite parameter set, so the only
+evaluation a complete, declared, finite parameter set (the step guard
+below is what keeps that true for stepped values), so the only
 remaining failure sources are properties of the caller's template or
 Hamiltonian that only running them reveals: a factory returning a gate of
 the wrong width (`quantum.InvalidGateApplicationError` from
@@ -81,16 +94,59 @@ N"`, `"step evaluation at iteration N"`.
 
 **Gradient guard.** After `parameterShiftGradient` returns, `VQE` checks
 each component is finite and otherwise fails with
-`InvalidVQEInputError{Reason: "gradient of parameter %q is non-finite (%v) at iteration %d: the Hamiltonian's energy overflows float64"}`.
-This closes the one path the up-front coefficient check leaves open:
-coefficients that are each finite but whose sum overflows float64 (for
-example two `math.MaxFloat64` terms). Verified on the current code: the
-energy is `+Inf` at the start and at one shifted point, the gradient is
-`-Inf`, the step carries `theta` to `+Inf`, and `Bind` blames `theta`.
-The contract says no error may do that, so the driver stops at the
-gradient. Coefficients are finite and every Pauli expectation is bounded
-by 1, so a non-finite gradient can only mean overflow, which the message
-says.
+`InvalidVQEInputError{Reason: "gradient of parameter %q is non-finite (%v) at iteration %d: the Hamiltonian's energy at a shifted point or the shift difference overflows float64"}`.
+Coefficients that are each finite but whose sum overflows float64 (for
+example two `math.MaxFloat64` terms) escape the up-front coefficient
+check; verified on the original code: the energy is `+Inf` at the start
+and at one shifted point, the gradient is `-Inf`, the step carries
+`theta` to `+Inf`, and `Bind` blames `theta`. The contract says no error
+may do that. Coefficients are finite and every Pauli expectation is
+bounded by 1, so a non-finite gradient can only mean overflow, in one of
+two places the message names: a shifted energy itself, or the difference
+of two finite shifted energies (a single `MaxFloat64 Z0` term at
+`theta = pi/2` gives `-M` and `+M`). Amended 2026-09-08 after round 1:
+the original wording, "the Hamiltonian's energy overflows float64", was
+false in the second case. The shifted energies are not checked
+separately: they are evaluated inside `parameterShiftGradient`, which
+stays untouched, and any non-finite one makes the gradient non-finite.
+
+**Energy guards.** Amended 2026-09-08 after round 1 review and red
+testing. The gradient guard alone did not close the overflow path: a
+template with no parameters has no gradient, so an overflowing
+Hamiltonian returned `Energy: +Inf` with a nil error; and a start energy
+that overflows while both shifted energies stay finite gives a finite
+gradient, so `VQE` optimized from `+Inf` and returned a nil error (the
+accept/revert comparison cannot order infinities, so any finite step is
+accepted). Every energy `VQE` evaluates itself is therefore checked
+right after its evaluation, through
+`checkEnergy(where string, energy float64, names []string, params parameterized.Params) error`:
+the initial energy (`where` = `"initial energy"`) and each stepped
+energy (`"step energy at iteration N"`). The point is finite and the
+coefficients are, so a non-finite energy can only mean the term sum
+overflowed, and the Reason blames the Hamiltonian. The Reason names the
+point (`%q=%v` per parameter in declaration order, joined by `", "`)
+because a stepped point is not one the caller chose or can reconstruct,
+and the initial one reads the same way for consistency; a template with
+no parameters has no point to name and the clause is omitted. Nothing
+is wrapped: `Err` is nil.
+
+**Step guard.** Amended 2026-09-08 after round 1 review. The gradient
+guard proves `grad[name]` finite, but `params[name] - step*grad[name]`
+still overflows when `StepSize` is large: the validator accepts any
+finite positive value, so `1e308` is in domain, and with a gradient of
+`-4 sin(1)` the update is `+Inf`, which `Bind` rejects by name inside the
+step-evaluation wrap. `VQE` checks each stepped value with `isFinite` as
+it is computed and fails with
+`InvalidVQEInputError{Reason: "StepSize is too large: the step of parameter %q overflows float64 at iteration %d (step size %v times gradient %v)"}`.
+The message leads with the field at fault: the current step is at most
+the `StepSize` option (halving only shrinks it, and the `1e-6` floor
+cannot overflow anything), so an overflowing step is `StepSize`'s fault
+at any iteration. `Err` is nil.
+
+Order inside the loop: gradient wrap, gradient guard, step guard, step
+wrap, step-energy guard, then the accept/revert comparison. With these
+four guards `VQE` never hands `Bind` a non-finite value, never compares a
+non-finite energy, and never returns one.
 
 ## Decision 2: wrapping preserves the cause
 
@@ -117,12 +173,18 @@ had an `Unwrap` before; this is the first, and the doc comment says why.
 | coefficient non-finite | `Hamiltonian term 1 has non-finite coefficient NaN` |
 | Pauli string length mismatch | `Hamiltonian term 0 has 1 Pauli axes but the template has 2 qubits` |
 | evaluation failure | `initial energy evaluation failed: gate CNOT requires 2 qubits but got 1` |
-| gradient overflow | `gradient of parameter "theta" is non-finite (-Inf) at iteration 0: the Hamiltonian's energy overflows float64` |
+| gradient overflow (revised 2026-09-08) | `gradient of parameter "theta" is non-finite (-Inf) at iteration 0: the Hamiltonian's energy at a shifted point or the shift difference overflows float64` |
+| initial energy overflow (added 2026-09-08) | `initial energy is non-finite (+Inf) with "theta"=0.1: the Hamiltonian's energy overflows float64` |
+| initial energy overflow, no parameters (added 2026-09-08) | `initial energy is non-finite (+Inf): the Hamiltonian's energy overflows float64` |
+| step energy overflow (added 2026-09-08) | `step energy at iteration 0 is non-finite (+Inf) with "theta"=6.283185307179586: the Hamiltonian's energy overflows float64` |
+| step overflow (added 2026-09-08) | `StepSize is too large: the step of parameter "theta" overflows float64 at iteration 0 (step size 1e+308 times gradient -2)` |
 
 Every message names the field, term index, or parameter, and the offending
 value, so the caller can go straight to the literal. Option messages say
 that zero would have selected the default because zero is the sentinel and
-"must be positive" alone would read as forbidding it.
+"must be positive" alone would read as forbidding it. The three overflow
+messages end by naming what overflowed, so a caller who reads only the
+tail still knows whether to rescale the Hamiltonian or shrink `StepSize`.
 
 ## Rulings on edge cases
 
@@ -174,7 +236,11 @@ failing.
 ## Backward compatibility (ADR-style note)
 
 Inputs that were accepted and now error: negative `StepSize`, negative
-`MaxIterations`, negative or non-finite `Tolerance` (including `+Inf`).
+`MaxIterations`, negative or non-finite `Tolerance` (including `+Inf`);
+and, since the 2026-09-08 amendment, a Hamiltonian whose energy overflows
+float64 at any point `VQE` evaluates (previously returned or optimized
+from `+Inf`) and a `StepSize` whose update overflows (previously
+`InvalidParameterValueError` from `Bind`).
 Inputs that already errored but change type: non-finite `StepSize` or
 `InitialParams` (was `parameterized.InvalidParameterValueError`, now
 `InvalidVQEInputError` with `Err == nil`); Pauli-length mismatches (was
@@ -197,6 +263,25 @@ None is stricter than the contract. The third is weaker than the contract
 the type and the Reason text alongside it rather than editing the moved
 test.
 
+Round 1 (2026-09-08) black-box red tests, all four real bugs against the
+contract's "no error attributes the failure to a parameter that was
+finite on entry" clause or the "non-finite coefficient" clause read as
+the spec's own Decision 1 reads it (overflow of finite coefficients is
+reported too), all fixed and moved into `algorithm/vqe_test.go` with
+cases and assertions unchanged:
+
+- `TestRedVQEHugeStepSizeDoesNotBlameFiniteParameter` ->
+  `TestVQEHugeStepSizeDoesNotBlameFiniteParameter` (step guard).
+- `TestRedVQENoParameterTemplateReportsOverflowingHamiltonian` ->
+  `TestVQENoParameterTemplateReportsOverflowingHamiltonian` (initial
+  energy guard, no-parameter path).
+- `TestRedVQEOverflowingStartEnergyWithFiniteGradientIsReported` ->
+  `TestVQEOverflowingStartEnergyWithFiniteGradientIsReported` (initial
+  energy guard with a finite gradient).
+- `TestRedVQEGradientOverflowMessageMatchesFiniteEnergies` ->
+  `TestVQEGradientOverflowMessageMatchesFiniteEnergies` (gradient guard
+  wording).
+
 ## Testing
 
 - Moved red tests as above.
@@ -208,8 +293,26 @@ test.
   `quantum.InvalidGateApplicationError`; Reason carries the phase and the
   cause; a bad axis reaches `quantum.InvalidPauliAxisError`.
 - `TestVQEOverflowingHamiltonianIsNotBlamedOnParams`: two `MaxFloat64`
-  terms give `InvalidVQEInputError` naming the gradient, never
-  `InvalidParameterValueError`.
+  terms give `InvalidVQEInputError`, never `InvalidParameterValueError`,
+  with a Reason that names `"theta"` and says non-finite. Amended
+  2026-09-08: this input overflows at the initial energy, so the initial
+  energy guard now fires first and its point clause is what names
+  `"theta"`; the test's assertions are unchanged from the first
+  implementation.
+- Added 2026-09-08 after round 1:
+  - `TestVQEStepOverflowReasonBlamesStepSize`: the review's probe input
+    (`2 Z0`, `theta = pi/2`, `StepSize 1e308`) gives the exact step-guard
+    Reason with the gradient read back from `parameterShiftGradient`, and
+    `Err` is nil.
+  - `TestVQEEnergyGuardReasons`: exact initial-energy Reason with and
+    without a point clause, `Err` nil.
+  - `TestVQENonFiniteStepEnergyIsReported`: every energy up to the step
+    finite, the step lands on `+Inf`; exact step-energy Reason and no
+    parameter blame.
+  - `TestVQEGradientGuardReason`: exact revised gradient Reason.
+  - `TestVQEEvaluationErrorNamesThePhase`: a factory that fails past 10
+    pins `"gradient evaluation at iteration 0"` and
+    `"step evaluation at iteration 0"` with the cause reachable.
 
 ## Out of scope
 
