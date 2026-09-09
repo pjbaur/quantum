@@ -10,6 +10,7 @@ import (
 	"github.com/pjbaur/quantum/gates"
 	"github.com/pjbaur/quantum/internal/sparsestate"
 	"github.com/pjbaur/quantum/parameterized"
+	"github.com/pjbaur/quantum/quantum"
 	"github.com/pjbaur/quantum/state"
 )
 
@@ -299,5 +300,68 @@ func TestParamStepCounts(t *testing.T) {
 	// A name the template never declared is absent from the map.
 	if _, ok := single.ParamStepCounts()["nope"]; ok {
 		t.Fatal(`ParamStepCounts()["nope"] present, want absent`)
+	}
+}
+
+// TestZeroValueTemplateAddParamGateDoesNotPanic pins that a Template
+// declared without NewTemplate is safe to call (backlog item 18). Before
+// the fix AddParamGate wrote to the nil seen map unconditionally and
+// panicked with "assignment to entry in nil map"; the map is now allocated
+// on the first declaration, so the call errors or succeeds like any other.
+func TestZeroValueTemplateAddParamGateDoesNotPanic(t *testing.T) {
+	var tmpl parameterized.Template
+	defer func() {
+		if r := recover(); r != nil {
+			t.Fatalf("AddParamGate on a zero-value Template panicked: %v; want an error or success, never a panic (NewTemplate is not documented as required)", r)
+		}
+	}()
+	// A zero-value template has no qubits, so any target is out of range;
+	// the no-target call is the one that reaches the parameter bookkeeping.
+	err := tmpl.AddParamGate("", parameterized.Ry)
+	if err == nil {
+		if names := tmpl.ParamNames(); len(names) != 1 || names[0] != "" {
+			t.Fatalf("after an accepted AddParamGate(%q): ParamNames() = %q, want [%q]", "", names, "")
+		}
+		if counts := tmpl.ParamStepCounts(); counts[""] != 1 {
+			t.Fatalf("after an accepted AddParamGate(%q): ParamStepCounts() = %v, want map[\"\":1]", "", counts)
+		}
+	}
+}
+
+// TestZeroValueTemplateIsAZeroQubitTemplate pins what the zero value is:
+// the template NewTemplate(0) returns. It declares nothing, rejects every
+// target as out of range, leaves nothing declared after a rejection, and
+// Bind fails the way circuit.New fails for a qubit count of zero, after
+// its own parameter checks. Nothing here depends on AddParamGate accepting
+// a call with no targets, so the test keeps its meaning once such calls
+// are rejected (backlog item 19).
+func TestZeroValueTemplateIsAZeroQubitTemplate(t *testing.T) {
+	var tmpl parameterized.Template
+	if got := tmpl.NumQubits(); got != 0 {
+		t.Fatalf("NumQubits() = %d, want 0", got)
+	}
+	if got := tmpl.ParamNames(); len(got) != 0 {
+		t.Fatalf("ParamNames() = %q, want none", got)
+	}
+	if got := tmpl.ParamStepCounts(); len(got) != 0 {
+		t.Fatalf("ParamStepCounts() = %v, want none", got)
+	}
+	var rangeErr *quantum.QubitsOutOfRangeError
+	if err := tmpl.AddParamGate("theta", parameterized.Ry, 0); !errors.As(err, &rangeErr) {
+		t.Fatalf("AddParamGate(%q, Ry, 0) on a zero-value Template: err = %v, want QubitsOutOfRangeError", "theta", err)
+	}
+	if err := tmpl.AddGate(gates.NewHadamard(), 0); !errors.As(err, &rangeErr) {
+		t.Fatalf("AddGate(H, 0) on a zero-value Template: err = %v, want QubitsOutOfRangeError", err)
+	}
+	if got := tmpl.ParamNames(); len(got) != 0 {
+		t.Fatalf("ParamNames() after rejected declarations = %q, want none", got)
+	}
+	var unknownErr *parameterized.UnknownParameterError
+	if _, err := tmpl.Bind(parameterized.Params{"theta": 0.1}); !errors.As(err, &unknownErr) {
+		t.Fatalf("Bind with an undeclared name on a zero-value Template: err = %v, want UnknownParameterError", err)
+	}
+	var countErr *quantum.InvalidQubitCountError
+	if _, err := tmpl.Bind(parameterized.Params{}); !errors.As(err, &countErr) {
+		t.Fatalf("Bind on a zero-value Template: err = %v, want InvalidQubitCountError, the error circuit.New returns for zero qubits", err)
 	}
 }

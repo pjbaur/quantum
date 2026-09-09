@@ -20,30 +20,6 @@ import (
 	"github.com/pjbaur/quantum/parameterized"
 )
 
-// Backlog item 18: zero-value Template panics in AddParamGate.
-//
-// Template zero value × nil seen map in AddParamGate → panic instead of an
-// error (or success).
-func TestRedZeroValueTemplateAddParamGateDoesNotPanic(t *testing.T) {
-	var tmpl parameterized.Template
-	defer func() {
-		if r := recover(); r != nil {
-			t.Fatalf("AddParamGate on a zero-value Template panicked: %v; want an error or success, never a panic (NewTemplate is not documented as required)", r)
-		}
-	}()
-	// A zero-value template has no qubits, so any target is out of range;
-	// the no-target call is the one that reaches the parameter bookkeeping.
-	err := tmpl.AddParamGate("", parameterized.Ry)
-	if err == nil {
-		if names := tmpl.ParamNames(); len(names) != 1 || names[0] != "" {
-			t.Fatalf("after an accepted AddParamGate(%q): ParamNames() = %q, want [%q]", "", names, "")
-		}
-		if counts := tmpl.ParamStepCounts(); counts[""] != 1 {
-			t.Fatalf("after an accepted AddParamGate(%q): ParamStepCounts() = %v, want map[\"\":1]", "", counts)
-		}
-	}
-}
-
 // Backlog item 19: AddParamGate and AddGate accept an empty target list.
 //
 // AddParamGate("") with no targets × missing guard → accepted at build time

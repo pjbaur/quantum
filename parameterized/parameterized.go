@@ -43,21 +43,25 @@ type step struct {
 	targets []int
 }
 
-// Template is a circuit recipe with named parameter holes. A Template is
-// safe for concurrent reads after all Add calls complete.
+// Template is a circuit recipe with named parameter holes. The zero value
+// is ready to use and is the template NewTemplate(0) returns: it declares
+// nothing, rejects every target as out of range, and Bind fails as
+// circuit.New does for a qubit count of zero. No method panics on it;
+// NewTemplate is how a template for a positive qubit count is made, not a
+// precondition of the methods. A Template is safe for concurrent reads
+// after all Add calls complete.
 type Template struct {
 	numQubits  int
 	steps      []step
 	paramOrder []string
-	seen       map[string]bool
+	// seen is allocated by AddParamGate on the first declaration, the only
+	// place it is written, so the zero value needs no constructor.
+	seen map[string]bool
 }
 
 // NewTemplate returns a template for circuits on numQubits qubits.
 func NewTemplate(numQubits int) *Template {
-	return &Template{
-		numQubits: numQubits,
-		seen:      make(map[string]bool),
-	}
+	return &Template{numQubits: numQubits}
 }
 
 // NumQubits returns the qubit count the template builds circuits for.
@@ -107,6 +111,9 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 	}
 	if err := t.checkTargets(targets); err != nil {
 		return err
+	}
+	if t.seen == nil {
+		t.seen = make(map[string]bool)
 	}
 	if !t.seen[name] {
 		t.seen[name] = true

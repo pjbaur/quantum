@@ -111,6 +111,20 @@ suite, `algorithm/backlog_red_test.go` is removed; item 20's red test
 stays tagged in `algorithm/backlog_red_numeric_test.go`. Design:
 `docs/superpowers/specs/2026-09-08-parameter-shift-evaluation-count-design.md`.
 
+#### `parameterized.Template`'s zero value is usable
+
+`AddParamGate` wrote to the template's name-tracking map unconditionally,
+so a `Template` declared as a plain variable rather than through
+`NewTemplate` panicked with "assignment to entry in nil map" on its first
+parameter declaration, although nothing documented `NewTemplate` as
+required. The map is now allocated on the first declaration, the only
+place it is written, and `NewTemplate` no longer pre-allocates it, so the
+zero value is exactly the template `NewTemplate(0)` returns: it declares
+nothing, rejects every target as out of range, and `Bind` fails as
+`circuit.New` does for a qubit count of zero. No method panics on it;
+templates built with `NewTemplate` behave as before. Design:
+`docs/superpowers/specs/2026-09-09-zero-value-template-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed
