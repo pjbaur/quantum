@@ -330,12 +330,15 @@ func TestZeroValueTemplateAddParamGateDoesNotPanic(t *testing.T) {
 }
 
 // TestZeroValueTemplateIsAZeroQubitTemplate pins what the zero value is:
-// the template NewTemplate(0) returns. It declares nothing, rejects every
-// target as out of range, leaves nothing declared after a rejection, and
-// Bind fails the way circuit.New fails for a qubit count of zero, after
-// its own parameter checks. Nothing here depends on AddParamGate accepting
-// a call with no targets, so the test keeps its meaning once such calls
-// are rejected (backlog item 19).
+// the template NewTemplate(0) returns. It declares nothing, rejects a
+// declaration with an out-of-range target or with none, leaves nothing
+// declared after a rejection, and Bind fails the way circuit.New fails
+// for a qubit count of zero, after its own parameter checks. This test
+// only exercises the out-of-range case (target 0 on a 0-qubit template);
+// the no-target case on the zero value is
+// TestZeroValueTemplateAddParamGateDoesNotPanic's. Nothing here depends
+// on AddParamGate accepting a call with no targets, so the test keeps its
+// meaning once such calls are rejected (backlog item 19).
 func TestZeroValueTemplateIsAZeroQubitTemplate(t *testing.T) {
 	var tmpl parameterized.Template
 	if got := tmpl.NumQubits(); got != 0 {
