@@ -136,7 +136,7 @@ deep inside `circuit.AddGate` rather than at the call that declared the
 gate. Both methods now reject an empty target list at the call, after
 their nil check and before the range check, with an error naming the
 parameter (`parameter "theta": at least one target is required`) or the
-gate (`fixed gate Hadamard: at least one target is required`); the
+gate (`fixed gate "Hadamard": at least one target is required`); the
 template is left as it was. Declarations with at least one target are
 unchanged. Design:
 `docs/superpowers/specs/2026-09-09-empty-target-list-design.md`.

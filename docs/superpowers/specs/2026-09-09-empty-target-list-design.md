@@ -118,13 +118,28 @@ this error.
 | Call | Error |
 |---|---|
 | `AddParamGate(name, factory)` with no targets | `parameter %q: at least one target is required` with `name` |
-| `AddGate(gate)` with no targets | `fixed gate %s: at least one target is required` with `gate.Name()` |
+| `AddGate(gate)` with no targets | `fixed gate %q: at least one target is required` with `gate.Name()` |
 
 The prefixes copy the two existing checks (`parameter %q: ...`, `fixed
 gate ...`), so a parameter name is `%q`-quoted as everywhere in the
-package (`""` renders as `""`) and a gate name is bare `%s` as in
-`quantum.InvalidGateApplicationError`. The tail is `circuit.AddGate`'s
-phrase verbatim.
+package (`""` renders as `""`). The tail is `circuit.AddGate`'s phrase
+verbatim.
+
+Amended 2026-09-09 (round 1 fix): the gate name was originally bare `%s`,
+matching `quantum.InvalidGateApplicationError`'s `gate %s requires %d
+qubits but got %d`. Round-1 black-box red testing
+(`item-19-round-1-red.md` survivor 2) found that a gate whose `Name()` is
+`""` (legal per the `quantum.Gate` interface, though every gate this repo
+defines refuses one via `gates.NewMatrixGate`) then renders as
+`fixed gate : at least one target is required`, which names no gate and
+so fails the item's own contract ("an error naming the gate"). The round-1
+whole-item review's Recommendations section had already flagged this
+exact gap and judged it "not worth diverging from the spec now"; the red
+test showed it is a contract violation, not a hypothetical. The gate name
+is now `%q`-quoted,
+matching the parameter path rather than `InvalidGateApplicationError`, so
+`fixed gate "": at least one target is required` names the gate visibly
+as empty. `CHANGELOG.md`'s quoted example message is updated to match.
 
 ## Decision 3: doc comments state the rejection
 
@@ -133,7 +148,13 @@ at least one target is required and that a call with none is rejected at
 the call, naming the parameter or the gate, rather than left for
 `circuit.AddGate` to reject at `Bind`. The `Template` doc comment is
 unchanged: "rejects every target as out of range" on the zero value stays
-true, and the new rule is per method, not per template.
+true, and the new rule is per method, not per template. Amended
+2026-09-09 (round 1 fix, `item-19-round-1-docs.md` finding 1): that last
+claim was wrong. This item's guard runs before `checkTargets`, so a
+no-target call on the zero value is now rejected by a plain `fmt.Errorf`,
+never a `*quantum.QubitsOutOfRangeError`; the `Template` doc comment is
+corrected to "rejects a declaration with an out-of-range target or with
+none" instead of being left unchanged.
 
 ## Effect on item 18's tests
 

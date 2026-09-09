@@ -415,3 +415,31 @@ func TestAddNoTargetsErrorNamesTheGateAndDeclaresNothing(t *testing.T) {
 		t.Fatalf("AddParamGate(%q, nil) with no targets: err = %v, want the nil-factory error first", "theta", err)
 	}
 }
+
+// namedGate is a minimal quantum.Gate whose Name() is whatever the test
+// chooses, including the empty string, which gates.NewMatrixGate refuses;
+// it lets a test exercise a gate name gates.NewHadamard and friends never
+// produce.
+type namedGate struct{ name string }
+
+func (g namedGate) Name() string { return g.name }
+func (g namedGate) Matrix() [][]complex128 {
+	return [][]complex128{{1, 0}, {0, 1}}
+}
+
+// TestAddNoTargetsErrorRendersEmptyGateNameVisibly pins that the no-target
+// error names the gate even when Name() is empty (backlog item 19, round
+// 1 fix). The gate name is %q-quoted, as the parameter name already is,
+// so an empty name still identifies something rather than vanishing into
+// "fixed gate : at least one target is required", which names no gate at
+// all.
+func TestAddNoTargetsErrorRendersEmptyGateNameVisibly(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	err := tmpl.AddGate(namedGate{name: ""})
+	if err == nil {
+		t.Fatal("AddGate(gate with empty name) with no targets accepted, want an error")
+	}
+	if strings.Contains(err.Error(), "gate :") || !strings.Contains(err.Error(), `""`) {
+		t.Fatalf("AddGate(gate with empty name) with no targets: err = %q; the empty name is not rendered, so the error names no gate", err.Error())
+	}
+}

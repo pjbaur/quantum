@@ -143,7 +143,7 @@ func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 		return fmt.Errorf("fixed gate must not be nil")
 	}
 	if len(targets) == 0 {
-		return fmt.Errorf("fixed gate %s: at least one target is required", gate.Name())
+		return fmt.Errorf("fixed gate %q: at least one target is required", gate.Name())
 	}
 	if err := t.checkTargets(targets); err != nil {
 		return err
