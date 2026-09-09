@@ -141,12 +141,21 @@ it is computed and fails with
 The message leads with the field at fault: the current step is at most
 the `StepSize` option (halving only shrinks it, and the `1e-6` floor
 cannot overflow anything), so an overflowing step is `StepSize`'s fault
-at any iteration. `Err` is nil.
+at any iteration. `Err` is nil. Amended 2026-09-09 (item 20): the guard
+also rejects a stepped value whose magnitude exceeds 2^26, the bound
+`parameterShiftGradient` enforces on the angles it shifts, so the
+helper's own check stays unreachable from `VQE`
+(`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`,
+Decision 3); that Reason names the step and the iteration rather than
+`StepSize`, since a start near the bound crosses it at any step size.
 
 Order inside the loop: gradient wrap, gradient guard, step guard, step
 wrap, step-energy guard, then the accept/revert comparison. With these
 four guards `VQE` never hands `Bind` a non-finite value, never compares a
-non-finite energy, and never returns one.
+non-finite energy, and never returns one. Amended 2026-09-09 (item 20):
+with the magnitude check on `InitialParams` and the step guard's second
+clause, `VQE` also never hands `parameterShiftGradient` an angle beyond
+2^26.
 
 ## Decision 2: wrapping preserves the cause
 
@@ -178,6 +187,8 @@ had an `Unwrap` before; this is the first, and the doc comment says why.
 | initial energy overflow, no parameters (added 2026-09-08) | `initial energy is non-finite (+Inf): the Hamiltonian's energy overflows float64` |
 | step energy overflow (added 2026-09-08) | `step energy at iteration 0 is non-finite (+Inf) with "theta"=6.283185307179586: the Hamiltonian's energy overflows float64` |
 | step overflow (added 2026-09-08) | `StepSize is too large: the step of parameter "theta" overflows float64 at iteration 0 (step size 1e+308 times gradient -2)` |
+| initial parameter beyond the shift bound (added 2026-09-09, item 20) | `initial parameter "theta" must have magnitude at most 2^26 (6.7108864e+07), beyond which float64 cannot resolve the +/- pi/2 parameter shift, got 1.152921504606847e+18` |
+| step beyond the shift bound (added 2026-09-09, item 20) | `the step of parameter "theta" reaches 6.710886403417353e+07 at iteration 0, beyond the 2^26 (6.7108864e+07) within which float64 resolves the +/- pi/2 parameter shift (step size 0.3 times gradient -0.5305784211229922)` |
 
 Every message names the field, term index, or parameter, and the offending
 value, so the caller can go straight to the literal. Option messages say
@@ -235,6 +246,15 @@ an energy
 the total is the same. With its last test moved into the regular suite,
 `algorithm/backlog_red_test.go` is deleted; item 20's red test stays
 tagged in `algorithm/backlog_red_numeric_test.go`.
+Amended 2026-09-09 (item 20): the huge-angle defect was closed by a
+magnitude bound of 2^26 on every angle the helper shifts
+(`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`);
+this time `VQE` does change, in two places this design's shape
+anticipated: the inline `InitialParams` check gains a magnitude clause
+beside its finiteness clause, and the step guard gains a second clause,
+so the helper's check is unreachable from `VQE` as items 16 and 17's
+were. Two Decision 3 rows record the Reasons. Item 20's red test was
+ruled contradicted by the chosen contract and deleted with its file.
 
 ## Effect on callers
 

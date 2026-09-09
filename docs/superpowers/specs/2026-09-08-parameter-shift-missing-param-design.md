@@ -243,6 +243,17 @@ pointing here. The comments of `TestParameterShiftMissingParamErrorMatchesBind`
 and `TestParameterShiftUndeclaredNameIsRejectedByBind` were reworded to
 match; no assertion changed.
 
+Amended 2026-09-09 (item 20): the helper now runs a second check of its
+own ahead of the loop, a magnitude bound of 2^26 on the finite value of
+each name it shifts
+(`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`,
+Decision 2). That bound is the helper's precondition, not one of `Bind`'s,
+so "completeness only" stands as a statement about `Bind`'s rules and the
+doc comment now says "Of Bind's rules it guarantees completeness only".
+Non-finite values are still left to `Bind`: the magnitude check skips
+them, so every sentence above about where a non-finite value is reported
+holds as written.
+
 ## Item 17 follows on locally
 
 Item 17 (evaluation undercount on failure): the loop body does
@@ -381,7 +392,13 @@ this item's doc comment added) and the fourth out of scope.
   `algorithm/backlog_red_test.go` is item 17's and its plan deletes it).
   The defect is float64 spacing swallowing the `+/- pi/2` shift at
   `a = 2^60`, inside the loop body this item did not touch and unrelated
-  to parameter completeness.
+  to parameter completeness. Amended 2026-09-09 (item 20): deleted, not
+  moved. The test asserted a gradient at `a = 2^60` equal to the slope at
+  the angle reduced mod 2*pi; item 20 chose an error for any shifted angle
+  beyond 2^26 rather than a reduction
+  (`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`,
+  "Red test ruling"), and its file, empty after the deletion, went with
+  it.
 
 ## Testing
 

@@ -207,7 +207,11 @@ becomes
 It states the success-path cost, the error-path meaning and its rule, why
 the failing evaluation is excluded, the precedent for reading a count next
 to an error, who can observe it, and how the item 16 return fits. Nothing
-else in the comment changes.
+else in the comment changes. Amended 2026-09-09 (item 20): the last
+sentence now reads "The completeness and magnitude checks above return 0
+because they precede the first evaluation", since the helper gained a
+second pre-loop check (a magnitude bound on shifted angles) that returns
+the literal `0` for the same reason.
 
 ## Decision 6: no `InvalidVQEInputError` Reason, no Decision 3 row
 
@@ -263,7 +267,12 @@ written, so the prediction above no longer holds:
 `go test -tags redtests ./algorithm -run '^TestRed'` now lists and fails
 exactly that one test, not `[no tests to run]`. `go vet -tags redtests
 ./algorithm` still passes, because it is item 20's file, not this design's
-deleted `backlog_red_test.go`, that carries the tag.
+deleted `backlog_red_test.go`, that carries the tag. Amended 2026-09-09
+(item 20): that file is now deleted too, its test ruled contradicted by
+the contract item 20 chose
+(`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`,
+"Red test ruling"), so the prediction above holds again: the red run of
+`algorithm` reports `[no tests to run]`.
 
 ## Effect on callers
 

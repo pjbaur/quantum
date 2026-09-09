@@ -26,6 +26,26 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 	return h.Energy(s)
 }
 
+// maxShiftMagnitude is the largest |theta| the parameter-shift rule
+// shifts: 2^26. float64 rounds theta +/- pi/2 to a multiple of theta's
+// spacing, so the shift lands within half that spacing of its true
+// offset. Below 2^26 the spacing is at most 2^-27 (1.5e-8), the offset is
+// exact to 7.5e-9 rad, and a gradient component is off by at most that
+// times the largest slope, which the Hamiltonian's coefficient sum
+// bounds. Beyond it the rule degrades until it fails: from 2^48 the
+// default 0.3 step times a gradient of 0.1 rounds to no change, so VQE
+// would freeze the parameter and report Converged; from 2^51 the shift is
+// applied at the wrong offset (a multiple of 0.5 or coarser); from 2^54
+// the spacing exceeds pi, theta +/- pi/2 rounds back to theta, both
+// evaluations bind the same circuit, and the difference is exactly 0. The
+// bound is the even split of the 53-bit significand, 26 bits before the
+// binary point and 27 after: the parameter keeps a resolution finer than
+// 1e-8 rad, and 2^26 rad is more than 10^7 turns, far beyond any angle a
+// descent reaches from an angle a caller chose (200 iterations of a 0.3
+// step times a unit gradient walk 60 rad). Larger angles are rejected,
+// not reduced mod 2*pi: see parameterShiftGradient.
+const maxShiftMagnitude = 1 << 26
+
 // parameterShiftGradient computes dE/dtheta per parameter via the exact
 // parameter-shift rule: dE/dtheta = (E(theta+pi/2) - E(theta-pi/2)) / 2.
 // The rule is exact only when, with every other parameter held fixed,
@@ -56,6 +76,27 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // textbook gamma/beta is half of it).
 // TestParameterShiftIsBlindToRescaledFactory pins this failure mode.
 //
+// Third, float64 must resolve the shift. theta +/- pi/2 is rounded to a
+// multiple of theta's spacing, and from 2^54 that spacing exceeds pi, so
+// both shifted values round back to theta, the two evaluations bind the
+// same circuit, and the half difference is exactly 0 with a nil error,
+// again indistinguishable from a stationary point. This one is checked:
+// each name in names must be bound to a finite value of magnitude at most
+// maxShiftMagnitude (2^26, where the shift lands within 7.5e-9 rad of its
+// offset; the constant's comment derives the bound), or the call returns
+// InvalidVQEInputError naming the first such name in names order, before
+// any evaluation and with the count 0. Only shifted names are checked,
+// because an unshifted value enters both evaluations identically, and
+// only finite values, because a non-finite one is Bind's to reject as
+// before. A larger angle is rejected rather than reduced mod 2*pi. The
+// energy is 2*pi-periodic only under the previous paragraph's
+// precondition, which this function cannot check, so a reduction would
+// silently move the point evaluated for a factory of another period; and
+// the reduction itself exceeds float64 (math.Mod(2^60, 2*pi) with the
+// float64 constant is off by about 80 rad). A caller who knows the
+// factory's period reduces before calling, and VQE rejects such an
+// initial parameter up front so this check is unreachable from it.
+//
 // params must bind every parameter the template declares, the precondition
 // Bind states; names selects which of those to differentiate and may list
 // any subset in any order, and repeats: the loop shifts and counts each
@@ -72,8 +113,8 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // depended on which names were shifted. The check reports the first
 // missing name in declaration order as parameterized.MissingParameterError,
 // the error Bind returns when a declared name is absent, and consumes no
-// evaluation. It guarantees completeness only: that is the one rule of
-// Bind's a shift can hide, since the copies keep every key of params, a
+// evaluation. Of Bind's rules it guarantees completeness only: that is
+// the one a shift can hide, since the copies keep every key of params, a
 // non-finite value stays non-finite when shifted, and a name in names that
 // the template never declared is written into the copies where Bind sees
 // it. Everything else is left to Bind, which rejects it at the first
@@ -93,12 +134,17 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // one, which returned no energy (how far into evaluate it got is not
 // something a count of energies can express). Like io.Reader's n, the
 // count is meaningful alongside a non-nil error; VQE discards it with the
-// error, so only a direct caller sees it. The completeness check above
-// returns 0 because it precedes the first evaluation.
+// error, so only a direct caller sees it. The completeness and magnitude
+// checks above return 0 because they precede the first evaluation.
 func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params parameterized.Params, names []string) (map[string]float64, int, error) {
 	for _, name := range t.ParamNames() {
 		if _, ok := params[name]; !ok {
 			return nil, 0, &parameterized.MissingParameterError{Name: name}
+		}
+	}
+	for _, name := range names {
+		if v := params[name]; isFinite(v) && math.Abs(v) > maxShiftMagnitude {
+			return nil, 0, &InvalidVQEInputError{Reason: fmt.Sprintf("parameter %q cannot be shifted by +/- pi/2: its magnitude must be at most 2^26 (%v), got %v", name, float64(maxShiftMagnitude), v)}
 		}
 	}
 	grad := make(map[string]float64, len(names))
@@ -134,7 +180,8 @@ func parameterShiftGradient(h *Hamiltonian, t *parameterized.Template, params pa
 // through the first update.
 type VQEOptions struct {
 	// InitialParams names starting angles. Missing declared parameters
-	// default to 0. Unknown names and non-finite values are rejected.
+	// default to 0. Unknown names, non-finite values, and magnitudes
+	// beyond 2^26 (see maxShiftMagnitude) are rejected.
 	InitialParams parameterized.Params
 	// StepSize is the initial gradient-descent step (default 0.3). Must
 	// be finite and positive; zero selects the default.
@@ -322,7 +369,10 @@ func checkEnergy(where string, energy float64, names []string, params parameteri
 //
 // Inputs are validated before the first evaluation: nil arguments, option
 // values outside their domains (see VQEOptions), initial parameters that
-// are undeclared or non-finite, a parameter driving several gates, a
+// are undeclared, non-finite, or beyond 2^26 in magnitude (where float64
+// no longer resolves the +/- pi/2 shift; see maxShiftMagnitude, which
+// says why such an angle is rejected rather than reduced mod 2*pi), a
+// parameter driving several gates, a
 // Hamiltonian term whose Pauli string does not match the template's qubit
 // count, and a non-finite Hamiltonian coefficient are all rejected with
 // InvalidVQEInputError. Problems only running the template can reveal,
@@ -333,8 +383,10 @@ func checkEnergy(where string, energy float64, names []string, params parameteri
 // energy or gradient, and a StepSize large enough that a step overflows
 // gives a non-finite parameter; VQE checks each energy it evaluates, each
 // gradient component, and each stepped value, and reports all three as
-// InvalidVQEInputError blaming the Hamiltonian or StepSize. No error
-// blames a parameter that was finite on entry.
+// InvalidVQEInputError blaming the Hamiltonian or StepSize. A stepped
+// value that leaves the 2^26 bound is rejected the same way, naming the
+// step that crossed it, so the gradient never shifts an angle it cannot
+// resolve. No error blames a parameter that was finite on entry.
 func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult, error) {
 	if h == nil {
 		return nil, &InvalidVQEInputError{Reason: "Hamiltonian must not be nil"}
@@ -373,6 +425,9 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 		}
 		if !isFinite(value) {
 			return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("initial parameter %q has non-finite value %v", name, value)}
+		}
+		if math.Abs(value) > maxShiftMagnitude {
+			return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("initial parameter %q must have magnitude at most 2^26 (%v), beyond which float64 cannot resolve the +/- pi/2 parameter shift, got %v", name, float64(maxShiftMagnitude), value)}
 		}
 		params[name] = value
 	}
@@ -420,6 +475,15 @@ func VQE(h *Hamiltonian, t *parameterized.Template, opts VQEOptions) (*VQEResult
 			steps[name] = params[name] - step*grad[name]
 			if !isFinite(steps[name]) {
 				return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("StepSize is too large: the step of parameter %q overflows float64 at iteration %d (step size %v times gradient %v)", name, iter, step, grad[name])}
+			}
+			// The same bound the initial parameters met: past it the next
+			// gradient would shift an angle float64 cannot resolve, and
+			// parameterShiftGradient would reject it inside the wrap.
+			// Stopping here keeps that check unreachable from VQE and
+			// names the step that crossed, since the caller chose neither
+			// the point nor the iteration.
+			if math.Abs(steps[name]) > maxShiftMagnitude {
+				return nil, &InvalidVQEInputError{Reason: fmt.Sprintf("the step of parameter %q reaches %v at iteration %d, beyond the 2^26 (%v) within which float64 resolves the +/- pi/2 parameter shift (step size %v times gradient %v)", name, steps[name], iter, float64(maxShiftMagnitude), step, grad[name])}
 			}
 		}
 		newEnergy, err := evaluate(h, t, steps)

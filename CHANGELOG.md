@@ -141,6 +141,30 @@ template is left as it was. Declarations with at least one target are
 unchanged. Design:
 `docs/superpowers/specs/2026-09-09-empty-target-list-design.md`.
 
+#### `algorithm.VQE` rejects an angle too large for the parameter shift
+
+The parameter-shift gradient behind `VQE` evaluates `theta +/- pi/2` in
+float64, and from 2^54 the spacing between adjacent values exceeds pi, so
+both shifted values rounded back to `theta`, the two evaluations bound the
+same circuit, and the gradient came back exactly 0 with a nil error;
+below that, from about 2^48, the shift was applied at a rounded offset
+and the descent step was lost to the spacing. A huge finite
+`InitialParams` value therefore passed the finiteness guard, never moved,
+and the run reported `Converged` with it frozen at its start. `VQE` now
+rejects an initial parameter whose magnitude exceeds 2^26 (67,108,864
+rad, where the shift is still exact to 7.5e-9 rad) with
+`InvalidVQEInputError`, and stops with the same type when a descent step
+carries a parameter past that bound; the unexported helper rejects such
+an angle before any evaluation for direct callers. Angles are rejected,
+not reduced mod 2*pi: the energy is periodic only under the
+`exp(-i*theta*P/2)` factory convention `VQE` cannot check, and the
+reduction itself is not computable in float64 at those magnitudes.
+Callers with a larger angle reduce it themselves. Angles within the bound,
+including every value a run from an angle of ordinary size reaches, are
+unaffected. With its only test replaced by tests of the chosen contract,
+`algorithm/backlog_red_numeric_test.go` is removed. Design:
+`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed

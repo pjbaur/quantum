@@ -194,6 +194,8 @@ func TestVQEOptionValidation(t *testing.T) {
 		{"NaN Tolerance", VQEOptions{Tolerance: math.NaN(), MaxIterations: 5}},
 		{"NaN InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.NaN()}}},
 		{"Inf InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.Inf(-1)}}},
+		{"huge InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.Ldexp(1, 60)}}},
+		{"huge negative InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": -math.Nextafter(math.Ldexp(1, 26), math.Inf(1))}}},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -220,6 +222,7 @@ func TestVQEOptionErrorNamesTheField(t *testing.T) {
 		{"MaxIterations", VQEOptions{MaxIterations: -1}, "MaxIterations must not be negative (zero selects the default 200), got -1"},
 		{"Tolerance", VQEOptions{Tolerance: math.NaN()}, "Tolerance must be finite and positive (zero selects the default 1e-10), got NaN"},
 		{"InitialParams", VQEOptions{InitialParams: parameterized.Params{"theta": math.Inf(-1)}}, `initial parameter "theta" has non-finite value -Inf`},
+		{"InitialParams magnitude", VQEOptions{InitialParams: parameterized.Params{"theta": math.Ldexp(1, 60)}}, `initial parameter "theta" must have magnitude at most 2^26 (6.7108864e+07), beyond which float64 cannot resolve the +/- pi/2 parameter shift, got 1.152921504606847e+18`},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -987,5 +990,180 @@ func TestParameterShiftEvaluationCountOnFailure(t *testing.T) {
 				t.Errorf("evals = %d, want %d: every evaluation that completed before the failure, and not the failure itself", evals, c.want)
 			}
 		})
+	}
+}
+
+// TestParameterShiftRejectsUnresolvableAngle pins the magnitude bound on
+// the angles parameterShiftGradient shifts (backlog item 20). Before the
+// check, a = 2^60 returned {a: 0} after two evaluations with a nil error:
+// float64 spacing there is 256, so a +/- pi/2 rounded back to a and both
+// evaluations bound the same circuit. Now any shifted name whose finite
+// value has magnitude beyond maxShiftMagnitude (2^26) is rejected before
+// any evaluation; at the bound itself the rule is still exact to the
+// spacing (7.5e-9 rad), pinned against the analytic slope of cos; an
+// unshifted huge value is harmless because it enters both evaluations of
+// every other name identically; and a non-finite value stays Bind's.
+func TestParameterShiftRejectsUnresolvableAngle(t *testing.T) {
+	bound := math.Ldexp(1, 26)
+	if bound != maxShiftMagnitude {
+		t.Fatalf("maxShiftMagnitude = %v, want 2^26 = %v", float64(maxShiftMagnitude), bound)
+	}
+	h := H2Hamiltonian()
+	tmpl := gradientTargetTemplate()
+
+	rejected := []struct {
+		name string
+		a    float64
+	}{
+		{"2^60, where both shifts round back", math.Ldexp(1, 60)},
+		{"-2^60", -math.Ldexp(1, 60)},
+		{"2^54, where the spacing first exceeds pi", math.Ldexp(1, 54)},
+		{"one ulp past the bound", math.Nextafter(bound, math.Inf(1))},
+		{"one ulp past the negative bound", -math.Nextafter(bound, math.Inf(1))},
+	}
+	for _, c := range rejected {
+		t.Run(c.name, func(t *testing.T) {
+			grad, evals, err := parameterShiftGradient(h, tmpl, parameterized.Params{"a": c.a, "b": 0.1}, []string{"a"})
+			var ve *InvalidVQEInputError
+			if !errors.As(err, &ve) {
+				t.Fatalf("a=%v: grad = %v, evals = %d, err = %v (%T); want InvalidVQEInputError", c.a, grad, evals, err, err)
+			}
+			if grad != nil || evals != 0 {
+				t.Errorf("a=%v: grad = %v, evals = %d; want nil and 0, the check precedes the first evaluation", c.a, grad, evals)
+			}
+			want := fmt.Sprintf("parameter %q cannot be shifted by +/- pi/2: its magnitude must be at most 2^26 (%v), got %v", "a", bound, c.a)
+			if ve.Reason != want {
+				t.Errorf("Reason = %q, want %q", ve.Reason, want)
+			}
+			if cause := errors.Unwrap(err); cause != nil {
+				t.Errorf("errors.Unwrap(err) = %v, want nil for a problem the helper detected itself", cause)
+			}
+		})
+	}
+
+	t.Run("first offender in names order", func(t *testing.T) {
+		_, evals, err := parameterShiftGradient(h, tmpl, parameterized.Params{"a": math.Ldexp(1, 60), "b": -math.Ldexp(1, 60)}, []string{"b", "a"})
+		var ve *InvalidVQEInputError
+		if !errors.As(err, &ve) || evals != 0 {
+			t.Fatalf("err = %v, evals = %d; want InvalidVQEInputError after 0 evaluations", err, evals)
+		}
+		if !strings.HasPrefix(ve.Reason, `parameter "b" `) {
+			t.Fatalf("Reason = %q, want it to name %q, the first offender in names order", ve.Reason, "b")
+		}
+	})
+
+	// E = cos(theta) on H2Ansatz against Z0, so dE/dtheta = -sin(theta).
+	// The shift at |theta| = 2^26 lands within half the spacing (7.5e-9)
+	// of +/- pi/2, and the slope of cos is at most 1, so the rule is
+	// exact to 1e-8.
+	for _, theta := range []float64{bound, -bound} {
+		grad, evals, err := parameterShiftGradient(zOnQubit0(1), H2Ansatz(), parameterized.Params{"theta": theta}, []string{"theta"})
+		if err != nil {
+			t.Fatalf("theta=%v is at the bound and must be accepted: %v", theta, err)
+		}
+		if evals != 2 {
+			t.Fatalf("theta=%v: evals = %d, want 2", theta, evals)
+		}
+		if want := -math.Sin(theta); math.Abs(grad["theta"]-want) > 1e-8 {
+			t.Errorf("theta=%v: gradient %v, want -sin(theta) = %v within 1e-8", theta, grad["theta"], want)
+		}
+	}
+
+	t.Run("unshifted huge value is harmless", func(t *testing.T) {
+		params := parameterized.Params{"a": math.Ldexp(1, 60), "b": 0.1}
+		grad, evals, err := parameterShiftGradient(h, tmpl, params, []string{"b"})
+		if err != nil || evals != 2 {
+			t.Fatalf("grad = %v, evals = %d, err = %v; want a gradient for b after 2 evaluations", grad, evals, err)
+		}
+		const hstep = 1e-6
+		ePlus, err := evaluate(h, tmpl, parameterized.Params{"a": params["a"], "b": params["b"] + hstep})
+		if err != nil {
+			t.Fatalf("evaluate plus: %v", err)
+		}
+		eMinus, err := evaluate(h, tmpl, parameterized.Params{"a": params["a"], "b": params["b"] - hstep})
+		if err != nil {
+			t.Fatalf("evaluate minus: %v", err)
+		}
+		fd := (ePlus - eMinus) / (2 * hstep)
+		if math.Abs(grad["b"]-fd) > 1e-6 {
+			t.Errorf("gradient of b at a=2^60: parameter-shift %v != finite-diff %v", grad["b"], fd)
+		}
+	})
+
+	t.Run("non-finite value stays Bind's", func(t *testing.T) {
+		_, evals, err := parameterShiftGradient(h, tmpl, parameterized.Params{"a": math.Inf(1), "b": 0.1}, []string{"a"})
+		var pe *parameterized.InvalidParameterValueError
+		if !errors.As(err, &pe) || pe.Name != "a" || evals != 0 {
+			t.Fatalf("err = %v (%T), evals = %d; want Bind's InvalidParameterValueError for %q after 0 evaluations", err, err, evals, "a")
+		}
+	})
+}
+
+// TestVQEHugeInitialParamIsRejected pins the driver side of backlog item
+// 20. Before the check, a = 2^60 passed the finiteness guard, its gradient
+// came back exactly 0, the descent step of 0.03 was lost to the spacing of
+// 256, and VQE reported Converged after one iteration with a frozen at its
+// start. Now the value is rejected up front with a Reason that names the
+// bound and the value; at the bound itself the run proceeds.
+func TestVQEHugeInitialParamIsRejected(t *testing.T) {
+	h := H2Hamiltonian()
+	tmpl := gradientTargetTemplate()
+	huge := math.Ldexp(1, 60)
+
+	res, err := VQE(h, tmpl, VQEOptions{InitialParams: parameterized.Params{"a": huge, "b": 0.1}})
+	var ve *InvalidVQEInputError
+	if !errors.As(err, &ve) {
+		t.Fatalf("VQE(a=%v): result = %+v, err = %v (%T); want InvalidVQEInputError, not a Converged result with a frozen", huge, res, err, err)
+	}
+	want := fmt.Sprintf("initial parameter %q must have magnitude at most 2^26 (%v), beyond which float64 cannot resolve the +/- pi/2 parameter shift, got %v", "a", float64(maxShiftMagnitude), huge)
+	if ve.Reason != want {
+		t.Fatalf("Reason = %q, want %q", ve.Reason, want)
+	}
+	if cause := errors.Unwrap(err); cause != nil {
+		t.Fatalf("errors.Unwrap(err) = %v, want nil for a problem VQE detected itself", cause)
+	}
+
+	atBound := math.Ldexp(1, 26)
+	res, err = VQE(h, tmpl, VQEOptions{InitialParams: parameterized.Params{"a": atBound, "b": 0.1}, MaxIterations: 3})
+	if err != nil {
+		t.Fatalf("VQE(a=%v) at the bound must run: %v", atBound, err)
+	}
+	if res.Evaluations < 1+3*res.Iterations {
+		t.Fatalf("Evaluations = %d, want >= 1+3*%d: the gradient at the bound was evaluated", res.Evaluations, res.Iterations)
+	}
+}
+
+// TestVQEStepBeyondShiftBoundIsReported pins the step guard's second
+// clause (backlog item 20): a descent that carries a parameter past 2^26
+// stops before the next gradient would shift an angle float64 cannot
+// resolve, so parameterShiftGradient's own check is unreachable from VQE
+// and no error arrives wrapped. The start sits 0.125 below the bound;
+// E = cos(theta) has slope -sin(theta) = -0.53 there, so the default 0.3
+// step moves theta up by 0.16 and crosses on iteration 0.
+func TestVQEStepBeyondShiftBoundIsReported(t *testing.T) {
+	h := zOnQubit0(1)
+	tmpl := H2Ansatz()
+	start := math.Ldexp(1, 26) - 0.125
+	params := parameterized.Params{"theta": start}
+	grad, _, err := parameterShiftGradient(h, tmpl, params, tmpl.ParamNames())
+	if err != nil {
+		t.Fatalf("setup gradient: %v", err)
+	}
+	stepped := start - 0.3*grad["theta"]
+	if !(stepped > maxShiftMagnitude) {
+		t.Fatalf("setup: the step reaches %v, want beyond %v (gradient %v)", stepped, float64(maxShiftMagnitude), grad["theta"])
+	}
+
+	var ve *InvalidVQEInputError
+	res, err := VQE(h, tmpl, VQEOptions{InitialParams: params, MaxIterations: 3})
+	if !errors.As(err, &ve) {
+		t.Fatalf("result = %+v, err = %v (%T); want InvalidVQEInputError", res, err, err)
+	}
+	want := fmt.Sprintf("the step of parameter %q reaches %v at iteration 0, beyond the 2^26 (%v) within which float64 resolves the +/- pi/2 parameter shift (step size %v times gradient %v)", "theta", stepped, float64(maxShiftMagnitude), 0.3, grad["theta"])
+	if ve.Reason != want {
+		t.Fatalf("Reason = %q, want %q", ve.Reason, want)
+	}
+	if cause := errors.Unwrap(err); cause != nil {
+		t.Fatalf("errors.Unwrap(err) = %v, want nil for a problem VQE detected itself", cause)
 	}
 }

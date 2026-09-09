@@ -188,6 +188,13 @@ res, err := algorithm.VQE(h, tmpl, algorithm.VQEOptions{
   package's error reachable through `errors.As`; the first failure still
   aborts the loop. Direct callers of `Bind`, `Execute`, and `Energy` are
   unaffected.
+- Amended 2026-09-09 (backlog item 20): the parameter shift above is
+  computed in float64, and from 2^54 `theta +/- pi/2` rounds back to
+  `theta`, so `VQE` rejects an initial parameter of magnitude beyond 2^26
+  with `InvalidVQEInputError` and stops the same way when a step carries a
+  parameter past that bound; angles are not reduced mod 2*pi because the
+  energy is periodic only under the factory convention `VQE` cannot check
+  (`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`).
 
 ## Testing
 
