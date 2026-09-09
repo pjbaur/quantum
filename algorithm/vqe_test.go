@@ -378,7 +378,7 @@ func TestVQEOverflowingHamiltonianIsNotBlamedOnParams(t *testing.T) {
 		t.Fatalf("VQE: err = %v (%T), result = %+v; want InvalidVQEInputError", err, err, res)
 	}
 	if !strings.Contains(ve.Reason, `"theta"`) || !strings.Contains(ve.Reason, "non-finite") {
-		t.Fatalf("Reason = %q, want it to name the non-finite gradient of %q", ve.Reason, "theta")
+		t.Fatalf("Reason = %q, want it to name the non-finite value and the point %q it was evaluated at", ve.Reason, "theta")
 	}
 }
 
