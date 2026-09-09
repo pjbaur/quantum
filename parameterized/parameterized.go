@@ -133,7 +133,11 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 // AddGate adds a fixed gate needing no parameter. At least one target is
 // required: a call with none is rejected here, with an error naming the
 // gate, rather than appended and left for circuit.AddGate to reject at
-// Bind.
+// Bind. gate must be non-nil; a typed nil wrapped in a non-nil
+// quantum.Gate value (for example, (*gates.MatrixGate)(nil)) passes the
+// nil check undetected, the same caller-bug gap circuit.AddGate has, and
+// panics when this method calls gate.Name() to name the gate in the
+// no-target error.
 func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 	if gate == nil {
 		return fmt.Errorf("fixed gate must not be nil")

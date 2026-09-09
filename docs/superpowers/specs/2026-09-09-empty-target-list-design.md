@@ -157,6 +157,20 @@ design, and is unchanged.
   nil-factory error (Decision 1, check order). Pinned.
 - **Nil gate and no targets.** `AddGate(nil)` returns `fixed gate must
   not be nil`, as today; `gate.Name()` is never reached on a nil gate.
+- **Typed-nil gate and no targets.** `AddGate((*gates.MatrixGate)(nil))`
+  is not caught by `gate == nil` (a typed nil wrapped in a non-nil
+  interface) and panics in `gate.Name()`. Amended 2026-09-09 (round 1
+  fix): ruled a caller-bug precondition, not a defect to fix. A typed nil
+  is not a nil gate, Go cannot tell the two apart without reflection, the
+  repo's existing nil checks are all interface-nil checks, and
+  `circuit.AddGate` has the identical exposure once targets are given
+  (`quantum.GateQubitCount` type-asserts `gate` to `QubitCounter` and
+  calls `NumQubits()` on it before ever reaching `Matrix()`); the
+  no-target path only avoided this by accident of check order before this
+  item. `AddGate`'s doc comment now states the precondition. The round-1
+  red test asserting no panic on this input was deleted as contradicting
+  this ruling
+  (`.superpowers/backlog/enhancement-backlog-2026-08-27/item-19-round-1-fix.md`).
 - **Nothing declared after a rejection.** The guard precedes the `seen`
   write and the `steps` append, so `ParamNames()` and `ParamStepCounts()`
   are as before the call and `Bind` on the template still succeeds.
