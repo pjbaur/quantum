@@ -481,3 +481,20 @@ QPE is actually wanted.
   > **Red tests**: `TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent`
   > in `parameterized/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./parameterized -run '^TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent'`.
+- [ ] 22. **`AddParamGate` and `AddGate` store the caller's variadic
+  targets slice by reference** — both methods append
+  `step{... targets: targets}` directly, so the `step.targets` slice
+  shares the backing array of the `targets ...int` the caller passed;
+  mutating that slice after a successful declaration changes what `Bind`
+  later builds, although the call already returned success and the
+  declaration looked complete. Observed: declare `AddParamGate("theta",
+  Ry, targets...)` with `targets := []int{0}`, then set `targets[0] = 1`
+  and `Bind`; the bound circuit applies `Ry` to qubit 1, not qubit 0 as
+  declared. Reachable whenever a caller builds its target slice once and
+  reuses or mutates it across declarations, a common pattern for
+  generated circuits. Expected contract: either `Add*Gate` copies the
+  targets it stores, or the doc comments state that the slice passed in
+  must not be mutated after the call; which one is not prescribed here.
+  > **Red tests**: `TestRedDeclaredTargetsAreNotAliasedToCallerSlice` in
+  > `parameterized/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./parameterized -run '^TestRedDeclaredTargetsAreNotAliasedToCallerSlice'`.
