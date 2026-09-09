@@ -120,9 +120,10 @@ parameter declaration, although nothing documented `NewTemplate` as
 required. The map is now allocated on the first declaration, the only
 place it is written, and `NewTemplate` no longer pre-allocates it, so the
 zero value is exactly the template `NewTemplate(0)` returns: it declares
-nothing, rejects every target as out of range, and `Bind` fails as
-`circuit.New` does for a qubit count of zero. No method panics on it;
-templates built with `NewTemplate` behave as before. Design:
+nothing, rejects every target as out of range, and, once `Bind`'s own
+parameter checks pass, it fails as `circuit.New` does for a qubit count
+of zero. No method panics on it; templates built with `NewTemplate`
+behave as before. Design:
 `docs/superpowers/specs/2026-09-09-zero-value-template-design.md`.
 
 ### Breaking

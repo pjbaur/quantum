@@ -45,11 +45,11 @@ type step struct {
 
 // Template is a circuit recipe with named parameter holes. The zero value
 // is ready to use and is the template NewTemplate(0) returns: it declares
-// nothing, rejects every target as out of range, and Bind fails as
-// circuit.New does for a qubit count of zero. No method panics on it;
-// NewTemplate is how a template for a positive qubit count is made, not a
-// precondition of the methods. A Template is safe for concurrent reads
-// after all Add calls complete.
+// nothing, rejects every target as out of range, and, once Bind's own
+// parameter checks pass, Bind fails as circuit.New does for a qubit count
+// of zero. No method panics on it; NewTemplate is how a template for a
+// positive qubit count is made, not a precondition of the methods. A
+// Template is safe for concurrent reads after all Add calls complete.
 type Template struct {
 	numQubits  int
 	steps      []step

@@ -72,6 +72,15 @@ does for a qubit count of zero; no method panics on it; `NewTemplate` is
 how a template for a positive qubit count is made, not a precondition of
 the methods.
 
+Amended 2026-09-09 after round-1 review: that sentence undersold the
+ordering "Rulings on edge cases" already states below — `Bind` runs its
+own parameter checks first, so a call with an undeclared or non-finite
+key fails with `UnknownParameterError` or `InvalidParameterValueError`
+before the qubit-count check in `circuit.New` is ever reached, whatever
+the qubit count. The `Template` doc comment and the CHANGELOG entry now
+say "once `Bind`'s own parameter checks pass" rather than stating the
+`circuit.New` failure unconditionally.
+
 ## Decision 2: one allocation site, in `AddParamGate`
 
 Three shapes for the fix were weighed.
