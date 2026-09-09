@@ -426,7 +426,7 @@ QPE is actually wanted.
   > declarations share `seen` with inconsistent `paramOrder`/`steps` headers)
   > routed to item 21 under `redtests`. Commits: c71c567, 832af4d, 534668b,
   > b5f2727, 44befc7.
-- [ ] 19. **`AddParamGate` and `AddGate` accept an empty target list** —
+- [x] 19. **`AddParamGate` and `AddGate` accept an empty target list** —
   `checkTargets` loops over the given targets, so a call with none passes
   vacuously: the step is appended and later reported by `ParamNames` and
   `ParamStepCounts`, but `Bind` fails deep inside `circuit.AddGate` with
@@ -438,6 +438,26 @@ QPE is actually wanted.
   > **Red tests**: `TestRedAddParamGateRejectsNoTargets` in
   > `parameterized/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./parameterized -run '^TestRedAddParamGateRejectsNoTargets'`.
+  > **Done (2026-09-09)**: `AddParamGate` and `AddGate` in
+  > `parameterized/parameterized.go` now reject an empty target list after
+  > the nil check and before `checkTargets`, with `fmt.Errorf` messages
+  > `parameter %q: at least one target is required` and `fixed gate %q: at
+  > least one target is required` (the gate name rendered with `%q` after
+  > gate-round red testing showed an empty `Name()` produced a message
+  > naming nothing). An untyped error was chosen because the package's
+  > typed errors are `Bind`-time binding errors and this is the third
+  > declaration-time argument check beside two untyped siblings (`factory`
+  > and gate nil checks). The red test moved untagged into
+  > `parameterized/parameterized_test.go` as `TestAddRejectsNoTargets`
+  > alongside `TestAddNoTargetsErrorNamesTheGateAndDeclaresNothing` and
+  > its item-18 neighbors `TestZeroValueTemplate*`. A typed-nil gate was
+  > ruled a caller-bug precondition (same exposure as `circuit.AddGate`)
+  > and documented in `AddGate`'s doc comment. The `Template` doc comment
+  > and the 2026-08-30 parameter-binding spec got precision fixes and a
+  > dated amendment. Red testing found a pre-existing defect: declared
+  > targets alias the caller's slice, routed to item 22 under `redtests`.
+  > Commits: 4a74a06, 753227a, 0712b96, 4954527, a56a270, f30ddbf,
+  > 8e0040f, 2ea42fa, c8652ee.
 - [ ] 20. **`parameterShiftGradient` returns an exactly zero gradient where
   the +/- pi/2 shift is not representable** — the helper computes
   `theta + pi/2` and `theta - pi/2` in float64. From about 2^54 the spacing
