@@ -104,10 +104,16 @@ func (t *Template) checkTargets(targets []int) error {
 // AddParamGate adds a gate built by factory from the named parameter's
 // value at Bind time. The same name may drive several gates. The name is
 // an opaque key: any string is accepted, the empty string included, and
-// it is what Bind and ParamStepCounts key on.
+// it is what Bind and ParamStepCounts key on. At least one target is
+// required: a declaration with none is rejected here, with an error naming
+// the parameter, rather than declared, counted, and left for
+// circuit.AddGate to reject at Bind.
 func (t *Template) AddParamGate(name string, factory Factory, targets ...int) error {
 	if factory == nil {
 		return fmt.Errorf("parameter %q: factory must not be nil", name)
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("parameter %q: at least one target is required", name)
 	}
 	if err := t.checkTargets(targets); err != nil {
 		return err
@@ -123,10 +129,16 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 	return nil
 }
 
-// AddGate adds a fixed gate needing no parameter.
+// AddGate adds a fixed gate needing no parameter. At least one target is
+// required: a call with none is rejected here, with an error naming the
+// gate, rather than appended and left for circuit.AddGate to reject at
+// Bind.
 func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 	if gate == nil {
 		return fmt.Errorf("fixed gate must not be nil")
+	}
+	if len(targets) == 0 {
+		return fmt.Errorf("fixed gate %s: at least one target is required", gate.Name())
 	}
 	if err := t.checkTargets(targets); err != nil {
 		return err

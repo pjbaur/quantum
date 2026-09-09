@@ -315,8 +315,9 @@ func TestZeroValueTemplateAddParamGateDoesNotPanic(t *testing.T) {
 			t.Fatalf("AddParamGate on a zero-value Template panicked: %v; want an error or success, never a panic (NewTemplate is not documented as required)", r)
 		}
 	}()
-	// A zero-value template has no qubits, so any target is out of range;
-	// the no-target call is the one that reaches the parameter bookkeeping.
+	// A zero-value template has no qubits, so any target is out of range,
+	// and a call with no targets is rejected too (backlog item 19); either
+	// way the call must return an error, never panic.
 	err := tmpl.AddParamGate("", parameterized.Ry)
 	if err == nil {
 		if names := tmpl.ParamNames(); len(names) != 1 || names[0] != "" {
@@ -363,5 +364,51 @@ func TestZeroValueTemplateIsAZeroQubitTemplate(t *testing.T) {
 	var countErr *quantum.InvalidQubitCountError
 	if _, err := tmpl.Bind(parameterized.Params{}); !errors.As(err, &countErr) {
 		t.Fatalf("Bind on a zero-value Template: err = %v, want InvalidQubitCountError, the error circuit.New returns for zero qubits", err)
+	}
+}
+
+// TestAddRejectsNoTargets pins that a gate declared with zero targets is
+// rejected at the Add*Gate call (backlog item 19). Before the fix
+// checkTargets passed vacuously on an empty list, so the step was declared,
+// counted by ParamNames and ParamStepCounts, and only Bind failed, deep
+// inside circuit.AddGate.
+func TestAddRejectsNoTargets(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	err := tmpl.AddParamGate("", parameterized.Ry)
+	if err == nil {
+		_, bindErr := tmpl.Bind(parameterized.Params{"": 0.1})
+		t.Fatalf("AddParamGate(%q, Ry) with no targets accepted: ParamNames() = %q, ParamStepCounts() = %v; Bind then fails with %v; want the step rejected when added", "", tmpl.ParamNames(), tmpl.ParamStepCounts(), bindErr)
+	}
+	fixed := parameterized.NewTemplate(2)
+	if err := fixed.AddGate(gates.NewHadamard()); err == nil {
+		_, bindErr := fixed.Bind(parameterized.Params{})
+		t.Fatalf("AddGate(H) with no targets accepted; Bind then fails with %v; want the step rejected when added", bindErr)
+	}
+}
+
+// TestAddNoTargetsErrorNamesTheGateAndDeclaresNothing pins the shape of
+// the rejection: the error names the parameter or the gate, the template
+// is left as it was, and a nil factory is still reported before the
+// missing targets, since it is the earlier argument.
+func TestAddNoTargetsErrorNamesTheGateAndDeclaresNothing(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	if err := tmpl.AddParamGate("theta", parameterized.Ry); err == nil || !strings.Contains(err.Error(), `"theta"`) {
+		t.Fatalf("AddParamGate(%q, Ry) with no targets: err = %v, want an error naming the parameter", "theta", err)
+	}
+	if names := tmpl.ParamNames(); len(names) != 0 {
+		t.Fatalf("ParamNames() after a rejected declaration = %q, want none", names)
+	}
+	if counts := tmpl.ParamStepCounts(); len(counts) != 0 {
+		t.Fatalf("ParamStepCounts() after a rejected declaration = %v, want none", counts)
+	}
+	if err := tmpl.AddGate(gates.NewHadamard()); err == nil || !strings.Contains(err.Error(), "Hadamard") {
+		t.Fatalf("AddGate(H) with no targets: err = %v, want an error naming the gate", err)
+	}
+	// Neither rejected step was appended, so the template still binds.
+	if _, err := tmpl.Bind(parameterized.Params{}); err != nil {
+		t.Fatalf("Bind after rejected declarations: %v, want success on an empty template", err)
+	}
+	if err := tmpl.AddParamGate("theta", nil); err == nil || !strings.Contains(err.Error(), "factory must not be nil") {
+		t.Fatalf("AddParamGate(%q, nil) with no targets: err = %v, want the nil-factory error first", "theta", err)
 	}
 }

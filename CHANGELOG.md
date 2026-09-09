@@ -126,6 +126,21 @@ of zero. No method panics on it; templates built with `NewTemplate`
 behave as before. Design:
 `docs/superpowers/specs/2026-09-09-zero-value-template-design.md`.
 
+#### `parameterized.Template` rejects a gate declared with no targets
+
+`AddParamGate` and `AddGate` checked each given target for range and so
+accepted a call with none: the step was appended, a parameter declared
+that way was listed by `ParamNames` and counted by `ParamStepCounts`, and
+only `Bind` failed, with circuit's "at least one target is required" from
+deep inside `circuit.AddGate` rather than at the call that declared the
+gate. Both methods now reject an empty target list at the call, after
+their nil check and before the range check, with an error naming the
+parameter (`parameter "theta": at least one target is required`) or the
+gate (`fixed gate Hadamard: at least one target is required`); the
+template is left as it was. Declarations with at least one target are
+unchanged. Design:
+`docs/superpowers/specs/2026-09-09-empty-target-list-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed
