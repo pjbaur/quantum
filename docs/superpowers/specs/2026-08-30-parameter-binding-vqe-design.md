@@ -42,7 +42,11 @@ c, err := t.Bind(parameterized.Params{"theta": 0.4, "phi": 1.1})
 - `NewTemplate(numQubits int) *Template`. Amended 2026-08-30: takes the
   qubit count so `AddParamGate`/`AddGate` reject out-of-range targets at
   declaration time, mirroring `circuit.New` (the no-arg sketch predated
-  target validation).
+  target validation). Amended 2026-09-09 (backlog item 19):
+  `AddParamGate`/`AddGate` also reject a call with no targets at
+  declaration time, checked before the out-of-range check, with an error
+  naming the parameter or the gate rather than deferring to `Bind`
+  (`docs/superpowers/specs/2026-09-09-empty-target-list-design.md`).
 - `(*Template) AddParamGate(name string, factory Factory, targets ...int) error`
   — declares use of a parameter. `Factory` is `func(value float64) quantum.Gate`.
 - `(*Template) AddGate(gate quantum.Gate, targets ...int) error` — fixed step.
