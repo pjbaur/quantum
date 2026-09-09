@@ -88,9 +88,10 @@ order, as `parameterized.MissingParameterError`, the error `Bind` itself
 returns for an absent declared name. The check guarantees completeness
 only, the one `Bind` rule a shift can hide; a non-finite value or an
 undeclared key in `Params`, or an undeclared name among those to
-differentiate, stays `Bind`'s to reject when the first shifted evaluation
-reaches it. `VQE` binds every declared parameter itself and is
-unaffected; no exported behavior changes. Design:
+differentiate, stays `Bind`'s to reject at the first shifted evaluation
+that reaches it; with `names` empty no evaluation runs and nothing beyond
+completeness is checked. `VQE` binds every declared parameter itself and
+is unaffected; no exported behavior changes. Design:
 `docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`.
 
 #### `algorithm`'s parameter-shift gradient counts every completed evaluation on failure
