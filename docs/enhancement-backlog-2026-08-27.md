@@ -394,7 +394,7 @@ QPE is actually wanted.
   > `TestParameterShiftCountsEvaluationsBeforeFailure`, plus four-row
   > `TestParameterShiftEvaluationCountOnFailure` pinning counts 0/1/2/3
   > across failure positions. Commits: 9a0c2c0, 7828e60, 49445e7.
-- [ ] 18. **Zero-value `Template` panics in `AddParamGate`** — a
+- [x] 18. **Zero-value `Template` panics in `AddParamGate`** — a
   `Template` declared without `NewTemplate` (so its `seen` map is nil)
   panics on the first `AddParamGate` call instead of returning an error,
   because the call writes to `seen` unconditionally. Observed:
@@ -407,6 +407,25 @@ QPE is actually wanted.
   > **Red tests**: `TestRedZeroValueTemplateAddParamGateDoesNotPanic` in
   > `parameterized/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./parameterized -run '^TestRedZeroValueTemplate'`.
+  > **Done (2026-09-09)**: `AddParamGate` allocates `seen` on its first
+  > parameter declaration (the only write site) and `NewTemplate` dropped its
+  > `make` in `parameterized/parameterized.go`, so the zero value is a valid
+  > template equal to `NewTemplate(0)`: declares nothing, rejects every target
+  > as out of range, and `Bind` fails as `circuit.New` does for zero qubits.
+  > No method panics. `NewTemplate` as enforced precondition rejected because
+  > `NumQubits`, `ParamNames`, `ParamStepCounts` return no error and cannot
+  > enforce it. The `Template` doc comment now states the contract. Round-1
+  > amendment: `Bind`'s own parameter checks run before `circuit.New`'s
+  > zero-qubit failure (spec
+  > `docs/superpowers/specs/2026-09-09-zero-value-template-design.md`). Tests:
+  > red test `TestRedZeroValueTemplateAddParamGateDoesNotPanic` moved to
+  > `parameterized/parameterized_test.go` untagged; added
+  > `TestZeroValueTemplateIsAZeroQubitTemplate` pinning observable zero-value
+  > behavior through calls item 19 does not change. Red round found
+  > pre-existing copy-by-value aliasing defect (value copies after
+  > declarations share `seen` with inconsistent `paramOrder`/`steps` headers)
+  > routed to item 21 under `redtests`. Commits: c71c567, 832af4d, 534668b,
+  > b5f2727, 44befc7.
 - [ ] 19. **`AddParamGate` and `AddGate` accept an empty target list** —
   `checkTargets` loops over the given targets, so a call with none passes
   vacuously: the step is appended and later reported by `ParamNames` and
