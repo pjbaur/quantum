@@ -99,8 +99,14 @@ rejected there). Rejected.
 in the style of `MissingParameterError` and friends. Rejected. The
 package's typed errors are `Bind`-time binding errors: each carries the
 parameter name so a variational loop can react to a missing, unknown, or
-non-finite value programmatically, and `algorithm.VQE` does. The
-declaration-time argument checks are a different family: a nil factory
+non-finite value programmatically, and `algorithm.VQE` does. Amended
+2026-09-09 (round 1 fix): more precisely, `VQE`'s `parameterShiftGradient`
+constructs and returns a `MissingParameterError` itself and
+`InvalidVQEInputError` unwraps so `errors.As` can reach the package's
+types; no code in `algorithm` branches on one of them via `errors.As`
+today. `VQE` produces and propagates these errors rather than reacting to
+them; the argument that follows is unaffected. The declaration-time
+argument checks are a different family: a nil factory
 and a nil gate are caller bugs reported with `fmt.Errorf`, and an empty
 target list is the third check of that kind. Typing one of the three
 while its two siblings stay untyped would be the inconsistency; typing
@@ -175,6 +181,11 @@ design, and is unchanged.
   changes behavior. The prototype's `go run ./cmd/quantum -demo qaoa`
   still prints `VQE from the symmetric start: energy = -1.0000, expected cut = 2.0000`
   followed by `iterations accepted: 29, energy evaluations: 378`.
+  Amended 2026-09-09 (round 1 fix): `internal/examples/qaoa.go` makes no
+  `Add*Gate` call itself; it calls `algorithm.QAOATemplate`, which does,
+  so it reaches `Template` only through that function, already listed
+  here. The claim was vacuously true of the file, not false, but it does
+  not belong in this bullet's list of direct callers.
 - `Bind` is unchanged. A template built through the public API can no
   longer hold a step with zero targets, so the "at least one target is
   required" path in `circuit.AddGate` is unreachable from `Bind`; the
