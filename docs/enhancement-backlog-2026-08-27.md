@@ -439,3 +439,26 @@ QPE is actually wanted.
   > **Red tests**: `TestRedParameterShiftAtHugeAngleMatchesReducedAngle` in
   > `algorithm/backlog_red_numeric_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftAtHugeAngle'`.
+- [ ] 21. **Copying a `Template` by value after a declaration desyncs
+  `ParamNames` from `ParamStepCounts`** — `Template.seen` is a map and
+  `Template.AddParamGate` appends to `Template.paramOrder` and
+  `Template.steps`; a value copy taken after at least one declaration
+  shares the `seen` map with the original (maps are reference types) but
+  starts with its own header over the same `paramOrder`/`steps` backing
+  arrays, so a later declaration on either copy can flip an entry in the
+  shared `seen` map that the other copy's `ParamNames` never lists, while
+  `ParamStepCounts` (built by scanning `steps` for a factory, not by
+  reading `seen`) counts it only on the copy whose own `steps` grew.
+  Observed: copy `a` after declaring `theta`, declare `phi` on the copy
+  `b`, then declare `phi` again on `a`; `a.ParamStepCounts()` reports
+  `phi` but `a.ParamNames()` omits it, and `a.Bind` with only `theta`
+  supplied returns a bound circuit instead of `MissingParameterError`.
+  Reachable on any `Template`, `NewTemplate`-built ones included; not
+  specific to the zero value. Expected contract: either `Template`
+  documented as not safe to copy by value after any declaration (only
+  passed and stored by pointer), or `AddParamGate`/`ParamNames`/
+  `ParamStepCounts` made independent per copy; which one is not
+  prescribed here.
+  > **Red tests**: `TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent`
+  > in `parameterized/backlog_red_test.go`; reproduce with
+  > `go test -tags redtests ./parameterized -run '^TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent'`.
