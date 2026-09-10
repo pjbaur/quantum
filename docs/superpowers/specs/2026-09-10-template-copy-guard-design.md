@@ -181,11 +181,44 @@ lists. (Amended 2026-09-10, round 1 fix: `seen` is gone and `Bind` reads
 lists. It stays refused: those lists share backing arrays with the
 original's and, after a copy-back, may no longer hold what they held when
 copied, see the copy-back ruling, and the contract as stated is that a
-copy is unusable as a whole.) Each method calls `checkNotCopied` as its first statement, before
-its argument checks: a copied template is unusable whatever the
-arguments, so `AddParamGate("x", nil, 1)` on a copy reports the copy, not
-the factory, and `Bind` on a copy reports the copy before any missing or
-unknown name.
+copy is unusable as a whole.) (Amended 2026-09-10, round 3 fix: both
+reasons above are superseded; what the guard now does is stated in the
+paragraph below.) Each method calls `checkNotCopied` as its first
+statement, before its argument checks: a copied template is unusable
+whatever the arguments, so `AddParamGate("x", nil, 1)` on a copy reports
+the copy, not the factory, and `Bind` on a copy reports the copy before
+any missing or unknown name.
+
+Amended 2026-09-10 (round 3 fix, the round 3 review's I1). Under the
+round 2 layout neither reason above survives. A copy holds the original's
+`state` pointer and no list of its own, so deleting the guard would not
+desync anything: a copy's `AddParamGate` would append to the one shared
+state through the same code path the original uses, and `ParamNames`,
+`ParamStepCounts`, and `Bind` on the copy and on the original would go on
+agreeing. The same holds for every route past the guard the rounds have
+found, the copy-back and the theoretical address coincidence included:
+under the shared state a bypass yields an alias, never a desync. What
+keeps the item's invariant is the `templateState`, not the guard.
+
+The guard is kept for the contract, not for consistency. Item 21 offers
+two acceptable contracts, "not safe to copy by value after any
+declaration (only passed and stored by pointer)" and "independent per
+copy"; two values of a value type quietly writing one declaration list is
+neither. Decision 1 chose the first, so a used `Template` is refused as a
+copy rather than allowed to act as a silent alias, and that is the whole
+of what the guard now enforces. Removing it would be a contract change,
+giving `Template` map-like alias semantics, not a consistency fix; it
+would also reclaim the receiver escape (Decision 3's `noescape` note).
+Neither is proposed here.
+
+As one statement of the contract, for a reader who should not have to
+reconstruct it from three amendments: the state pointer keeps
+`ParamNames`, `ParamStepCounts`, and `Bind` consistent under any sequence
+of by-value copies, copy-backs, and declarations; the guard refuses
+copies as a matter of contract; and a copy-back restores a state the same
+variable founded, which is the variable's current state unless it was
+reset to an undeclared template in between (the round 3 note on the
+copy-back ruling under "Rulings on edge cases").
 
 **Not checked: `NumQubits`, `ParamNames`, `ParamStepCounts`.** They read
 only `numQubits` and the elements inside the copy's own slice lengths.
@@ -238,7 +271,12 @@ every copy's `addr`, so no later `Template` can come to occupy the pinned
 address while a copy holding it exists, and the comparison in
 `checkNotCopied` cannot pass a copy by coincidence. `strings.Builder`,
 through `abi.NoEscape`, leaves that theoretical hole open; this design
-does not.
+does not. (Amended 2026-09-10, round 3 fix: the escape argument stands,
+but what it closes is a contract hole rather than a correctness one.
+Under the shared state a coincidental pass could at most let a copy
+write the state it already shares, as an alias; `ParamNames`,
+`ParamStepCounts`, and `Bind` would stay consistent on both values. See
+Decision 3's round 3 amendment.)
 
 ## Rulings on edge cases
 
@@ -248,7 +286,12 @@ does not.
   independent templates. Pinned by `TestCopyBeforeDeclarationIsIndependent`.
 - **Copy after an accepted `AddGate` only.** `AddGate` pins too, since its
   `append` is enough to corrupt the other copy's step list. A copy taken
-  after only fixed gates is refused like any other.
+  after only fixed gates is refused like any other. (Amended 2026-09-10,
+  round 3 fix: under the shared state there is no other copy's step list
+  to corrupt. `AddGate` pins because a fixed gate is an accepted
+  declaration and the state has to exist to hold it, and a copy taken
+  after one is refused for the contract reason in Decision 3's round 3
+  amendment.)
 - **A copy that outlives the original.** A function that declares into a
   local `Template` and returns it by value hands back a copy whose `addr`
   points at the original, which the copy's `addr` keeps alive on the
@@ -351,7 +394,9 @@ does not.
   nil), and item 18's contract is unchanged: no allocation on the zero
   value until a declaration is accepted, nothing declared after a
   rejection, `NewTemplate(0)` and the zero value identical. The `addr`
-  guard is exactly where it was.
+  guard is exactly where it was. (Amended 2026-09-10, round 3 fix: where
+  it is, which is unchanged, and not why it is there; Decision 3's round 3
+  amendment states what it now enforces.)
 
   Completeness. Every write to `addr` or `state` is in `pin`, which runs
   only in a writer after `checkNotCopied` has passed, and a struct copy
