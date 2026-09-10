@@ -656,10 +656,12 @@ changed, and it is the only test expectation this round changes.
 Survivor 2 (`TestCopyAssignedBackOverOriginalBindRejectsUnlistedName`)
 asserted that after `b := a`, `a` declares `phi`, `a = b`, `ParamNames`
 is `[theta]` and `Bind` with `phi` is `UnknownParameterError`. Under the
-shared state the copy-back drops nothing, so `ParamNames` is
-`[theta phi]` and that `Bind` succeeds; the "twice" ruling above records
-why (the survivor's expectation was the snapshot semantics that the
-two-step hole shows cannot be kept). The test is replaced by
+shared state the copy-back drops nothing (Amended 2026-09-10, round 3
+fix: unless the variable was reset to an undeclared template in between;
+this sequence has no such reset, so the answer stands), so `ParamNames`
+is `[theta phi]` and that `Bind` succeeds; the "twice" ruling above
+records why (the survivor's expectation was the snapshot semantics that
+the two-step hole shows cannot be kept). The test is replaced by
 `TestCopyAssignedBackOverOriginalKeepsEveryDeclaration`, which keeps the
 sequence and pins the new answers: `ParamNames` is `[theta phi]`,
 `ParamStepCounts` is `map[phi:1 theta:1]`, `Bind` with both succeeds,
