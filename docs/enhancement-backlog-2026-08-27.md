@@ -458,7 +458,7 @@ QPE is actually wanted.
   > targets alias the caller's slice, routed to item 22 under `redtests`.
   > Commits: 4a74a06, 753227a, 0712b96, 4954527, a56a270, f30ddbf,
   > 8e0040f, 2ea42fa, c8652ee.
-- [ ] 20. **`parameterShiftGradient` returns an exactly zero gradient where
+- [x] 20. **`parameterShiftGradient` returns an exactly zero gradient where
   the +/- pi/2 shift is not representable** — the helper computes
   `theta + pi/2` and `theta - pi/2` in float64. From about 2^54 the spacing
   between adjacent float64 values exceeds pi, so both shifted values round
@@ -478,6 +478,33 @@ QPE is actually wanted.
   > **Red tests**: `TestRedParameterShiftAtHugeAngleMatchesReducedAngle` in
   > `algorithm/backlog_red_numeric_test.go`; reproduce with
   > `go test -tags redtests ./algorithm -run '^TestRedParameterShiftAtHugeAngle'`.
+  > **Done (2026-09-10)**: an unexported `maxShiftMagnitude = 1 << 26` in
+  > `algorithm/vqe.go` enforces the bound that any finite angle with
+  > magnitude above it is rejected as `InvalidVQEInputError` with 0
+  > evaluations. `parameterShiftGradient` checks each shifted name ahead of
+  > its loop (after item 16's completeness check, finite values only);
+  > `VQE` checks `InitialParams` values up front and stops when a descent
+  > step carries a parameter past the bound, making the helper's check
+  > unreachable from `VQE`. The constant's comment derives the bound: below
+  > 2^26 the shifted angle is exact to 7.5e-9 rad (the even split of the
+  > 53-bit significand; 10^7 turns of headroom); beyond it the rule
+  > degrades at 2^48 (descent frozen), 2^51 (wrong offset), and 2^54
+  > (exactly zero). Angles are rejected, not reduced mod 2*pi: the energy
+  > is 2*pi-periodic only under the `exp(-i*theta*P/2)` factory convention
+  > the driver cannot check, the reduction is not computable in float64 at
+  > those magnitudes (math.Mod error about 45 rad), and it matches item
+  > 14's domain-check taxonomy. The red test was ruled contradicted by
+  > Decision 1 and deleted with `algorithm/backlog_red_numeric_test.go`.
+  > New tests in `algorithm/vqe_test.go` pin the bound at ±2^26 and one
+  > ulp beyond, the exact Reasons, at-the-bound gradient accuracy, and the
+  > item's `a = 2^60` scenario through `VQE`
+  > (`TestVQEHugeInitialParamIsRejected`). Gate rounds corrected two
+  > arithmetic figures in the derivation prose, stated the ordering for
+  > undeclared names in `names` (the magnitude check runs over every name,
+  > so a finite huge undeclared value is reported at 0 evaluations; ±Inf
+  > still reaches `Bind`), and added dated amendment notes to four prior
+  > specs. Commits: 4817e29, 6ea900d, 76a5f3e, 9a7fe3e, 9d79e4e, dda9f54,
+  > c26c392, 4d53f44, 57647fc, bb8ed87.
 - [ ] 21. **Copying a `Template` by value after a declaration desyncs
   `ParamNames` from `ParamStepCounts`** — `Template.seen` is a map and
   `Template.AddParamGate` appends to `Template.paramOrder` and
