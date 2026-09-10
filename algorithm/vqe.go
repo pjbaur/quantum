@@ -303,8 +303,13 @@ func validateVQEStructure(h *Hamiltonian, t *parameterized.Template) error {
 // parameter-shift bound, from reaching Bind or parameterShiftGradient).
 // What can still fail is what only running the template reveals: a factory
 // returning a gate of the wrong width or with a malformed matrix, or a
-// Pauli axis outside the enum. Those are input properties, so the caller
-// sees the VQE type, with the detecting package's error kept in Err.
+// Pauli axis outside the enum. One more input fails here rather than in
+// validation: a t whose pointee is a parameterized.Template copied by
+// value after a declaration. validateVQEStructure reads only the accessors
+// such a copy still answers, so it passes, and the first evaluation's Bind
+// refuses it (see parameterized.Template). Those are all input properties,
+// so the caller sees the VQE type, with the detecting package's error kept
+// in Err.
 func wrapEvaluationError(where string, err error) error {
 	return &InvalidVQEInputError{Reason: where + " failed: " + err.Error(), Err: err}
 }
@@ -387,7 +392,10 @@ func checkEnergy(where string, energy float64, names []string, params parameteri
 // InvalidVQEInputError. Problems only running the template can reveal,
 // such as a factory returning a gate wider than its target list, surface
 // from the first evaluation and are wrapped in the same type with the
-// detecting package's error reachable through errors.As. Coefficients
+// detecting package's error reachable through errors.As; so does a t that
+// points to a parameterized.Template copied by value after a declaration,
+// which the structural checks cannot tell from the original and whose
+// first Bind refuses it (see wrapEvaluationError). Coefficients
 // that are each finite but whose sum overflows float64 give a non-finite
 // energy or gradient, and a StepSize large enough that a step overflows
 // gives a non-finite parameter; VQE checks each energy it evaluates, each
