@@ -1104,7 +1104,10 @@ func TestParameterShiftRejectsUnresolvableAngle(t *testing.T) {
 // came back exactly 0, the descent step of 0.03 was lost to the spacing of
 // 256, and VQE reported Converged after one iteration with a frozen at its
 // start. Now the value is rejected up front with a Reason that names the
-// bound and the value; at the bound itself the run proceeds.
+// bound and the value; at the bound itself the run proceeds, since a's
+// gradient there is +0.162 (positive), so the first step moves a to
+// 2^26 - 0.049, away from the bound, rather than crossing it into the
+// step guard.
 func TestVQEHugeInitialParamIsRejected(t *testing.T) {
 	h := H2Hamiltonian()
 	tmpl := gradientTargetTemplate()
@@ -1130,6 +1133,9 @@ func TestVQEHugeInitialParamIsRejected(t *testing.T) {
 	}
 	if res.Evaluations < 1+3*res.Iterations {
 		t.Fatalf("Evaluations = %d, want >= 1+3*%d: the gradient at the bound was evaluated", res.Evaluations, res.Iterations)
+	}
+	if math.Abs(res.Params["a"]) > maxShiftMagnitude {
+		t.Fatalf("Params[\"a\"] = %v, want magnitude <= %v: the descent moved a away from the bound, not past it", res.Params["a"], float64(maxShiftMagnitude))
 	}
 }
 
