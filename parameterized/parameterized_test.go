@@ -487,8 +487,9 @@ func TestCopyAfterDeclarationKeepsNamesAndCountsConsistent(t *testing.T) {
 // TestCopiedTemplateIsRefusedByAddAndBind pins the shape of the refusal:
 // AddParamGate, AddGate, and Bind on a by-value copy taken after a
 // declaration each return the copy error before any other check, the
-// accessors on the copy still describe the template as it was when
-// copied, and the original is untouched and fully usable.
+// accessors on the copy still answer (with the state the copy shares with
+// the original, which here is what it was when copied), and the original
+// is untouched and fully usable.
 func TestCopiedTemplateIsRefusedByAddAndBind(t *testing.T) {
 	orig := parameterized.NewTemplate(2)
 	if err := orig.AddParamGate("theta", parameterized.Ry, 0); err != nil {
@@ -519,7 +520,8 @@ func TestCopiedTemplateIsRefusedByAddAndBind(t *testing.T) {
 	if _, err := c.Bind(parameterized.Params{"theta": 0.1, "typo": 0}); err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("Bind(with an undeclared name) on a copy: err = %v, want the copy error before UnknownParameterError", err)
 	}
-	// The accessors read only what the copy holds by value.
+	// The accessors answer on a copy; nothing has been declared since the
+	// copy was taken, so they report what it held when copied.
 	if got := c.NumQubits(); got != 2 {
 		t.Fatalf("NumQubits() on a copy = %d, want 2", got)
 	}
@@ -580,11 +582,13 @@ func TestCopyBeforeDeclarationIsIndependent(t *testing.T) {
 // check (backlog item 21): a copy taken after a declaration and assigned
 // back over the original after the original declared once more has the
 // original's own address, so the check passes. While a shared name map
-// existed it still listed the dropped name, so the original's next
+// existed alongside per-copy slice headers, the map still listed the name
+// the restored headers no longer covered, so the original's next
 // declaration of it was counted by ParamStepCounts, absent from
-// ParamNames, and never demanded by Bind. Declared names are now read
-// from the name list itself, so the copy-back restores a consistent
-// snapshot and the re-declaration is listed, counted, and demanded.
+// ParamNames, and never demanded by Bind. The declaration state now sits
+// behind one pointer every copy shares, so the copy-back writes that
+// pointer over itself and the re-declaration is a second step of a name
+// still listed: listed, counted, and demanded.
 func TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent(t *testing.T) {
 	a := *parameterized.NewTemplate(2)
 	if err := a.AddParamGate("theta", parameterized.Ry, 0); err != nil {
@@ -619,11 +623,18 @@ func TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent(t *testing.T)
 	}
 }
 
-// TestCopyAssignedBackOverOriginalBindRejectsUnlistedName pins the same
-// copy-back sequence with no further declaration: Bind is given a name
-// that ParamNames does not list and must reject it as unknown, which a
-// shared name map still holding the dropped name did not.
-func TestCopyAssignedBackOverOriginalBindRejectsUnlistedName(t *testing.T) {
+// TestCopyAssignedBackOverOriginalKeepsEveryDeclaration pins what a
+// copy-back is under the shared declaration state (backlog item 21, round
+// 2): a no-op on the declarations. The copy and the original hold the same
+// state pointer, so assigning the copy back restores nothing older; the
+// name declared between the copy and the copy-back stays listed, and Bind
+// demands exactly the listed names, accepting phi, rejecting its absence,
+// and rejecting a name no declaration ever made. Round 1's version of this
+// test expected the copy-back to drop phi and Bind to reject it as
+// unknown, the answer per-copy slice headers gave; the design's round 2
+// amendment replaces those headers with the shared state, so the
+// expectation follows the state.
+func TestCopyAssignedBackOverOriginalKeepsEveryDeclaration(t *testing.T) {
 	a := *parameterized.NewTemplate(2)
 	if err := a.AddParamGate("theta", parameterized.Ry, 0); err != nil {
 		t.Fatal(err)
@@ -634,12 +645,163 @@ func TestCopyAssignedBackOverOriginalBindRejectsUnlistedName(t *testing.T) {
 	}
 	a = b
 	names := a.ParamNames()
-	if len(names) != 1 || names[0] != "theta" {
-		t.Fatalf("ParamNames = %v, want [theta]", names)
+	if len(names) != 2 || names[0] != "theta" || names[1] != "phi" {
+		t.Fatalf("ParamNames after a copy-back = %q, want [theta phi]: the copy-back must not drop a declaration", names)
 	}
-	_, err := a.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2})
+	if counts := a.ParamStepCounts(); len(counts) != 2 || counts["theta"] != 1 || counts["phi"] != 1 {
+		t.Fatalf("ParamStepCounts after a copy-back = %v, want map[phi:1 theta:1]", counts)
+	}
+	if _, err := a.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2}); err != nil {
+		t.Fatalf("Bind with exactly the listed names after a copy-back: %v, want success", err)
+	}
+	var missing *parameterized.MissingParameterError
+	if _, err := a.Bind(parameterized.Params{"theta": 0.1}); !errors.As(err, &missing) || missing.Name != "phi" {
+		t.Fatalf("Bind without phi after a copy-back: err = %v, want MissingParameterError for phi", err)
+	}
 	var unknown *parameterized.UnknownParameterError
-	if !errors.As(err, &unknown) {
-		t.Fatalf("Bind with phi, which ParamNames does not list: err = %v, want UnknownParameterError", err)
+	if _, err := a.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2, "typo": 0}); !errors.As(err, &unknown) {
+		t.Fatalf("Bind with an undeclared name after a copy-back: err = %v, want UnknownParameterError", err)
+	}
+}
+
+// TestCopiedTemplateAccessorsReportSharedState pins that NumQubits,
+// ParamNames, and ParamStepCounts on a refused copy read the declaration
+// state the copy shares with the original (backlog item 21, round 2):
+// after the original declares again, the copy lists and counts the new
+// name too, and its two accessors never disagree, while its writers and
+// Bind stay refused.
+func TestCopiedTemplateAccessorsReportSharedState(t *testing.T) {
+	orig := parameterized.NewTemplate(2)
+	if err := orig.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	c := *orig
+	if err := orig.AddParamGate("phi", parameterized.Rx, 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := orig.AddGate(gates.NewHadamard(), 1); err != nil {
+		t.Fatal(err)
+	}
+	names := c.ParamNames()
+	if len(names) != 2 || names[0] != "theta" || names[1] != "phi" {
+		t.Fatalf("ParamNames() on a copy after the original declared phi = %q, want [theta phi]", names)
+	}
+	if counts := c.ParamStepCounts(); len(counts) != 2 || counts["theta"] != 1 || counts["phi"] != 1 {
+		t.Fatalf("ParamStepCounts() on a copy after the original declared phi = %v, want map[phi:1 theta:1]", counts)
+	}
+	if got := c.NumQubits(); got != 2 {
+		t.Fatalf("NumQubits() on a copy = %d, want 2", got)
+	}
+	if err := c.AddGate(gates.NewHadamard(), 0); err == nil || !strings.Contains(err.Error(), "copied by value") {
+		t.Fatalf("AddGate on a copy after the original declared again: err = %v, want the copy error", err)
+	}
+	if _, err := c.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2}); err == nil || !strings.Contains(err.Error(), "copied by value") {
+		t.Fatalf("Bind on a copy after the original declared again: err = %v, want the copy error", err)
+	}
+}
+
+// TestCopyAssignedBackTwiceKeepsNamesAndCountsConsistent pins the two-step
+// copy-back hole round 1's re-review found (backlog item 21): with the step
+// and name lists held as slice headers, a copy taken after an earlier
+// copy-back restored stale headers over slots the original had since
+// rewritten, so the pinned original's ParamNames and ParamStepCounts came
+// from different generations and Bind with exactly the listed names bound
+// an unlisted parameter at 0. The declaration state now lives behind one
+// pointer shared by every copy, so a copy-back is a no-op on it: no
+// declaration is dropped or rewritten, names and counts agree, and Bind
+// demands exactly the listed names. Both variants of the sequence are
+// run: a repeat declaration between the copy and the copy-back, and a
+// fixed gate in its place.
+func TestCopyAssignedBackTwiceKeepsNamesAndCountsConsistent(t *testing.T) {
+	for _, tt := range []struct {
+		name    string
+		between func(a *parameterized.Template) error
+		wantX   int // steps driven by "x" once the sequence has run
+	}{
+		{"repeat declaration", func(a *parameterized.Template) error { return a.AddParamGate("x", parameterized.Ry, 0) }, 2},
+		{"fixed gate", func(a *parameterized.Template) error { return a.AddGate(gates.NewHadamard(), 0) }, 1},
+	} {
+		t.Run(tt.name, func(t *testing.T) {
+			a := *parameterized.NewTemplate(2)
+			for _, name := range []string{"x", "y", "z"} {
+				if err := a.AddParamGate(name, parameterized.Ry, 0); err != nil {
+					t.Fatal(err)
+				}
+			}
+			b := a
+			if err := tt.between(&a); err != nil {
+				t.Fatal(err)
+			}
+			if err := a.AddParamGate("w", parameterized.Ry, 0); err != nil {
+				t.Fatal(err)
+			}
+			s := a
+			a = b
+			if err := a.AddParamGate("v", parameterized.Ry, 0); err != nil {
+				t.Fatalf("AddParamGate on the original after a copy-back: %v, want success", err)
+			}
+			a = s
+
+			names := a.ParamNames()
+			counts := a.ParamStepCounts()
+			wantNames := []string{"x", "y", "z", "w", "v"}
+			if len(names) != len(wantNames) {
+				t.Fatalf("ParamNames() after two copy-backs = %q, want %q: a copy-back must not drop or rewrite a declaration", names, wantNames)
+			}
+			for i, want := range wantNames {
+				if names[i] != want {
+					t.Fatalf("ParamNames()[%d] after two copy-backs = %q, want %q (names %q)", i, names[i], want, names)
+				}
+			}
+			for name := range counts {
+				found := false
+				for _, n := range names {
+					if n == name {
+						found = true
+					}
+				}
+				if !found {
+					t.Errorf("ParamStepCounts() = %v lists %q but ParamNames() = %q omits it", counts, name, names)
+				}
+			}
+			for _, name := range names {
+				if counts[name] == 0 {
+					t.Errorf("ParamNames() = %q lists %q but ParamStepCounts() = %v omits it", names, name, counts)
+				}
+			}
+			if counts["x"] != tt.wantX {
+				t.Errorf("ParamStepCounts()[%q] = %d, want %d: every accepted step is counted (counts %v)", "x", counts["x"], tt.wantX, counts)
+			}
+
+			// Bind with exactly the listed names succeeds; one listed name
+			// omitted is missing; one name more is unknown.
+			exact := parameterized.Params{}
+			for _, name := range names {
+				exact[name] = 0.1
+			}
+			if _, err := a.Bind(exact); err != nil {
+				t.Fatalf("Bind with exactly ParamNames() = %q: %v, want success", names, err)
+			}
+			for _, omit := range names {
+				partial := parameterized.Params{}
+				for name := range exact {
+					if name != omit {
+						partial[name] = 0.1
+					}
+				}
+				var missing *parameterized.MissingParameterError
+				if _, err := a.Bind(partial); !errors.As(err, &missing) || missing.Name != omit {
+					t.Errorf("Bind without %q: err = %v, want MissingParameterError for %q", omit, err, omit)
+				}
+			}
+			extra := parameterized.Params{"typo": 0}
+			for name := range exact {
+				extra[name] = 0.1
+			}
+			var unknown *parameterized.UnknownParameterError
+			if _, err := a.Bind(extra); !errors.As(err, &unknown) {
+				t.Errorf("Bind with an undeclared name: err = %v, want UnknownParameterError", err)
+			}
+		})
 	}
 }

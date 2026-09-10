@@ -55,33 +55,68 @@ type step struct {
 // A Template is used in place or through a pointer, as NewTemplate returns
 // it. Copying a Template by value after a declaration has been accepted is
 // not supported, whether by assignment, by passing or returning it, or by
-// storing it in a slice, map, or struct field that is later copied: the
-// copy shares the backing arrays of the original's step and name lists but
-// not their slice headers, so a declaration on either could overwrite one
-// the other still lists. Like strings.Builder, a Template records the
-// receiver of its first accepted declaration, and AddParamGate, AddGate,
-// and Bind on a copy taken after that return an error, before any other
-// check, instead of touching the shared arrays. A copy taken before any
+// storing it in a slice, map, or struct field that is later copied. Like
+// strings.Builder, a Template records the receiver of its first accepted
+// declaration, and AddParamGate, AddGate, and Bind on a copy taken after
+// that return an error, before any other check. A copy taken before any
 // declaration is accepted shares nothing and is an independent template.
-// Nothing else is shared: whether a name is declared is read from the name
-// list itself, so every Template value describes itself. In particular, a
-// copy assigned back over the original, which the receiver check cannot
-// tell from the original, restores the lists as they were when the copy
-// was taken, drops the declarations made in between, and goes on
-// consistently from there. NumQubits, ParamNames, and ParamStepCounts on
-// a refused copy describe the template as it was when copied, unless the
-// original has since been rolled back that way and has declared again
-// into slots the copy's lists still cover. A Template is safe for
-// concurrent reads after all Add calls complete.
+//
+// The step list and the declared names live behind one pointer, allocated
+// by the first accepted declaration, so every copy of a declared Template
+// refers to the same declaration state rather than to its own slice
+// headers over shared arrays. Only the original ever writes it, and
+// assigning any copy back over the original writes that same pointer over
+// itself: no sequence of copies, copy-backs, and declarations drops,
+// rewrites, or duplicates a declaration, so ParamNames and ParamStepCounts
+// always describe the same declarations and Bind demands exactly the
+// listed names. The receiver check cannot tell a copy assigned back over
+// the original from the original, and does not need to: the value it
+// restores is the original's own state. NumQubits, ParamNames, and
+// ParamStepCounts on a refused copy report that shared state, so they
+// describe the template as it is now, declarations the original has made
+// since the copy included. A Template is safe for concurrent reads after
+// all Add calls complete.
 type Template struct {
 	// addr is the receiver of the first accepted declaration, set only by
 	// AddParamGate and AddGate, so a by-value copy taken after that can be
 	// told from the original, as strings.Builder does. Nil until then: a
 	// copy of a template with no accepted declaration shares nothing.
-	addr       *Template
-	numQubits  int
+	addr      *Template
+	numQubits int
+	// state holds every declaration. It is allocated together with addr,
+	// by the first accepted declaration, so the zero value and a copy
+	// taken before that carry nil and later get a state of their own.
+	// Every copy taken after that carries this same pointer, which is what
+	// keeps a copy assigned back over the original from restoring a stale
+	// view of the lists (backlog item 21).
+	state *templateState
+}
+
+// templateState is a Template's declaration state: the steps in order and
+// the declared names in first-use order, without duplicates. Every step
+// with a factory names a parameter in paramOrder, and every name in
+// paramOrder has at least one such step; AddParamGate maintains both in
+// one call, and nothing else writes either list.
+type templateState struct {
 	steps      []step
 	paramOrder []string
+}
+
+// names returns the declared names; nil on a nil state, which is a
+// template with no accepted declaration.
+func (s *templateState) names() []string {
+	if s == nil {
+		return nil
+	}
+	return s.paramOrder
+}
+
+// stepList returns the steps in order; nil on a nil state.
+func (s *templateState) stepList() []step {
+	if s == nil {
+		return nil
+	}
+	return s.steps
 }
 
 // errCopiedTemplate is what AddParamGate, AddGate, and Bind return on a
@@ -90,12 +125,11 @@ var errCopiedTemplate = errors.New("Template copied by value after a declaration
 
 // checkNotCopied returns errCopiedTemplate when t is a by-value copy of a
 // Template that had already accepted a declaration when it was copied.
-// Such a copy shares the slices' backing arrays with the original, so an
-// append through either could overwrite a step or name the other still
-// lists; the two writers and Bind call this first. A copy assigned back
-// over the original passes (its addr is the receiver again) and is a
-// consistent snapshot, since nothing but the arrays is shared; see
-// Template.
+// Such a copy shares the original's declaration state, which only the
+// original may write; the two writers and Bind call this first. A copy
+// assigned back over the original passes (its addr is the receiver again)
+// and holds the original's own state pointer, so nothing about it is
+// stale; see Template.
 func (t *Template) checkNotCopied() error {
 	if t.addr != nil && t.addr != t {
 		return errCopiedTemplate
@@ -103,12 +137,24 @@ func (t *Template) checkNotCopied() error {
 	return nil
 }
 
-// declared reports whether name is in paramOrder. The list is the single
-// record of the declared names: a by-value copy of a Template carries its
-// own header over it, so a copy's or a rolled-back original's answer is
-// its own, which a shared map could not give (backlog item 21).
+// pin records t as the writer of its declaration state and allocates that
+// state on the first accepted declaration. The two writers call it after
+// their argument checks pass and before their first mutation, so a
+// rejected declaration leaves both fields untouched and the pin and the
+// state come into being in the same call.
+func (t *Template) pin() {
+	t.addr = t
+	if t.state == nil {
+		t.state = &templateState{}
+	}
+}
+
+// declared reports whether name is in the declared names. The list is the
+// single record of the declared names, read through the state every copy
+// shares, so the answer is the same for the original and for any copy
+// (backlog item 21).
 func (t *Template) declared(name string) bool {
-	for _, n := range t.paramOrder {
+	for _, n := range t.state.names() {
 		if n == name {
 			return true
 		}
@@ -127,8 +173,9 @@ func (t *Template) NumQubits() int { return t.numQubits }
 // ParamNames returns declared parameter names in first-use order, without
 // duplicates.
 func (t *Template) ParamNames() []string {
-	out := make([]string, len(t.paramOrder))
-	copy(out, t.paramOrder)
+	names := t.state.names()
+	out := make([]string, len(names))
+	copy(out, names)
 	return out
 }
 
@@ -140,8 +187,8 @@ func (t *Template) ParamNames() []string {
 // applies, so a parameter named "" is counted like any other rather than
 // mistaken for a fixed step.
 func (t *Template) ParamStepCounts() map[string]int {
-	counts := make(map[string]int, len(t.paramOrder))
-	for _, s := range t.steps {
+	counts := make(map[string]int, len(t.state.names()))
+	for _, s := range t.state.stepList() {
 		if s.factory != nil {
 			counts[s.param]++
 		}
@@ -180,11 +227,11 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 	if err := t.checkTargets(targets); err != nil {
 		return err
 	}
-	t.addr = t
+	t.pin()
 	if !t.declared(name) {
-		t.paramOrder = append(t.paramOrder, name)
+		t.state.paramOrder = append(t.state.paramOrder, name)
 	}
-	t.steps = append(t.steps, step{param: name, factory: factory, targets: targets})
+	t.state.steps = append(t.state.steps, step{param: name, factory: factory, targets: targets})
 	return nil
 }
 
@@ -211,8 +258,8 @@ func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 	if err := t.checkTargets(targets); err != nil {
 		return err
 	}
-	t.addr = t
-	t.steps = append(t.steps, step{gate: gate, targets: targets})
+	t.pin()
+	t.state.steps = append(t.state.steps, step{gate: gate, targets: targets})
 	return nil
 }
 
@@ -226,7 +273,8 @@ func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
 	if err := t.checkNotCopied(); err != nil {
 		return nil, err
 	}
-	for _, name := range t.paramOrder {
+	names := t.state.names()
+	for _, name := range names {
 		value, ok := values[name]
 		if !ok {
 			return nil, &MissingParameterError{Name: name}
@@ -238,7 +286,7 @@ func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
 	// Every declared name is present and the declared names are distinct,
 	// so values holds an undeclared key exactly when it has more keys than
 	// the template has names; the scan that names one runs only then.
-	if len(values) != len(t.paramOrder) {
+	if len(values) != len(names) {
 		for name := range values {
 			if !t.declared(name) {
 				return nil, &UnknownParameterError{Name: name}
@@ -250,7 +298,7 @@ func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
 	if err != nil {
 		return nil, err
 	}
-	for _, s := range t.steps {
+	for _, s := range t.state.stepList() {
 		gate := s.gate
 		if s.factory != nil {
 			gate = s.factory(values[s.param])
