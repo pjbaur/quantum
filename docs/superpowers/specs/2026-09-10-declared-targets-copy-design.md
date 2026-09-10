@@ -135,7 +135,7 @@ rejected declaration makes one allocation fewer than before. This is
 escape analysis and not a language guarantee, so it is what the current
 toolchain does rather than something the design promises; the copy is a
 promise either way. Against that cost stands a class of defect whose
-symptom is a silently different circuit. `BenchmarkVQEIteration`, which
+symptom is a silently different circuit. `BenchmarkVQEIteration`, which measures
 bind-plus-execute-plus-energy with the template built before
 `ResetTimer`, does not touch the changed code at all: two runs at 2s gave
 2239 ns/op before and 2322 ns/op after, within run-to-run noise on an
