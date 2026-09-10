@@ -64,14 +64,20 @@ type step struct {
 // The step list and the declared names live behind one pointer, allocated
 // by the first accepted declaration, so every copy of a declared Template
 // refers to the same declaration state rather than to its own slice
-// headers over shared arrays. Only the original ever writes it, and
-// assigning any copy back over the original writes that same pointer over
-// itself: no sequence of copies, copy-backs, and declarations drops,
-// rewrites, or duplicates a declaration, so ParamNames and ParamStepCounts
-// always describe the same declarations and Bind demands exactly the
-// listed names. The receiver check cannot tell a copy assigned back over
-// the original from the original, and does not need to: the value it
-// restores is the original's own state. NumQubits, ParamNames, and
+// headers over shared arrays. Only the variable that founded a state ever
+// writes it, and its two lists grow together, so whichever state a value
+// holds, ParamNames and ParamStepCounts describe the same declarations and
+// Bind demands exactly the listed names: no sequence of by-value copies,
+// copy-backs, and declarations can leave the two disagreeing or let Bind
+// accept a binding that omits a declared name. The receiver check cannot
+// tell a copy assigned back over the original from the original, and does
+// not need to: the state it restores is one the same variable founded.
+// That is the variable's current state, so the copy-back drops nothing,
+// unless the variable was reset to an undeclared template in between (for
+// example a = *NewTemplate(n)), which founds a second state on its next
+// accepted declaration; a copy taken before such a reset restores the
+// earlier state and drops what was declared into the later one, which is
+// what assigning an older value means rather than a desync. NumQubits, ParamNames, and
 // ParamStepCounts on a refused copy report that shared state, so they
 // describe the template as it is now, declarations the original has made
 // since the copy included. A Template is safe for concurrent reads after
@@ -87,8 +93,11 @@ type Template struct {
 	// by the first accepted declaration, so the zero value and a copy
 	// taken before that carry nil and later get a state of their own.
 	// Every copy taken after that carries this same pointer, which is what
-	// keeps a copy assigned back over the original from restoring a stale
-	// view of the lists (backlog item 21).
+	// keeps a copy assigned back over the original from restoring a view
+	// of the lists that is inconsistent, or older than the state the
+	// variable is currently on (backlog item 21). Resetting the variable
+	// to an undeclared template founds a second state, and a copy taken
+	// before the reset restores the first one; see Template.
 	state *templateState
 }
 
@@ -128,8 +137,11 @@ var errCopiedTemplate = errors.New("Template copied by value after a declaration
 // Such a copy shares the original's declaration state, which only the
 // original may write; the two writers and Bind call this first. A copy
 // assigned back over the original passes (its addr is the receiver again)
-// and holds the original's own state pointer, so nothing about it is
-// stale; see Template.
+// and holds a state pointer that same variable founded, so what it
+// restores is always internally consistent: it is the variable's current
+// state unless the variable was reset to an undeclared template between
+// the copy and the copy-back, in which case it restores the earlier of
+// the variable's own states. See Template.
 func (t *Template) checkNotCopied() error {
 	if t.addr != nil && t.addr != t {
 		return errCopiedTemplate

@@ -363,7 +363,12 @@ does not.
   is the receiver then `state` is already that receiver's, and `pin`
   changes nothing. A copy-back `X = v` therefore writes `(&X, S_X)` over
   `(&X, S_X)`: a no-op on both fields, whatever `v` holds and however
-  many copies and copy-backs preceded it. Only the value at address `X`
+  many copies and copy-backs preceded it. (Amended 2026-09-10, round 3
+  fix: `S_X` is not unique to the address `X`, so the no-op holds only
+  while the variable at `X` has not been reset to an undeclared template
+  in between; the round 3 note at the end of this bullet states the
+  guarantee the code provides. The consistency conclusion in the rest of
+  this paragraph is unaffected.) Only the value at address `X`
   passes the guard, so every write to `S_X` is an append by `X`'s own
   writers, through one code path that adds a step on every accepted
   declaration and a name exactly when the name is absent; `S_X`'s lists
@@ -383,7 +388,10 @@ does not.
 
   Consequence for the round 1 copy-back ruling: a copy-back no longer
   drops the declarations made between the copy and the copy-back, because
-  it restores nothing older than the original's own state. In the round 1
+  it restores nothing older than the original's own state. (Amended
+  2026-09-10, round 3 fix: unless the original was reset to an undeclared
+  template in between; see the round 3 note at the end of this bullet.
+  The round 1 sequence below has no such reset, so its answers stand.) In the round 1
   sequence (`b := a` after `theta`, `a` declares `phi`, `a = b`), `a`
   still lists `phi`, `a.Bind(Params{"theta": 0.1, "phi": 0.2})` succeeds,
   and `a.Bind(Params{"theta": 0.1})` is `MissingParameterError`. Round
@@ -399,6 +407,38 @@ does not.
   entry say so. Residual: none for consistency. A refused copy's
   accessors report the shared state (Decision 3's round 2 note), which is
   the template as it is now rather than as it was when copied.
+
+  Amended 2026-09-10 (round 3 fix,
+  `.superpowers/backlog/enhancement-backlog-2026-08-27/item-21-round-2-rereview.md`,
+  "New Breakage in the Fix Diff", and the round 3 review's M1). The
+  completeness argument above assumes that a variable founds at most one
+  state, so that `S_X` names one state per address. It does not: `pin`
+  allocates whenever `state` is nil, and a reset to an undeclared template
+  clears both fields together, so a variable founds a new state every time
+  it is reset. Through the public API only: `a := *NewTemplate(2)`;
+  `a.AddParamGate("x", Ry, 0)` founds `S1`; `b := a`, which holds
+  `(&a, S1)`; `a = *NewTemplate(2)`, back to `(nil, nil)`;
+  `a.AddParamGate("y", Ry, 0)`, which founds `S2` at the same address;
+  `a = b`, which passes the guard and installs `S1` over `S2`, dropping
+  the declaration of `y`. So "a no-op on both fields, whatever `v` holds",
+  "the copy-back changes nothing", and the doc comment's "drops nothing"
+  are false as written.
+
+  What the code provides, and what the `Template` doc comment, the `state`
+  field's comment, `checkNotCopied`'s comment, and the CHANGELOG entry now
+  state: a copy-back installs a state the same variable founded and is the
+  sole writer of, so the restored value is always internally consistent
+  and `ParamNames`, `ParamStepCounts`, and `Bind` always agree on it; it
+  is a no-op whenever the variable has not been reset to an undeclared
+  template in between, and otherwise it restores that variable's earlier
+  state and drops what was declared into the later one. Two states never
+  share backing arrays, since `pin` allocates `&templateState{}` with nil
+  slices, so switching a variable between two of its own states presents
+  one consistent list or the other, never a mixture. Item 21's contract is
+  therefore untouched: a dropped declaration is what assigning an older
+  value means, not a desync, the ruling the round 1 bullet above already
+  made and the reason this stays documented rather than detected. The
+  residual is a wording residual only: nothing about consistency changes.
 - **Error precedence.** The copy error precedes the nil-factory,
   nil-gate, no-target, and range errors in the `Add` methods and the
   missing, non-finite, and unknown errors in `Bind`. Pinned for the

@@ -184,10 +184,12 @@ moved behind one pointer that the first accepted declaration allocates
 and every later copy shares (the name-tracking map is gone; whether a
 name is declared is read from the list), so a copy assigned back over the
 original, which the receiver check cannot tell from the original,
-restores the original's own state and drops nothing: no sequence of
-by-value copies, copy-backs, and declarations can leave `ParamNames` and
-`ParamStepCounts` disagreeing or let `Bind` accept a binding that omits a
-declared name. `NumQubits`, `ParamNames`, and `ParamStepCounts` on a
+restores a state that same variable founded, and drops nothing unless the
+variable was reset to an undeclared template between the copy and the
+copy-back, in which case it restores the earlier of that variable's own
+states: no sequence of by-value copies, copy-backs, and declarations can
+leave `ParamNames` and `ParamStepCounts` disagreeing or let `Bind` accept
+a binding that omits a declared name. `NumQubits`, `ParamNames`, and `ParamStepCounts` on a
 refused copy report that shared state, so they describe the template as
 it is now; a copy taken before any declaration is accepted is an
 independent template; no method panics. Nothing in the module copies a
