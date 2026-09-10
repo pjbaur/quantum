@@ -307,7 +307,13 @@ table by amendment.
   interaction; `algorithm/vqe.go`'s `parameterShiftGradient` doc comment
   now states the ordering explicitly, and
   `docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`
-  carries the same amendment.
+  carries the same amendment. (Amended 2026-09-10, round 2 fix: precisely,
+  finite and within `maxShiftMagnitude`. A bound value of `+Inf` or
+  `-Inf` is not finite, so the magnitude check's `isFinite` guard skips it
+  regardless of its magnitude, and `Bind`'s `UnknownParameterError` still
+  applies after the preceding names' evaluations, exactly as the general
+  undeclared-name case states. The missing-param spec's parallel note and
+  `algorithm/vqe.go`'s doc comment carry the same fix.)
 - **Empty `names`**: no name is checked, no evaluation runs. Unchanged.
 - **A step that crosses the bound and would have been reverted** is
   rejected, not reverted: the guard precedes the step evaluation, as the

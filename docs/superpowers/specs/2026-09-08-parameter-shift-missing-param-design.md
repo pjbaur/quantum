@@ -273,6 +273,21 @@ Rulings, amended the same date, states it for that spec's own text. An
 undeclared name absent from `params`, or present but within the bound,
 is unaffected: both still reach `Bind` as this section describes.
 
+Amended 2026-09-10 (item 20 round 2 fix): the two "within
+`maxShiftMagnitude`" clauses above, and the "beyond the magnitude bound"
+clause, need a finiteness qualifier. The magnitude check's `isFinite`
+guard skips a value of `+Inf` or `-Inf` regardless of its magnitude, so
+such a value is not "within `maxShiftMagnitude`" by a raw magnitude
+test, yet it is also not caught by the magnitude check, and it still
+reaches `Bind` exactly as an in-bound finite value does. Precisely: the
+claim above holds when the bound value is finite and within
+`maxShiftMagnitude` (or absent), and the magnitude check instead catches
+a name whose bound value is finite and exceeds the bound.
+`algorithm/vqe.go`'s `parameterShiftGradient` doc comment and the
+angle-bound spec's parallel ruling
+(`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`,
+Rulings) carry the same fix.
+
 ## Item 17 follows on locally
 
 Item 17 (evaluation undercount on failure): the loop body does

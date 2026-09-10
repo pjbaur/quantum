@@ -127,8 +127,8 @@ const maxShiftMagnitude = 1 << 26
 // where Bind would report the value; a name in names that the template
 // never declared is rejected as UnknownParameterError when its own shift
 // is evaluated, after the names before it have cost their evaluations,
-// unless its bound value's magnitude also exceeds maxShiftMagnitude, in
-// which case the earlier magnitude check reports it first, at 0
+// unless its bound value is finite with magnitude above maxShiftMagnitude,
+// in which case the earlier magnitude check reports it first, at 0
 // evaluations, since that check does not distinguish declared names from
 // undeclared ones: it runs over every name in names before either loop
 // evaluates anything; and with names empty no evaluation runs and nothing
