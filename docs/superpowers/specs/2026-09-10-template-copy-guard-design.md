@@ -506,7 +506,15 @@ Decision 3's round 3 amendment.)
 - **Concurrency.** The pin is a write inside `AddParamGate` and `AddGate`,
   which are already writes. `Bind`'s check is a read of `addr`, so "safe
   for concurrent reads after all `Add` calls complete" is unchanged;
-  `Bind`'s doc comment says so.
+  `Bind`'s doc comment says so. (Amended 2026-09-10, round 3 fix: the
+  rule is unchanged but it now binds across copies. Before round 2 a
+  refused copy's `ParamNames` read the copy's own header and elements the
+  original never rewrote, since the original could only append beyond
+  them; it now reads `state.paramOrder`, the header the original's
+  `AddParamGate` writes, so a read on a copy concurrent with a
+  declaration on the original is a data race. The documented rule already
+  forbids it, so this is a scope note, not a defect; the `Template` doc
+  comment says the rule covers reads on any copy.)
 - **Zero value.** Item 18's contract holds: the zero value is the template
   `NewTemplate(0)` returns (`addr` is nil in both), no method panics on
   it, and `TestZeroValueTemplateIsAZeroQubitTemplate` runs every call on

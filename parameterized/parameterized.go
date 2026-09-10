@@ -84,7 +84,9 @@ type step struct {
 // original has made since the copy included. NumQubits agrees with the
 // original for a different reason: the qubit count is a plain field of
 // the value, fixed at construction and never written afterwards. A
-// Template is safe for concurrent reads after all Add calls complete.
+// Template is safe for concurrent reads after all Add calls complete;
+// since a refused copy reads the same state the original's Add calls
+// write, that rule covers reads on any copy too.
 type Template struct {
 	// addr is the receiver of the first accepted declaration, set only by
 	// AddParamGate and AddGate, so a by-value copy taken after that can be
