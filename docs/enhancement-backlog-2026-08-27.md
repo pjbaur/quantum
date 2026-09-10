@@ -549,7 +549,7 @@ QPE is actually wanted.
   > Commits: ed7c0e0, 1140e21, 1047b22, 597d84a, 32e13ec, c0ac3cd, f70ece3,
   > e80e9e0, cf2cf08, 6369cca, 77ba545, 40810ba, 6219788, 206cb4a, c38900d,
   > b3bc080, c9083d9, 9e52b17, f3a9ee0, 52a9e9e, 588db6a, deb8e66, 19558b7.
-- [ ] 22. **`AddParamGate` and `AddGate` store the caller's variadic
+- [x] 22. **`AddParamGate` and `AddGate` store the caller's variadic
   targets slice by reference** — both methods append
   `step{... targets: targets}` directly, so the `step.targets` slice
   shares the backing array of the `targets ...int` the caller passed;
@@ -566,3 +566,30 @@ QPE is actually wanted.
   > **Red tests**: `TestRedDeclaredTargetsAreNotAliasedToCallerSlice` in
   > `parameterized/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./parameterized -run '^TestRedDeclaredTargetsAreNotAliasedToCallerSlice'`.
+  > **Done (2026-09-10)**: `AddParamGate` and `AddGate` in
+  > `parameterized/parameterized.go` now store their own copy of the
+  > declared target list via an unexported `cloneTargets` helper returning
+  > `append([]int(nil), targets...)`, the same expression `circuit.AddGate`
+  > uses one layer down. The copy sits in each writer's `step` literal after
+  > the copy guard, the argument checks, `checkTargets`, and the pin, so a
+  > rejected declaration makes no copy. Copying on the way in was chosen over
+  > documenting a non-mutation rule, because such a rule would be unenforceable
+  > and would attach to a parameter most callers never allocate thanks to the
+  > variadic form; items 18, 19, and 21 moved caller mistakes from silent
+  > wrong answers to checked, reported failures at the earliest point, and
+  > documentation-only ruling here would reverse that direction. No `Bind`-side
+  > copy and no new backlog item needed, because `circuit.AddGate` already
+  > copies what it stores. Measurement on go1.26.3 shows the change is free for
+  > declarations written with literal targets, which is every declaration in
+  > this module: the copy takes over the heap allocation the argument slice
+  > used to make; only a caller holding a slice and spreading it pays one
+  > allocation, the copy itself, and a rejected declaration allocates one
+  > fewer. The item's red test moved into the regular suite as
+  > `TestDeclaredTargetsAreNotAliasedToCallerSlice`, joined by
+  > `TestAddCopiesTheCallerTargetsSlice` and two later tests pinning a caller
+  > slice grown after the call and a mutation reached through a `Template`
+  > copied by value under item 21's shared state. `parameterized/backlog_red_test.go`
+  > was deleted; no Go file in the repository carries the `redtests` build tag
+  > now, and nothing in CI or the QA gate used it.
+  > Commits: 2202ccf, f3bda4c, e81cad8, 6a27607, 0cfc9e8, 86a4cfb, 0acdb3e,
+  > 9e85491, d597b4a, 2b91c8e, a60833b.
