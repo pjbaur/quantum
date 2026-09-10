@@ -189,10 +189,11 @@ variable was reset to an undeclared template between the copy and the
 copy-back, in which case it restores the earlier of that variable's own
 states: no sequence of by-value copies, copy-backs, and declarations can
 leave `ParamNames` and `ParamStepCounts` disagreeing or let `Bind` accept
-a binding that omits a declared name. `NumQubits`, `ParamNames`, and `ParamStepCounts` on a
-refused copy report that shared state, so they describe the template as
-it is now; a copy taken before any declaration is accepted is an
-independent template; no method panics. Nothing in the module copies a
+a binding that omits a declared name. `ParamNames` and `ParamStepCounts`
+on a refused copy read that shared state, so they describe the template
+as it is now, and `NumQubits` agrees with the original because a
+template's qubit count is fixed at construction; a copy taken before any
+declaration is accepted is an independent template; no method panics. Nothing in the module copies a
 `Template` by value, so no caller changes. Design:
 `docs/superpowers/specs/2026-09-10-template-copy-guard-design.md`.
 

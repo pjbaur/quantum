@@ -237,7 +237,14 @@ is now, declarations the original has made since the copy included, and
 `ParamNames` and `ParamStepCounts` on any value always describe the same
 declarations. The round 1 residual is gone. The accessors' signatures are
 untouched and they stay unguarded, for the reasons given; pinned by
-`TestCopiedTemplateAccessorsReportSharedState`.)
+`TestCopiedTemplateAccessorsReportSharedState`.) (Amended 2026-09-10,
+round 3 fix: "the accessors" in the round 2 note means `ParamNames` and
+`ParamStepCounts`. `NumQubits` returns `numQubits`, a plain field of the
+`Template` value that is copied at copy time and never written after
+construction; a copy's count agrees with the original's because it never
+changes, not because it is read through the state pointer. The same
+correction applies to the `Template` doc comment and the CHANGELOG
+entry.)
 
 **Pinned by the two writers, on an accepted declaration.** `t.addr = t`
 runs in `AddParamGate` and `AddGate` immediately after `checkTargets`

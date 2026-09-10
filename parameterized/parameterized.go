@@ -77,11 +77,14 @@ type step struct {
 // example a = *NewTemplate(n)), which founds a second state on its next
 // accepted declaration; a copy taken before such a reset restores the
 // earlier state and drops what was declared into the later one, which is
-// what assigning an older value means rather than a desync. NumQubits, ParamNames, and
-// ParamStepCounts on a refused copy report that shared state, so they
-// describe the template as it is now, declarations the original has made
-// since the copy included. A Template is safe for concurrent reads after
-// all Add calls complete.
+// what assigning an older value means rather than a desync.
+//
+// ParamNames and ParamStepCounts on a refused copy read that shared
+// state, so they describe the template as it is now, declarations the
+// original has made since the copy included. NumQubits agrees with the
+// original for a different reason: the qubit count is a plain field of
+// the value, fixed at construction and never written afterwards. A
+// Template is safe for concurrent reads after all Add calls complete.
 type Template struct {
 	// addr is the receiver of the first accepted declaration, set only by
 	// AddParamGate and AddGate, so a by-value copy taken after that can be
