@@ -291,6 +291,9 @@ Decision 3's round 3 amendment.)
   `u := *NewTemplate(2)`, or a copy after only rejected declarations:
   `addr` is nil in both, `seen` is nil, the slices are nil; both go on as
   independent templates. Pinned by `TestCopyBeforeDeclarationIsIndependent`.
+  (Amended 2026-09-10, round 3 fix: under the round 2 layout the fields
+  are `addr` and `state`, both nil in both values; each founds a state of
+  its own on its first accepted declaration. The ruling is unchanged.)
 - **Copy after an accepted `AddGate` only.** `AddGate` pins too, since its
   `append` is enough to corrupt the other copy's step list. A copy taken
   after only fixed gates is refused like any other. (Amended 2026-09-10,
@@ -314,7 +317,10 @@ Decision 3's round 3 amendment.)
 - **The original is never affected by a copy.** The copy's writers are
   refused, so the shared map and arrays are written only through the
   original; the original's names and counts agree and its `Bind` demands
-  every declared name. This is the acceptance test's assertion.
+  every declared name. This is the acceptance test's assertion. (Amended
+  2026-09-10, round 3 fix: the shared `templateState` is what is written
+  only through the original; there is no map, and no arrays a copy holds
+  a header over. The ruling is unchanged.)
 - **A copy of a copy** carries the same foreign `addr` and is refused the
   same way.
 - **A copy assigned back over the original.** Amended 2026-09-10 (round 1
@@ -494,7 +500,9 @@ Decision 3's round 3 amendment.)
 - **Error precedence.** The copy error precedes the nil-factory,
   nil-gate, no-target, and range errors in the `Add` methods and the
   missing, non-finite, and unknown errors in `Bind`. Pinned for the
-  nil-factory case.
+  nil-factory case. (Amended 2026-09-10, round 3 fix: pinned for the
+  nil-factory case and, since round 1, for `Bind`'s missing and unknown
+  cases too, at `parameterized/parameterized_test.go:519-523`.)
 - **Concurrency.** The pin is a write inside `AddParamGate` and `AddGate`,
   which are already writes. `Bind`'s check is a read of `addr`, so "safe
   for concurrent reads after all `Add` calls complete" is unchanged;
