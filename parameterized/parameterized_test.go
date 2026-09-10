@@ -978,3 +978,130 @@ func TestAddCopiesTheCallerTargetsSlice(t *testing.T) {
 		}
 	}
 }
+
+// TestDeclaredTargetsSurviveGrowingTheCallerSlice pins the case the item's
+// framing reaches by append rather than by assignment (backlog item 22). A
+// caller whose slice has spare capacity appends to it after a declaration
+// was accepted: the append writes into the same backing array the call
+// received, so a step that had kept that array would see the caller's
+// later writes. The declaration keeps the target it was given.
+func TestDeclaredTargetsSurviveGrowingTheCallerSlice(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	buf := make([]int, 1, 4) // spare capacity, so the append below reuses this array
+	buf[0] = 0
+	if err := tmpl.AddParamGate("theta", parameterized.Ry, buf...); err != nil {
+		t.Fatal(err)
+	}
+	// The caller grows its slice within capacity and then rewrites the
+	// element the declaration was given; both writes land in the array the
+	// call received.
+	buf = append(buf, 1)
+	buf[0] = 1
+	if len(buf) != 2 || cap(buf) != 4 {
+		t.Fatalf("caller slice after append = %v (len %d, cap %d), want len 2 and cap 4: the append must reuse the declared array for this test to mean anything", buf, len(buf), cap(buf))
+	}
+
+	bound, err := tmpl.Bind(parameterized.Params{"theta": 0.2})
+	if err != nil {
+		t.Fatalf("Bind after the caller grew its slice: %v, want the circuit as declared", err)
+	}
+	// As declared: Ry(0.2) on qubit 0, nothing on qubit 1.
+	manual, err := circuit.New(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.AddGate(gates.NewRy(0.2), 0); err != nil {
+		t.Fatal(err)
+	}
+	sa, _ := state.New(2)
+	sb, _ := state.New(2)
+	if err := bound.Execute(sa); err != nil {
+		t.Fatalf("executing the bound circuit: %v", err)
+	}
+	if err := manual.Execute(sb); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		if sa.Amplitude(i) != sb.Amplitude(i) {
+			t.Fatalf("amplitude %d after the caller grew and rewrote its slice: got %v, want %v (Ry on qubit 0 as declared)", i, sa.Amplitude(i), sb.Amplitude(i))
+		}
+	}
+}
+
+// TestCopiedTemplateKeepsTheDeclaredTargets pins backlog item 22 against
+// item 21's shared declaration state. Every by-value copy of a declared
+// Template refers to one templateState, so a step that kept the caller's
+// slice would put the caller's array inside the state every copy reads,
+// not just the original's. Item 21 refuses AddParamGate, AddGate, and
+// Bind on a copy taken after a declaration, so what a copy can still do
+// is read that state and be assigned back over the variable that founded
+// it; neither route shows the caller's later writes, on either writer.
+func TestCopiedTemplateKeepsTheDeclaredTargets(t *testing.T) {
+	tmpl := *parameterized.NewTemplate(2)
+	targets := []int{0}
+	if err := tmpl.AddParamGate("theta", parameterized.Ry, targets...); err != nil {
+		t.Fatal(err)
+	}
+	pair := []int{0, 1}
+	if err := tmpl.AddGate(gates.NewCNOT(), pair...); err != nil {
+		t.Fatal(err)
+	}
+	saved := tmpl // a by-value copy taken after a declaration: it shares the state
+	// The caller rewrites both slices: a different qubit for the Ry, a
+	// duplicate target for the CNOT.
+	targets[0] = 1
+	pair[1] = 0
+
+	// Item 21's guard stands: the copy is refused by both writers and by
+	// Bind, so the declared targets are not read back through a call the
+	// copy is not allowed to make.
+	const refused = "copied by value"
+	if err := saved.AddParamGate("phi", parameterized.Rx, 1); err == nil || !strings.Contains(err.Error(), refused) {
+		t.Fatalf("AddParamGate on a copy taken after a declaration: err = %v, want an error mentioning %q", err, refused)
+	}
+	if err := saved.AddGate(gates.NewHadamard(), 1); err == nil || !strings.Contains(err.Error(), refused) {
+		t.Fatalf("AddGate on a copy taken after a declaration: err = %v, want an error mentioning %q", err, refused)
+	}
+	if _, err := saved.Bind(parameterized.Params{"theta": 0.2}); err == nil || !strings.Contains(err.Error(), refused) {
+		t.Fatalf("Bind on a copy taken after a declaration: err = %v, want an error mentioning %q", err, refused)
+	}
+	// The copy reads the shared state, and the caller's writes reached
+	// neither the names nor the counts in it.
+	if names := saved.ParamNames(); len(names) != 1 || names[0] != "theta" {
+		t.Fatalf("ParamNames() on the copy after the caller mutated its slices = %q, want [theta]", names)
+	}
+	if counts := saved.ParamStepCounts(); len(counts) != 1 || counts["theta"] != 1 {
+		t.Fatalf("ParamStepCounts() on the copy after the caller mutated its slices = %v, want map[theta:1]", counts)
+	}
+
+	// Assigned back over the variable that founded the state, the copy
+	// binds, and it builds the two declarations as they were made.
+	tmpl = saved
+	bound, err := tmpl.Bind(parameterized.Params{"theta": 0.2})
+	if err != nil {
+		t.Fatalf("Bind through a copy assigned back after the caller mutated its slices: %v, want the circuit as declared", err)
+	}
+	manual, err := circuit.New(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.AddGate(gates.NewRy(0.2), 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
+	sa, _ := state.New(2)
+	sb, _ := state.New(2)
+	if err := bound.Execute(sa); err != nil {
+		t.Fatalf("executing the bound circuit: %v", err)
+	}
+	if err := manual.Execute(sb); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		if sa.Amplitude(i) != sb.Amplitude(i) {
+			t.Fatalf("amplitude %d after a copy, two caller mutations, and a copy-back: got %v, want %v (Ry on 0, CNOT 0->1 as declared)", i, sa.Amplitude(i), sb.Amplitude(i))
+		}
+	}
+}

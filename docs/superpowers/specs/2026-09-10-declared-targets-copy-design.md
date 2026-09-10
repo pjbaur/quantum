@@ -231,7 +231,10 @@ package. `parameterized` exposes no accessor for a step's targets at all.
   did.
 - **One slice reused across declarations.** The pattern the item names.
   Each declaration keeps its own copy, so the steps hold the targets each
-  was given. Pinned by `TestAddCopiesTheCallerTargetsSlice`.
+  was given, whether the caller rewrites its slice in place or grows it
+  by `append` into the same array. Pinned by
+  `TestAddCopiesTheCallerTargetsSlice` and
+  `TestDeclaredTargetsSurviveGrowingTheCallerSlice`.
 - **Mutation to an illegal value after the call.** Setting a target
   out of range, or duplicating one within a step, after an accepted
   declaration no longer reaches `Bind`. The declaration-time range check
@@ -250,7 +253,8 @@ package. `parameterized` exposes no accessor for a step's targets at all.
 - **A by-value copy of a `Template`.** Unchanged. Item 21's guard runs
   first in both writers, so a refused copy never reaches the copy.
   Because every copy shares one `templateState`, the change also means no
-  copy of a template can be reached through a caller's slice.
+  copy of a template can be reached through a caller's slice. Pinned by
+  `TestCopiedTemplateKeepsTheDeclaredTargets`.
 - **Concurrency.** `cloneTargets` reads its argument and writes only a
   fresh array, inside methods that are already writes. "Safe for
   concurrent reads after all `Add` calls complete" is unchanged, and
@@ -393,6 +397,18 @@ are all already imported there:
   `amplitude 1 after mutating the caller's slice: got (0+0i), want (0.09983341664682815+0i) (Ry on qubit 0 as declared)`.
 - `TestAddCopiesTheCallerTargetsSlice`: fails today at `Bind` with
   `Bind after mutating both caller slices: qubit index 7 is out of range [0,1], want the circuit as declared`.
+- `TestDeclaredTargetsSurviveGrowingTheCallerSlice` (added in round 1's
+  fix pass): the caller reaches the shared array by `append` within spare
+  capacity rather than by assignment, then rewrites through the grown
+  slice. It asserts the append reused the array before it asserts
+  anything about the circuit, so it cannot pass vacuously.
+- `TestCopiedTemplateKeepsTheDeclaredTargets` (added in the same pass):
+  the caller's writes land after a by-value copy shares the state, so
+  they are tried against every route item 21 leaves a copy. The copy's
+  writers and `Bind` are refused, its accessors read the shared state,
+  and the copy assigned back over the founding variable binds the two
+  declarations as made. Each of the two writers, aliased again on its own
+  in a scratch tree, fails it.
 - `go test -race ./parameterized ./algorithm` clean: the copy is a write
   to a fresh array inside a method that already writes.
 - `go test -tags redtests ./parameterized ./algorithm -run '^TestRed'`
