@@ -98,11 +98,12 @@ type Template struct {
 	// by the first accepted declaration, so the zero value and a copy
 	// taken before that carry nil and later get a state of their own.
 	// Every copy taken after that carries this same pointer, which is what
-	// keeps a copy assigned back over the original from restoring a view
-	// of the lists that is inconsistent, or older than the state the
-	// variable is currently on (backlog item 21). Resetting the variable
-	// to an undeclared template founds a second state, and a copy taken
-	// before the reset restores the first one; see Template.
+	// keeps a copy assigned back over the original from restoring an
+	// inconsistent view of the lists (backlog item 21): what it restores
+	// is a whole state the same variable founded and is the sole writer
+	// of, never a pair of headers over someone else's array. Resetting
+	// the variable to an undeclared template founds a second state, and a
+	// copy taken before the reset restores the first one; see Template.
 	state *templateState
 }
 
