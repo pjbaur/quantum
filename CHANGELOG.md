@@ -208,7 +208,7 @@ named, and the range check the declaration had passed no longer described
 the result. Both writers now store their own copy, as `circuit.AddGate`
 already does with the same argument, so an accepted declaration is fixed;
 the copy is made only after the argument checks pass, so a rejected
-declaration still allocates nothing. Nothing in the module mutates a
+declaration still makes no copy. Nothing in the module mutates a
 target slice after declaring with it, so no caller changes. With this the
 last red test moves into the regular suite and
 `parameterized/backlog_red_test.go` is removed, so no test carries the

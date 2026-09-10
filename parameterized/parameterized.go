@@ -236,7 +236,7 @@ func (t *Template) checkTargets(targets []int) error {
 // for the same reason (the Operation literal in circuit/circuit.go), so a
 // target list is copied once on the way in here and once on the way out
 // there. The writers call this only after their checks pass, so a rejected
-// declaration allocates nothing.
+// declaration makes no copy.
 func cloneTargets(targets []int) []int {
 	return append([]int(nil), targets...)
 }
