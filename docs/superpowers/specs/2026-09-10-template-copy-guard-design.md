@@ -704,6 +704,20 @@ All in `parameterized/parameterized_test.go` (package `parameterized_test`):
   2 note. `TestCopiedTemplateIsRefusedByAddAndBind`,
   `TestCopyBeforeDeclarationIsIndependent`, and both zero-value tests
   pass unchanged.
+- Amended 2026-09-10 (round 3 fix, the round 3 review's M4):
+  `TestParamAccessorsReturnFreshContainers` pins that the two accessors
+  return containers a caller cannot use to reach the shared state. It
+  overwrites the returned slice's first element and appends to it,
+  rewrites and deletes entries in the returned map, does both again
+  through a refused copy, then re-reads both accessors on the original
+  and on the copy and re-checks `Bind`'s three answers. This mattered
+  less while the lists lived in the value; now that every copy reads one
+  state, an accessor handing out `state.paramOrder` would let the holder
+  of a refused copy rewrite the original's names. Verified to catch that
+  regression: with `ParamNames` returning `t.state.names()` directly it
+  fails with
+  `ParamNames()[0] after mutating a returned slice = "hacked through a copy", want "theta"`.
+  The accessors are unchanged; this round adds the test only.
 - `go test -race ./parameterized ./algorithm` clean: `Bind`'s check is a
   read. (Round 2: `Bind` reads the `state` pointer and then the lists,
   still without writing; the run stays clean.)

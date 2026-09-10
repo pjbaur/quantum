@@ -807,3 +807,74 @@ func TestCopyAssignedBackTwiceKeepsNamesAndCountsConsistent(t *testing.T) {
 		})
 	}
 }
+
+// TestParamAccessorsReturnFreshContainers pins that ParamNames and
+// ParamStepCounts hand back containers of their own (backlog item 21,
+// round 3). The declared names and the step list live in the state every
+// copy of a declared Template shares, so an accessor that returned the
+// state's own slice or map would let any caller, one holding a refused
+// copy included, rewrite the original's names through the returned value.
+// Mutating what either accessor returns must leave the template's names,
+// counts, and Bind answers untouched, on the original and on a copy.
+func TestParamAccessorsReturnFreshContainers(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	for _, decl := range []struct {
+		name   string
+		target int
+	}{{"theta", 0}, {"phi", 1}, {"theta", 1}} {
+		if err := tmpl.AddParamGate(decl.name, parameterized.Ry, decl.target); err != nil {
+			t.Fatal(err)
+		}
+	}
+	wantNames := []string{"theta", "phi"}
+
+	names := tmpl.ParamNames()
+	names[0] = "hacked"
+	// Appending to the returned slice must not reach the template's own
+	// array either; the returned slice has no spare capacity, so this
+	// reallocates rather than writing past the length.
+	if grown := append(names, "extra"); len(grown) != len(names)+1 {
+		t.Fatalf("append to the ParamNames() result: len = %d, want %d", len(grown), len(names)+1)
+	}
+
+	counts := tmpl.ParamStepCounts()
+	counts["theta"] = 99
+	counts["injected"] = 1
+	delete(counts, "phi")
+
+	// A refused copy reads the original's state, so a shared container
+	// would let it rewrite the original's names and counts.
+	c := *tmpl
+	copyNames := c.ParamNames()
+	copyNames[0] = "hacked through a copy"
+	copyCounts := c.ParamStepCounts()
+	copyCounts["theta"] = -1
+
+	for _, got := range [][]string{tmpl.ParamNames(), c.ParamNames()} {
+		if len(got) != len(wantNames) {
+			t.Fatalf("ParamNames() after mutating a returned slice = %q, want %q", got, wantNames)
+		}
+		for i, want := range wantNames {
+			if got[i] != want {
+				t.Fatalf("ParamNames()[%d] after mutating a returned slice = %q, want %q (names %q)", i, got[i], want, got)
+			}
+		}
+	}
+	for _, got := range []map[string]int{tmpl.ParamStepCounts(), c.ParamStepCounts()} {
+		if len(got) != 2 || got["theta"] != 2 || got["phi"] != 1 {
+			t.Fatalf("ParamStepCounts() after mutating a returned map = %v, want map[phi:1 theta:2]", got)
+		}
+	}
+
+	if _, err := tmpl.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2}); err != nil {
+		t.Fatalf("Bind with the declared names after mutating the accessors' containers: %v, want success", err)
+	}
+	var unknown *parameterized.UnknownParameterError
+	if _, err := tmpl.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2, "hacked": 0.3}); !errors.As(err, &unknown) {
+		t.Fatalf("Bind with a name written into a returned slice: err = %v, want UnknownParameterError", err)
+	}
+	var missing *parameterized.MissingParameterError
+	if _, err := tmpl.Bind(parameterized.Params{"theta": 0.1}); !errors.As(err, &missing) || missing.Name != "phi" {
+		t.Fatalf("Bind without phi after deleting it from a returned map: err = %v, want MissingParameterError for phi", err)
+	}
+}
