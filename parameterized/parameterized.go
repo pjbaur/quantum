@@ -105,7 +105,8 @@ type Template struct {
 // the declared names in first-use order, without duplicates. Every step
 // with a factory names a parameter in paramOrder, and every name in
 // paramOrder has at least one such step; AddParamGate maintains both in
-// one call, and nothing else writes either list.
+// one call, AddGate appends a step and never a name, and nothing else
+// writes either list.
 type templateState struct {
 	steps      []step
 	paramOrder []string
