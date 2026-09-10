@@ -110,9 +110,32 @@ function these very targets are forwarded to: `circuit.AddGate` stores
 `Targets: append([]int(nil), targets...)` (`circuit/circuit.go:79-82`).
 The template is the one place in the chain that does not, so this makes
 `parameterized` consistent with `circuit` rather than introducing a new
-rule. The cost is one small allocation per accepted declaration, paid once
-when the template is built, against a class of defect whose symptom is a
-silently different circuit. `BenchmarkVQEIteration`, which measures
+rule. The cost is smaller than it looks, because a writer that stops
+retaining its argument stops forcing it onto the heap. Measured with
+`go build -gcflags=-m ./parameterized` on go1.26.3, `targets` goes from
+`leaking param: targets` in both writers to `targets does not escape`,
+and at the call site the variadic slice the compiler builds stops
+escaping with it. What a declaration pays then depends on its call shape:
+
+| Per accepted declaration | Before | After |
+|---|---|---|
+| literal targets, `AddGate(g, 0, 1)` | 4 allocs, 152 B | 4 allocs, 152 B |
+| a caller-held slice spread, `AddGate(g, targets...)` | 3 allocs, 136 B | 4 allocs, 152 B |
+| rejected on an out-of-range target, literal | 3 allocs, 56 B | 2 allocs, 40 B |
+| `H2Ansatz()`, three declarations, all literal | 19 allocs, 1128 B | 19 allocs, 1128 B |
+
+(One call on a fresh two-qubit template per operation, `-benchmem`, three
+runs at each commit with identical counts; commands in Testing.) So the
+guarantee is free for a declaration written with literal targets, which
+is every declaration in this module: the copy takes over the heap
+allocation the argument slice used to make, at the same size. The caller
+that holds a slice and spreads it, the caller this item is about, is the
+only one that pays, and it pays one allocation, the copy itself. A
+rejected declaration makes one allocation fewer than before. This is
+escape analysis and not a language guarantee, so it is what the current
+toolchain does rather than something the design promises; the copy is a
+promise either way. Against that cost, a class of defect whose symptom is
+a silently different circuit. `BenchmarkVQEIteration`, which measures
 bind-plus-execute-plus-energy with the template built before
 `ResetTimer`, does not touch the changed code at all: two runs at 2s gave
 2239 ns/op before and 2322 ns/op after, within run-to-run noise on an
@@ -199,10 +222,13 @@ package. `parameterized` exposes no accessor for a step's targets at all.
 ## Rulings on edge cases
 
 - **A caller that never spreads a slice.** `AddParamGate("theta", Ry, 0)`
-  and `AddGate(CNOT, 0, 1)` allocate their variadic slice at the call
-  site, and nobody else holds it. The copy is redundant for them and costs
-  one allocation; that is the price of the guarantee, and it is what
-  `circuit.AddGate` already charges them one layer down.
+  and `AddGate(CNOT, 0, 1)` build their variadic slice at the call site,
+  and nobody else holds it. The copy is redundant for them, and on the
+  measured toolchain it is also free: the writer no longer retains the
+  slice, so the compiler leaves it on the stack and the copy takes over
+  the heap allocation it used to make (Decision 1). They pay the same
+  copy once more one layer down, in `circuit.AddGate`, as they always
+  did.
 - **One slice reused across declarations.** The pattern the item names.
   Each declaration keeps its own copy, so the steps hold the targets each
   was given. Pinned by `TestAddCopiesTheCallerTargetsSlice`.
@@ -214,7 +240,10 @@ package. `parameterized` exposes no accessor for a step's targets at all.
   Pinned in the same test.
 - **A rejected declaration.** The copy is made after every check, so a nil
   factory, a nil gate, an empty target list, or an out-of-range target
-  leaves the template untouched and allocates nothing, exactly as before.
+  leaves the template untouched and makes no copy. It is cheaper than
+  before rather than the same: the argument slice no longer escapes, so a
+  rejection written with literal targets allocates its error value and
+  nothing else, one allocation fewer than it made before (Decision 1).
 - **The zero value.** Unchanged. `cloneTargets` is called only on a path
   that has already pinned the template and allocated its state, and no
   method gains a panic.
@@ -241,8 +270,10 @@ package. `parameterized` exposes no accessor for a step's targets at all.
 - `algorithm/h2.go` (`H2Ansatz`), `algorithm/qaoa.go` (`QAOATemplate`),
   `internal/examples/qaoa.go` (through `QAOATemplate`), and every test
   declare with literal targets or with a slice they do not touch again;
-  none changes behavior. Each accepted declaration makes one additional
-  small allocation, at template build time. The prototype's
+  none changes behavior. None allocates more either: they declare with
+  literal targets, the call shape the copy is free for, and `H2Ansatz`
+  builds its three-declaration template in the same 19 allocations and
+  1128 bytes it did before (Decision 1). The prototype's
   `go run ./cmd/quantum -demo qaoa` still prints
   `VQE from the symmetric start: energy = -1.0000, expected cut = 2.0000`
   followed by `iterations accepted: 29, energy evaluations: 378`.
@@ -367,6 +398,14 @@ are all already imported there:
 - `go test -tags redtests ./parameterized ./algorithm -run '^TestRed'`
   reports `[no tests to run]` for both packages, with no tagged file left
   anywhere in the repository.
+- Decision 1's allocation figures, on go1.26.3 darwin/amd64:
+  `go build -gcflags=-m ./parameterized` for the escape decisions on both
+  writers, and `go test -run XXX -bench . -benchmem` over a probe package
+  holding one `AddGate` per operation on a fresh two-qubit template, in
+  each call shape, plus one `algorithm.H2Ansatz()` per operation. The
+  probe is not committed: it is run out of tree, in `git archive` copies
+  of `8ee8579` and of this change, so the two commits are measured with
+  the same file.
 
 Prototype: every code and test change in the plan was applied to a scratch
 copy of the repository at `8ee8579`; both tests failed as stated against
