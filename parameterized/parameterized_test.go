@@ -510,6 +510,15 @@ func TestCopiedTemplateIsRefusedByAddAndBind(t *testing.T) {
 	if _, err := c.Bind(parameterized.Params{"theta": 0.1}); err == nil || !strings.Contains(err.Error(), want) {
 		t.Fatalf("Bind on a copy: err = %v, want an error mentioning %q", err, want)
 	}
+	// The copy check precedes Bind's own checks too: a binding that omits
+	// theta, or one that adds an undeclared name, is reported as the copy,
+	// not as a missing or unknown parameter.
+	if _, err := c.Bind(parameterized.Params{}); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("Bind(empty) on a copy: err = %v, want the copy error before MissingParameterError", err)
+	}
+	if _, err := c.Bind(parameterized.Params{"theta": 0.1, "typo": 0}); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("Bind(with an undeclared name) on a copy: err = %v, want the copy error before UnknownParameterError", err)
+	}
 	// The accessors read only what the copy holds by value.
 	if got := c.NumQubits(); got != 2 {
 		t.Fatalf("NumQubits() on a copy = %d, want 2", got)
