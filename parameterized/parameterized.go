@@ -5,6 +5,7 @@
 package parameterized
 
 import (
+	"errors"
 	"fmt"
 	"math"
 
@@ -49,15 +50,49 @@ type step struct {
 // and, once Bind's own parameter checks pass, Bind fails as circuit.New
 // does for a qubit count of zero. No method panics on it; NewTemplate is
 // how a template for a positive qubit count is made, not a precondition
-// of the methods. A Template is safe for concurrent reads after all Add
-// calls complete.
+// of the methods.
+//
+// A Template is used in place or through a pointer, as NewTemplate returns
+// it. Copying a Template by value after a declaration has been accepted is
+// not supported: the copy shares the original's name-tracking map and the
+// backing arrays of its step and name lists but not their slice headers,
+// so declarations on the two would drift apart or overwrite each other.
+// Like strings.Builder, a Template records the receiver of its first
+// accepted declaration, and AddParamGate, AddGate, and Bind on a copy taken
+// after that return an error, before any other check, instead of touching
+// the shared state; NumQubits, ParamNames, and ParamStepCounts on such a
+// copy describe the template as it was when copied. A copy taken before any
+// declaration is accepted shares nothing and is an independent template.
+// A Template is safe for concurrent reads after all Add calls complete.
 type Template struct {
+	// addr is the receiver of the first accepted declaration, set only by
+	// AddParamGate and AddGate, so a by-value copy taken after that can be
+	// told from the original, as strings.Builder does. Nil until then: a
+	// copy of a template with no accepted declaration shares nothing.
+	addr       *Template
 	numQubits  int
 	steps      []step
 	paramOrder []string
 	// seen is allocated by AddParamGate on the first declaration, the only
 	// place it is written, so the zero value needs no constructor.
 	seen map[string]bool
+}
+
+// errCopiedTemplate is what AddParamGate, AddGate, and Bind return on a
+// Template copied by value after an accepted declaration; see Template.
+var errCopiedTemplate = errors.New("Template copied by value after a declaration; a declared Template is used in place or through a pointer, never by copy")
+
+// checkNotCopied returns errCopiedTemplate when t is a by-value copy of a
+// Template that had already accepted a declaration when it was copied.
+// Such a copy shares seen and the slices' backing arrays with the
+// original, so a write through either, or Bind's read of seen on the
+// copy, could desync the two; the three methods that touch seen or append
+// call this first.
+func (t *Template) checkNotCopied() error {
+	if t.addr != nil && t.addr != t {
+		return errCopiedTemplate
+	}
+	return nil
 }
 
 // NewTemplate returns a template for circuits on numQubits qubits.
@@ -108,8 +143,13 @@ func (t *Template) checkTargets(targets []int) error {
 // it is what Bind and ParamStepCounts key on. At least one target is
 // required: a declaration with none is rejected here, with an error naming
 // the parameter, rather than declared, counted, and left for
-// circuit.AddGate to reject at Bind.
+// circuit.AddGate to reject at Bind. On a Template copied by value after
+// an accepted declaration the call is refused before any of these checks
+// (see Template).
 func (t *Template) AddParamGate(name string, factory Factory, targets ...int) error {
+	if err := t.checkNotCopied(); err != nil {
+		return err
+	}
 	if factory == nil {
 		return fmt.Errorf("parameter %q: factory must not be nil", name)
 	}
@@ -119,6 +159,7 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 	if err := t.checkTargets(targets); err != nil {
 		return err
 	}
+	t.addr = t
 	if t.seen == nil {
 		t.seen = make(map[string]bool)
 	}
@@ -137,8 +178,13 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 // quantum.Gate value (for example, (*gates.MatrixGate)(nil)) passes the
 // nil check undetected, the same caller-bug gap circuit.AddGate has, and
 // panics when this method calls gate.Name() to name the gate in the
-// no-target error.
+// no-target error. On a Template copied by value after an accepted
+// declaration the call is refused before any of these checks (see
+// Template).
 func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
+	if err := t.checkNotCopied(); err != nil {
+		return err
+	}
 	if gate == nil {
 		return fmt.Errorf("fixed gate must not be nil")
 	}
@@ -148,14 +194,21 @@ func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 	if err := t.checkTargets(targets); err != nil {
 		return err
 	}
+	t.addr = t
 	t.steps = append(t.steps, step{gate: gate, targets: targets})
 	return nil
 }
 
 // Bind materializes the template into a circuit using values. Every declared
 // parameter must be present and finite; unknown names are rejected so typos
-// fail loudly instead of silently ignoring an angle.
+// fail loudly instead of silently ignoring an angle. On a Template copied
+// by value after an accepted declaration the call is refused before any of
+// these checks (see Template); the refusal is a read, so Bind stays safe
+// to call concurrently once all Add calls complete.
 func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
+	if err := t.checkNotCopied(); err != nil {
+		return nil, err
+	}
 	for _, name := range t.paramOrder {
 		value, ok := values[name]
 		if !ok {

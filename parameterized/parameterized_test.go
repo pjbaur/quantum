@@ -443,3 +443,125 @@ func TestAddNoTargetsErrorRendersEmptyGateNameVisibly(t *testing.T) {
 		t.Fatalf("AddGate(gate with empty name) with no targets: err = %q; the empty name is not rendered, so the error names no gate", err.Error())
 	}
 }
+
+// TestCopyAfterDeclarationKeepsNamesAndCountsConsistent pins that a
+// Template copied by value after a declaration cannot desync the original
+// (backlog item 21). Before the fix the copy shared the original's seen
+// map but had its own paramOrder header, so a name declared on the copy
+// was already known to the original: its next declaration of that name
+// was counted by ParamStepCounts, absent from ParamNames, and never
+// demanded by Bind. A declaration on the copy is now refused, so the
+// original's names and counts agree and Bind still demands every name it
+// counts.
+func TestCopyAfterDeclarationKeepsNamesAndCountsConsistent(t *testing.T) {
+	a := *parameterized.NewTemplate(2)
+	if err := a.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	b := a
+	if err := b.AddParamGate("phi", parameterized.Rx, 1); err == nil {
+		t.Fatal("AddParamGate on a by-value copy taken after a declaration succeeded, want an error: the copy shares the original's bookkeeping")
+	}
+	if err := a.AddParamGate("phi", parameterized.Rx, 1); err != nil {
+		t.Fatal(err)
+	}
+	names := a.ParamNames()
+	counts := a.ParamStepCounts()
+	for name := range counts {
+		found := false
+		for _, n := range names {
+			if n == name {
+				found = true
+			}
+		}
+		if !found {
+			t.Fatalf("a.ParamStepCounts() = %v lists %q but a.ParamNames() = %q lacks it", counts, name, names)
+		}
+	}
+	var missing *parameterized.MissingParameterError
+	if _, err := a.Bind(parameterized.Params{"theta": 0.1}); !errors.As(err, &missing) {
+		t.Fatalf("a.Bind without phi: err = %v, want MissingParameterError", err)
+	}
+}
+
+// TestCopiedTemplateIsRefusedByAddAndBind pins the shape of the refusal:
+// AddParamGate, AddGate, and Bind on a by-value copy taken after a
+// declaration each return the copy error before any other check, the
+// accessors on the copy still describe the template as it was when
+// copied, and the original is untouched and fully usable.
+func TestCopiedTemplateIsRefusedByAddAndBind(t *testing.T) {
+	orig := parameterized.NewTemplate(2)
+	if err := orig.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	c := *orig
+	const want = "copied by value"
+	if err := c.AddParamGate("phi", parameterized.Rx, 1); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("AddParamGate on a copy: err = %v, want an error mentioning %q", err, want)
+	}
+	// The copy check precedes the argument checks: a nil factory on a copy
+	// is reported as the copy, not as the factory.
+	if err := c.AddParamGate("phi", nil, 1); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("AddParamGate(nil factory) on a copy: err = %v, want the copy error first", err)
+	}
+	if err := c.AddGate(gates.NewHadamard(), 1); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("AddGate on a copy: err = %v, want an error mentioning %q", err, want)
+	}
+	if _, err := c.Bind(parameterized.Params{"theta": 0.1}); err == nil || !strings.Contains(err.Error(), want) {
+		t.Fatalf("Bind on a copy: err = %v, want an error mentioning %q", err, want)
+	}
+	// The accessors read only what the copy holds by value.
+	if got := c.NumQubits(); got != 2 {
+		t.Fatalf("NumQubits() on a copy = %d, want 2", got)
+	}
+	if names := c.ParamNames(); len(names) != 1 || names[0] != "theta" {
+		t.Fatalf("ParamNames() on a copy = %q, want [%q]", names, "theta")
+	}
+	if counts := c.ParamStepCounts(); len(counts) != 1 || counts["theta"] != 1 {
+		t.Fatalf("ParamStepCounts() on a copy = %v, want map[theta:1]", counts)
+	}
+	// The original is untouched by the refused calls and still usable.
+	if names := orig.ParamNames(); len(names) != 1 || names[0] != "theta" {
+		t.Fatalf("ParamNames() on the original after refused calls on a copy = %q, want [%q]", names, "theta")
+	}
+	if err := orig.AddGate(gates.NewHadamard(), 1); err != nil {
+		t.Fatalf("AddGate on the original: %v", err)
+	}
+	if _, err := orig.Bind(parameterized.Params{"theta": 0.1}); err != nil {
+		t.Fatalf("Bind on the original: %v", err)
+	}
+}
+
+// TestCopyBeforeDeclarationIsIndependent pins the other half of the
+// contract: a Template copied before any declaration is accepted shares
+// nothing with its source, so both go on as separate templates. A
+// rejected declaration does not count; it leaves the template untouched,
+// so a copy taken after one is independent too.
+func TestCopyBeforeDeclarationIsIndependent(t *testing.T) {
+	fresh := *parameterized.NewTemplate(2)
+	twin := fresh
+	if err := fresh.AddParamGate("alpha", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := twin.AddParamGate("beta", parameterized.Rx, 1); err != nil {
+		t.Fatalf("AddParamGate on a copy taken before any declaration: %v, want success", err)
+	}
+	if names := fresh.ParamNames(); len(names) != 1 || names[0] != "alpha" {
+		t.Fatalf("fresh.ParamNames() = %q, want [%q]", names, "alpha")
+	}
+	if names := twin.ParamNames(); len(names) != 1 || names[0] != "beta" {
+		t.Fatalf("twin.ParamNames() = %q, want [%q]", names, "beta")
+	}
+	if _, err := twin.Bind(parameterized.Params{"beta": 0.2}); err != nil {
+		t.Fatalf("twin.Bind: %v", err)
+	}
+
+	rejected := parameterized.NewTemplate(2)
+	if err := rejected.AddParamGate("gamma", nil, 0); err == nil {
+		t.Fatal("nil factory accepted, want an error")
+	}
+	after := *rejected
+	if err := after.AddParamGate("gamma", parameterized.Ry, 0); err != nil {
+		t.Fatalf("AddParamGate on a copy taken after only a rejected declaration: %v, want success", err)
+	}
+}

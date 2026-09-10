@@ -165,6 +165,26 @@ reaches, are unaffected. With its only test replaced by tests of the
 chosen contract, `algorithm/backlog_red_numeric_test.go` is removed. Design:
 `docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`.
 
+#### `parameterized.Template` refuses a by-value copy taken after a declaration
+
+A `Template` copied by value after a declaration shared the original's
+name-tracking map but not its slice headers, so a name declared on the
+copy was already "known" to the original: the original's next declaration
+of that name was counted by `ParamStepCounts` but never listed by
+`ParamNames`, and `Bind` accepted values that omitted it, binding the gate
+at angle 0. Go cannot make such copies independent (the two also share the
+backing arrays of their step lists, so a declaration on one can overwrite
+one on the other), so a `Template` is now documented as used in place or
+through a pointer, as `NewTemplate` returns it, and, like
+`strings.Builder`, records the receiver of its first accepted declaration:
+`AddParamGate`, `AddGate`, and `Bind` on a copy taken after that return an
+error, before any other check, instead of touching the shared state.
+`NumQubits`, `ParamNames`, and `ParamStepCounts` on such a copy still
+describe the template as it was when copied; a copy taken before any
+declaration is accepted is an independent template; no method panics.
+Nothing in the module copies a `Template` by value, so no caller changes.
+Design: `docs/superpowers/specs/2026-09-10-template-copy-guard-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed
