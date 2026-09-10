@@ -29,15 +29,17 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // maxShiftMagnitude is the largest |theta| the parameter-shift rule
 // shifts: 2^26. float64 rounds theta +/- pi/2 to a multiple of theta's
 // spacing, so the shift lands within half that spacing of its true
-// offset. Below 2^26 the spacing is at most 2^-27 (1.5e-8), the offset is
-// exact to 7.5e-9 rad, and a gradient component is off by at most that
-// times the largest slope, which the Hamiltonian's coefficient sum
-// bounds. Beyond it the rule degrades until it fails: from 2^48 the
-// default 0.3 step times a gradient of 0.1 rounds to no change, so VQE
-// would freeze the parameter and report Converged; from 2^51 the shift is
-// applied at the wrong offset (a multiple of 0.5 or coarser); from 2^54
-// the spacing exceeds pi, theta +/- pi/2 rounds back to theta, both
-// evaluations bind the same circuit, and the difference is exactly 0. The
+// offset. Below 2^26, theta +/- pi/2 crosses into the next power-of-two
+// range for any theta within pi/2 of it, so the shifted value's spacing
+// is at most 2^-26 (1.49e-8), the offset is exact to 7.5e-9 rad, and a
+// gradient component is off by at most that times the largest slope,
+// which the Hamiltonian's coefficient sum bounds. Beyond it the rule
+// degrades until it fails: from 2^48 the default 0.3 step times a
+// gradient of 0.1 rounds to no change, so VQE would freeze the parameter
+// and report Converged; from 2^51 the shift is applied at the wrong
+// offset (a multiple of 0.5 or coarser); above 2^54 the spacing exceeds
+// pi, theta +/- pi/2 rounds back to theta, both evaluations bind the
+// same circuit, and the difference is exactly 0. The
 // bound is the even split of the 53-bit significand, 26 bits before the
 // binary point and 27 after: the parameter keeps a resolution finer than
 // 1e-8 rad, and 2^26 rad is more than 10^7 turns, far beyond any angle a
@@ -77,7 +79,7 @@ const maxShiftMagnitude = 1 << 26
 // TestParameterShiftIsBlindToRescaledFactory pins this failure mode.
 //
 // Third, float64 must resolve the shift. theta +/- pi/2 is rounded to a
-// multiple of theta's spacing, and from 2^54 that spacing exceeds pi, so
+// multiple of theta's spacing, and above 2^54 that spacing exceeds pi, so
 // both shifted values round back to theta, the two evaluations bind the
 // same circuit, and the half difference is exactly 0 with a nil error,
 // again indistinguishable from a stationary point. This one is checked:
@@ -93,9 +95,11 @@ const maxShiftMagnitude = 1 << 26
 // precondition, which this function cannot check, so a reduction would
 // silently move the point evaluated for a factory of another period; and
 // the reduction itself exceeds float64 (math.Mod(2^60, 2*pi) with the
-// float64 constant is off by about 80 rad). A caller who knows the
-// factory's period reduces before calling, and VQE rejects such an
-// initial parameter up front so this check is unreachable from it.
+// float64 constant accumulates about 45 rad of error, returning 5.0824
+// where the true reduction, at 256-bit precision, is 4.1219). A caller
+// who knows the factory's period reduces before calling, and VQE rejects
+// such an initial parameter up front so this check is unreachable from
+// it.
 //
 // params must bind every parameter the template declares, the precondition
 // Bind states; names selects which of those to differentiate and may list
@@ -122,9 +126,13 @@ const maxShiftMagnitude = 1 << 26
 // missing name in declaration order is reported here as the missing name,
 // where Bind would report the value; a name in names that the template
 // never declared is rejected as UnknownParameterError when its own shift
-// is evaluated, after the names before it have cost their evaluations; and
-// with names empty no evaluation runs and nothing beyond completeness is
-// checked.
+// is evaluated, after the names before it have cost their evaluations,
+// unless its bound value's magnitude also exceeds maxShiftMagnitude, in
+// which case the earlier magnitude check reports it first, at 0
+// evaluations, since that check does not distinguish declared names from
+// undeclared ones: it runs over every name in names before either loop
+// evaluates anything; and with names empty no evaluation runs and nothing
+// beyond completeness is checked.
 //
 // Returns the gradient keyed by name plus the number of energy evaluations
 // consumed: two per name in names. On error the gradient is nil and the
@@ -291,8 +299,9 @@ func validateVQEStructure(h *Hamiltonian, t *parameterized.Template) error {
 // evaluation runs, VQE has checked every option, every initial parameter,
 // the template's parameter structure, and the Hamiltonian's terms, and it
 // hands each evaluation a complete, declared, finite parameter set (the
-// step guard in VQE keeps an overflowing update from reaching Bind). What
-// can still fail is what only running the template reveals: a factory
+// step guard in VQE keeps an overflowing update, or one beyond the
+// parameter-shift bound, from reaching Bind or parameterShiftGradient).
+// What can still fail is what only running the template reveals: a factory
 // returning a gate of the wrong width or with a malformed matrix, or a
 // Pauli axis outside the enum. Those are input properties, so the caller
 // sees the VQE type, with the detecting package's error kept in Err.
