@@ -166,9 +166,9 @@ Item 19's Decision 1 deliberately kept it a pure check, and this design
 does not reopen that.
 
 **One helper, not an inline expression.** `append([]int(nil), targets...)`
-written twice inside the two composite literals pushes the
-`AddParamGate` line past 118 characters and puts the reason for the copy
-nowhere. An unexported `cloneTargets(targets []int) []int` keeps both
+written twice inside the two composite literals makes the `AddParamGate`
+line 116 characters, counting its leading tab as one, against 107 with
+the helper, and puts the reason for the copy nowhere. An unexported `cloneTargets(targets []int) []int` keeps both
 appends readable, matches the package's habit of tiny unexported helpers
 (`checkTargets`, `checkNotCopied`, `pin`, `declared`, `names`,
 `stepList`), and gives the one place where the reason is written down.
