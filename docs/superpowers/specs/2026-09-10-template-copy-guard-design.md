@@ -24,6 +24,13 @@ amendment and the copy-back ruling under "Rulings on edge cases". The
 rest of this section describes the code as it was when the design was
 written.
 
+Amended 2026-09-10 (round 2 fix): the slices described here no longer sit
+in the `Template` value either; `steps` and `paramOrder` live in a
+heap-allocated `templateState` that the first accepted declaration
+allocates and every later copy shares by pointer. See the round 2
+amendment under "Rulings on edge cases" ("A copy assigned back over the
+original, twice").
+
 Observed today (`go test -tags redtests ./parameterized -run '^TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent' -v`),
 with `a := *NewTemplate(2)`, `a.AddParamGate("theta", Ry, 0)`, `b := a`:
 
@@ -62,7 +69,10 @@ the top of three existing methods, and a one-line pin in two of them; no
 signature, exported type, or cross-package change. Short design doc plus a
 one-task plan. (Amended 2026-09-10, round 1 fix: also one field removed,
 `seen`, and a second unexported helper, `declared`; still no signature,
-exported type, or cross-package change.)
+exported type, or cross-package change. Amended 2026-09-10, round 2 fix:
+the two slice fields move into one unexported struct, `templateState`,
+held through one pointer field, `state`, with a third unexported helper,
+`pin`; still no signature, exported type, or cross-package change.)
 
 ## Decision 1: a `Template` is not copyable after a declaration, and copies are refused at runtime
 
@@ -101,6 +111,16 @@ undeclared key exists (every declared name is present and the names are
 distinct), so the accepted path stays O(names) and the scan is paid only
 on the way to `UnknownParameterError`. The validated-cache variant traced
 above is moot with no map.
+
+Amended 2026-09-10 (round 2 fix): "the backing arrays stay shared" is no
+longer the layout. Round 1's re-review showed that per-copy slice headers
+over shared arrays let a two-step copy-back desync the pinned original
+itself (ruling under "Rulings on edge cases"). The lists now live behind
+one pointer, so what a copy shares is the whole declaration state, one
+generation of it, and never a header of its own. Copies are still not
+independent, which this paragraph still rules out, and the guard is still
+what refuses them; what changed is that a copy can no longer carry a view
+of the lists that differs from the original's.
 
 **Document only.** Rejected by the dispatch and on its merits: the
 observed failure is a `Bind` that succeeds with a parameter silently at 0,
@@ -178,11 +198,22 @@ are. (Amended 2026-09-10, round 1 fix: "can only append beyond those
 lengths" holds unless the original is rolled back below the copy's length
 by a copy-back and declares again; the copy-back ruling records that
 residual. The accessors still stay as they are, for the reasons given.)
+(Amended 2026-09-10, round 2 fix: the accessors now read through the
+shared state pointer, so on a refused copy they report the template as it
+is now, declarations the original has made since the copy included, and
+`ParamNames` and `ParamStepCounts` on any value always describe the same
+declarations. The round 1 residual is gone. The accessors' signatures are
+untouched and they stay unguarded, for the reasons given; pinned by
+`TestCopiedTemplateAccessorsReportSharedState`.)
 
 **Pinned by the two writers, on an accepted declaration.** `t.addr = t`
 runs in `AddParamGate` and `AddGate` immediately after `checkTargets`
 succeeds and before the first mutation, so the pin and the first shared
-state come into being in the same call. A rejected declaration (nil
+state come into being in the same call. (Amended 2026-09-10, round 2 fix:
+literally so. The pin is now the unexported `pin`, which sets `addr` and,
+when `state` is nil, allocates the `templateState`; both writers call it
+at the same point, so the two fields are always set together and a
+rejected declaration touches neither.) A rejected declaration (nil
 factory, no targets, out-of-range target) leaves the template untouched,
 pin included, matching items 18 and 19's "nothing declared after a
 rejection". `Bind` checks but never pins: pinning is a write, and `Bind`
@@ -281,7 +312,93 @@ does not.
   slices was reallocated, disagree with each other. The copy's `Bind` is
   refused, and its accessors stay unguarded (Decision 3), so no binding
   is ever built from inconsistent lists; the `Template` doc comment
-  states the residual.
+  states the residual. (Amended 2026-09-10, round 2 fix: the
+  completeness argument above is wrong and the residual is superseded;
+  see the next bullet. `TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent`
+  still passes; the contract it pins, that a re-declaration after a
+  copy-back is listed, counted, and demanded, holds under the new layout
+  too, and its comment now says why. The other named test is replaced,
+  as recorded under "Red test rulings".)
+- **A copy assigned back over the original, twice.** Amended 2026-09-10
+  (round 2 fix,
+  `.superpowers/backlog/enhancement-backlog-2026-08-27/item-21-round-1-rereview.md`,
+  finding I1). The argument above assumed that the slots below a
+  snapshot's lengths still hold what they held when the snapshot was
+  taken, which is true only while the writer's length never drops below
+  them, and a copy-back is what drops it. Through the public API only:
+  `a` declares `x`, `y`, `z` (both lists `len 3, cap 4`); `b := a`; `a`
+  declares `x` again (a step only) and then `w` (name slot 3 = `w`, steps
+  reallocate); `s := a` (names `len 4`, steps `len 5`); `a = b` (back to
+  `len 3`); `a` declares `v`, which rewrites name slot 3 to `v` in the
+  array `s` still covers; `a = s` restores `s`'s headers over the
+  rewritten array. `a.ParamNames()` is `[x y z v]`,
+  `a.ParamStepCounts()` is `map[w:1 x:2 y:1 z:1]`, and
+  `a.Bind` with exactly the listed names builds a circuit with `w` at 0:
+  item 21's own symptom on the pinned original, `addr == &a`, every guard
+  passing. The same holds with a fixed `AddGate` in place of the repeat
+  declaration. A `Template` whose value holds slice headers cannot keep
+  the item's contract under copy-backs, because a copy-back restores
+  headers and nothing can make the restored lengths agree with the
+  array's contents.
+
+  Fix: the `Template` value holds no headers. `steps` and `paramOrder`
+  move into an unexported `templateState`, and `Template` holds it
+  through one pointer field, `state`, allocated by `pin` on the first
+  accepted declaration, in the same statement as `addr`. `NewTemplate(n)`
+  is still `&Template{numQubits: n}`, so the zero value and every
+  constructed template start with `state == nil`, which every reader
+  treats as no declarations (`names` and `stepList` on a nil state return
+  nil), and item 18's contract is unchanged: no allocation on the zero
+  value until a declaration is accepted, nothing declared after a
+  rejection, `NewTemplate(0)` and the zero value identical. The `addr`
+  guard is exactly where it was.
+
+  Completeness. Every write to `addr` or `state` is in `pin`, which runs
+  only in a writer after `checkNotCopied` has passed, and a struct copy
+  copies both fields together. So every `Template` value that exists
+  holds either `(nil, nil)` or `(&X, S_X)`, where `S_X` is the one state
+  `pin` allocated when the variable at `X` accepted its first
+  declaration: if `addr` is nil then `state` is nil (they are only ever
+  set together) and `pin` founds a new pair for the receiver; if `addr`
+  is the receiver then `state` is already that receiver's, and `pin`
+  changes nothing. A copy-back `X = v` therefore writes `(&X, S_X)` over
+  `(&X, S_X)`: a no-op on both fields, whatever `v` holds and however
+  many copies and copy-backs preceded it. Only the value at address `X`
+  passes the guard, so every write to `S_X` is an append by `X`'s own
+  writers, through one code path that adds a step on every accepted
+  declaration and a name exactly when the name is absent; `S_X`'s lists
+  are at every moment the accepted declarations on `X` in order, with
+  `paramOrder` the distinct parameter names among the steps in first-use
+  order. Every reader, on the original or on any copy, reads `S_X`. Hence
+  `ParamNames` and `ParamStepCounts` always describe the same
+  declarations, `Bind` demands exactly the listed names and rejects any
+  other, and no interleaving of by-value copies, copy-backs, and
+  declarations drops, rewrites, or duplicates a declaration. In the
+  two-step sequence above, `a`, `b`, and `s` all hold `(&a, S_a)`, both
+  assignments are no-ops on state, and the five accepted declarations
+  are all in `S_a`: `ParamNames` is `[x y z w v]`, `ParamStepCounts` is
+  `map[v:1 w:1 x:2 y:1 z:1]`, `Bind` with those five succeeds, and `Bind`
+  without any one of them is `MissingParameterError`. Pinned by
+  `TestCopyAssignedBackTwiceKeepsNamesAndCountsConsistent`, both variants.
+
+  Consequence for the round 1 copy-back ruling: a copy-back no longer
+  drops the declarations made between the copy and the copy-back, because
+  it restores nothing older than the original's own state. In the round 1
+  sequence (`b := a` after `theta`, `a` declares `phi`, `a = b`), `a`
+  still lists `phi`, `a.Bind(Params{"theta": 0.1, "phi": 0.2})` succeeds,
+  and `a.Bind(Params{"theta": 0.1})` is `MissingParameterError`. Round
+  1's survivor 2 asserted the opposite (`UnknownParameterError` for
+  `phi`, the answer the restored headers gave); that expectation is the
+  snapshot semantics this amendment replaces, so the moved test
+  `TestCopyAssignedBackOverOriginalBindRejectsUnlistedName` is replaced by
+  `TestCopyAssignedBackOverOriginalKeepsEveryDeclaration`, which pins the
+  new answer and still checks that `Bind` rejects a name no declaration
+  made. Round 1's "detecting the copy-back" discussion is moot: there is
+  nothing to detect, since the copy-back changes nothing. The
+  `Template` doc comment, `checkNotCopied`'s comment, and the CHANGELOG
+  entry say so. Residual: none for consistency. A refused copy's
+  accessors report the shared state (Decision 3's round 2 note), which is
+  the template as it is now rather than as it was when copied.
 - **Error precedence.** The copy error precedes the nil-factory,
   nil-gate, no-target, and range errors in the `Add` methods and the
   missing, non-finite, and unknown errors in `Bind`. Pinned for the
@@ -306,7 +423,10 @@ does not.
   and one pointer store more; each `Bind` runs one comparison more.
   (Amended 2026-09-10, round 1 fix: each `AddParamGate` also scans the
   declared names instead of reading a map, and `Bind`'s accepted path
-  replaces one map read per key with one length comparison.) The
+  replaces one map read per key with one length comparison. Amended
+  2026-09-10, round 2 fix: each template also makes one heap allocation,
+  the `templateState`, on its first accepted declaration, and every
+  reader adds one pointer indirection.) The
   prototype's `go run ./cmd/quantum -demo qaoa` still prints
   `VQE from the symmetric start: energy = -1.0000, expected cut = 2.0000`
   followed by `iterations accepted: 29, energy evaluations: 378`.
@@ -341,7 +461,11 @@ unaffected.
   copies share state and that it is out of scope there; this design is
   that scope. Its Decision 1 cites `strings.Builder` as the zero-value
   precedent, and this design follows the same type's copy rule. No
-  amendment.
+  amendment. (Amended 2026-09-10, round 2 fix: its zero-value contract is
+  re-checked against the new layout in the "twice" ruling above, and
+  `TestZeroValueTemplateAddParamGateDoesNotPanic` and
+  `TestZeroValueTemplateIsAZeroQubitTemplate` pass unchanged; still no
+  amendment.)
 - **Item 19's plan** (`docs/superpowers/plans/2026-09-09-empty-target-list.md`,
   the task's "Produces" note): says, for item 21, that the `seen`,
   `paramOrder`, and `steps` handling is byte for byte what item 18 left
@@ -418,6 +542,24 @@ declaration is accepted and the assertions run) and
 written-back value rejects the dropped name as `UnknownParameterError`).
 The survivor file is deleted.
 
+Amended 2026-09-10 (round 2 fix): one expectation from those survivors is
+changed, and it is the only test expectation this round changes.
+Survivor 2 (`TestCopyAssignedBackOverOriginalBindRejectsUnlistedName`)
+asserted that after `b := a`, `a` declares `phi`, `a = b`, `ParamNames`
+is `[theta]` and `Bind` with `phi` is `UnknownParameterError`. Under the
+shared state the copy-back drops nothing, so `ParamNames` is
+`[theta phi]` and that `Bind` succeeds; the "twice" ruling above records
+why (the survivor's expectation was the snapshot semantics that the
+two-step hole shows cannot be kept). The test is replaced by
+`TestCopyAssignedBackOverOriginalKeepsEveryDeclaration`, which keeps the
+sequence and pins the new answers: `ParamNames` is `[theta phi]`,
+`ParamStepCounts` is `map[phi:1 theta:1]`, `Bind` with both succeeds,
+`Bind` without `phi` is `MissingParameterError` for `phi`, and `Bind`
+with an undeclared name is still `UnknownParameterError`. Survivor 1
+(`TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent`) passes
+unchanged: its re-declaration of `phi` after the copy-back is accepted as
+a second step of a listed name, and its assertions hold.
+
 ## Testing
 
 All in `parameterized/parameterized_test.go` (package `parameterized_test`):
@@ -439,8 +581,24 @@ All in `parameterized/parameterized_test.go` (package `parameterized_test`):
   on the copy, one with an empty binding and one with an undeclared
   name, expecting the copy error ahead of `MissingParameterError` and
   `UnknownParameterError` (round 1 review, minor 4).
+- Amended 2026-09-10 (round 2 fix):
+  `TestCopyAssignedBackTwiceKeepsNamesAndCountsConsistent`, the
+  re-review's two-step sequence as two subtests (`repeat declaration`
+  and `fixed gate`), asserting the exact name list `[x y z w v]`, that
+  names and counts list each other, the count for `x`, and `Bind`'s
+  three answers (exact names succeed, each omission is
+  `MissingParameterError` for that name, an extra name is
+  `UnknownParameterError`); failed at c9083d9 with
+  `ParamNames() after two copy-backs = ["x" "y" "z" "v"], want ["x" "y" "z" "w" "v"]`
+  in both subtests. `TestCopyAssignedBackOverOriginalKeepsEveryDeclaration`
+  replaces survivor 2 as recorded under "Red test rulings".
+  `TestCopiedTemplateAccessorsReportSharedState` pins Decision 3's round
+  2 note. `TestCopiedTemplateIsRefusedByAddAndBind`,
+  `TestCopyBeforeDeclarationIsIndependent`, and both zero-value tests
+  pass unchanged.
 - `go test -race ./parameterized ./algorithm` clean: `Bind`'s check is a
-  read.
+  read. (Round 2: `Bind` reads the `state` pointer and then the lists,
+  still without writing; the run stays clean.)
 - `go test -tags redtests ./parameterized -run '^TestRed'` must list
   exactly `TestRedDeclaredTargetsAreNotAliasedToCallerSlice` (item 22) as
   failing; `algorithm` has no tagged tests left (`no tests to run`).
@@ -462,4 +620,6 @@ stores `targets` is not edited). A `Clone` method for callers who want a
 second template from the first (nobody in the module does; declare
 twice). The `noescape` optimization (Decision 3). Typing or exporting the
 copy error. Any change to `NumQubits`, `ParamNames`, `ParamStepCounts`,
-`checkTargets`, `NewTemplate`, or any exported signature.
+`checkTargets`, `NewTemplate`, or any exported signature. (Round 2 fix:
+`ParamNames` and `ParamStepCounts` read through the state pointer; their
+signatures, `NumQubits`, `checkTargets`, and `NewTemplate` are unchanged.)
