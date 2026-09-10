@@ -26,7 +26,11 @@ half a spacing of its true offset. The spacing grows with the angle:
 
 From `2^54` the spacing exceeds pi, both shifted values round back to
 `theta`, the two evaluations bind the same circuit, and the helper returns
-exactly 0 with a nil error. Observed at `0712b96` on
+exactly 0 with a nil error. (Amended 2026-09-10, round 1 fix: strictly,
+above `2^54`; at exactly `2^54` the minus shift still lands in
+`[2^53, 2^54)`, where the spacing is `2`, and moves by `-2`, as the table
+row above and its `-0.0797` observation below already show. Both round
+back only from `theta` in `(2^54, 2^55)` on.) Observed at `0712b96` on
 `gradientTargetTemplate` (declares `a` then `b`, H2 Hamiltonian) with the
 prototype of this design's tests run against the unchanged helper:
 
@@ -76,6 +80,17 @@ is the same class of silent failure item 13 documented for a rescaling
 factory, introduced this time by the helper itself. An error cannot
 produce a wrong number.
 
+Amended 2026-09-10 (round 1 fix): this reason is defense in depth rather
+than the load-bearing one. The parameter-shift rule itself is exact only
+under the same `exp(-i*theta*P/2)` precondition (`E = a + b*cos(theta) +
+c*sin(theta)`, which is `2*pi`-periodic); a factory of another period
+already yields a wrong gradient from this helper before any reduction is
+considered, so periodicity failure coincides with the rule's own
+precondition failing rather than being introduced fresh by a reduction.
+The reason still stands: an error cannot compound an already-wrong number
+into a differently-wrong one, and the decision does not rest on it alone
+(reasons 2 and 4 are each independently sufficient).
+
 **A reduction inside the helper does not fix `VQE`.** With the gradient
 correct at `a = 2^60`, the descent computes `a - step * grad` and float64
 loses a step of `0.03` to a spacing of `256`: `a` stays frozen and the
@@ -93,6 +108,18 @@ float64 constant `2*pi` carries an error of about `4e-16`, multiplied by a
 quotient of `1.8e17`: the result is off by about 80 radians. A correct
 reduction needs `math/big` or a Payne-Hanek table in the driver, for an
 input no caller has.
+
+Amended 2026-09-10 (round 1 fix): the error figures in the previous
+paragraph were wrong. Measured against a 512-bit `big.Float` value of
+`2*pi`: the float64 value of `2*math.Pi` is short by
+`2.4492935982947064e-16` (twice `math.Pi`'s own error of
+`1.2246467991473532e-16`), the quotient `2^60 / (2*math.Pi)` is
+`1.834931564551251e17`, and the accumulated error, quotient times
+per-term error, is `44.94` rad, not `80`. `5.0824 - 4.1219 = 0.9605` rad,
+which is `44.94 mod 2*pi`, so the two reduced values already quoted are
+correct; only the `4e-16` and `80` figures were not. The conclusion is
+unaffected: `45` rad of accumulated error is just as disqualifying as
+`80` for computing the reduction in float64.
 
 **An error is what the package does with an input outside its domain.**
 Item 14 (`docs/superpowers/specs/2026-09-08-vqe-input-validation-design.md`)
@@ -130,6 +157,16 @@ which the parameter keeps a resolution finer than `1e-8` rad, and it
 allows angles of more than `10^7` turns, far beyond any angle a descent
 reaches from an angle a caller chose: 200 iterations of a `0.3` step
 times a unit gradient walk 60 rad.
+
+Amended 2026-09-10 (round 1 fix): `2^-27 = 7.45e-9`, not `1.49e-8`; the
+two figures in the previous paragraph's first sentence contradicted each
+other. The correct chain: for `|theta| <= 2^26`, `theta +/- pi/2` crosses
+into `[2^26, 2^27)` for any `theta` within `pi/2` of the bound, so it is
+the shifted value's spacing that bounds the offset error, and that
+spacing is at most `2^-26 = 1.49e-8`. The offset error, half that
+spacing, is `7.45e-9`, as stated; only the intermediate `2^-27` label was
+wrong, not the `7.45e-9` conclusion or anything downstream of it
+(`algorithm/vqe.go`'s `maxShiftMagnitude` comment carries the same fix).
 
 **Why not the exact-defect threshold** (`theta + pi/2 == theta`, from
 `2^54`). It leaves the wrong-offset regime (`2^51` to `2^54`, shifts of
@@ -243,9 +280,25 @@ table by amendment.
 - **Several offenders**: the helper reports the first in `names` order;
   `VQE` reports whichever `InitialParams` map iteration reaches first,
   the pre-existing behavior of that loop (item 14's ruling).
-- **Undeclared name in `names`**: reads as 0 from `params`, passes the
-  bound, and is rejected by `Bind` when its own shift is evaluated, as
-  item 16's Decision 5 states. Unchanged.
+- **Undeclared name in `names`, absent from `params`**: reads as 0,
+  passes the bound, and is rejected by `Bind` when its own shift is
+  evaluated, as item 16's Decision 5 states. Unchanged.
+- **Undeclared name in `names`, present in `params` with a huge value**
+  (round 1 fix, 2026-09-10): Decision 3's magnitude check runs over every
+  name in `names`, in order, ahead of either loop; nothing in its text
+  restricts it to names the template declares, and it cannot: it runs
+  before `Bind` is ever called, so it has no way to know which names are
+  declared. So this case is caught there, at 0 evaluations, not by
+  `Bind`'s `UnknownParameterError` after the preceding names' evaluations
+  that item 16's Decision 5 describes for the general undeclared-name
+  case; that description now holds only when the undeclared name's bound
+  value (if any) is within `maxShiftMagnitude`. Round 1's black-box red
+  testing (`.superpowers/backlog/enhancement-backlog-2026-08-27/item-20-round-1-red.md`,
+  survivor 1) found the doc comment and this ruling silent on the
+  interaction; `algorithm/vqe.go`'s `parameterShiftGradient` doc comment
+  now states the ordering explicitly, and
+  `docs/superpowers/specs/2026-09-08-parameter-shift-missing-param-design.md`
+  carries the same amendment.
 - **Empty `names`**: no name is checked, no evaluation runs. Unchanged.
 - **A step that crosses the bound and would have been reverted** is
   rejected, not reverted: the guard precedes the step evaluation, as the
