@@ -197,6 +197,24 @@ declaration is accepted is an independent template; no method panics.
 Nothing in the module copies a `Template` by value, so no caller changes.
 Design: `docs/superpowers/specs/2026-09-10-template-copy-guard-design.md`.
 
+#### `parameterized.Template` copies the targets a declaration is given
+
+`AddParamGate` and `AddGate` stored the caller's variadic `targets` slice
+by reference, so mutating it after a call that had returned success
+changed what `Bind` later built. A caller that fills one target slice and
+reuses it across declarations, the usual shape of a generated circuit, got
+gates on the targets written last rather than on the ones each declaration
+named, and the range check the declaration had passed no longer described
+the result. Both writers now store their own copy, as `circuit.AddGate`
+already does with the same argument, so an accepted declaration is fixed;
+the copy is made only after the argument checks pass, so a rejected
+declaration still allocates nothing. Nothing in the module mutates a
+target slice after declaring with it, so no caller changes. With this the
+last red test moves into the regular suite and
+`parameterized/backlog_red_test.go` is removed, so no test carries the
+`redtests` build tag any more. Design:
+`docs/superpowers/specs/2026-09-10-declared-targets-copy-design.md`.
+
 ### Breaking
 
 #### `density.ApplySingleQubitGate` removed

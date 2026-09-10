@@ -41,6 +41,8 @@ type step struct {
 	param   string
 	factory Factory
 	gate    quantum.Gate
+	// targets is the template's own copy of the declared target list, made
+	// by cloneTargets; it is never the caller's variadic slice.
 	targets []int
 }
 
@@ -224,15 +226,32 @@ func (t *Template) checkTargets(targets []int) error {
 	return nil
 }
 
+// cloneTargets returns the template's own copy of a declared target list.
+// The variadic targets a writer receives are the caller's slice, and a
+// caller that builds one slice and reuses it across declarations, as a
+// generated circuit does, would otherwise rewrite steps already declared:
+// the call returned success and the declaration looked complete, yet Bind
+// would build something else, and the range check the writer just ran
+// would no longer describe it. circuit.AddGate copies the same argument
+// for the same reason (the Operation literal in circuit/circuit.go), so a
+// target list is copied once on the way in here and once on the way out
+// there. The writers call this only after their checks pass, so a rejected
+// declaration allocates nothing.
+func cloneTargets(targets []int) []int {
+	return append([]int(nil), targets...)
+}
+
 // AddParamGate adds a gate built by factory from the named parameter's
 // value at Bind time. The same name may drive several gates. The name is
 // an opaque key: any string is accepted, the empty string included, and
 // it is what Bind and ParamStepCounts key on. At least one target is
 // required: a declaration with none is rejected here, with an error naming
 // the parameter, rather than declared, counted, and left for
-// circuit.AddGate to reject at Bind. On a Template copied by value after
-// an accepted declaration the call is refused before any of these checks
-// (see Template).
+// circuit.AddGate to reject at Bind. The targets are copied, so the slice
+// a caller passed may be reused or mutated after the call without changing
+// what was declared. On a Template copied by value after an accepted
+// declaration the call is refused before any of these checks (see
+// Template).
 func (t *Template) AddParamGate(name string, factory Factory, targets ...int) error {
 	if err := t.checkNotCopied(); err != nil {
 		return err
@@ -250,7 +269,7 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 	if !t.declared(name) {
 		t.state.paramOrder = append(t.state.paramOrder, name)
 	}
-	t.state.steps = append(t.state.steps, step{param: name, factory: factory, targets: targets})
+	t.state.steps = append(t.state.steps, step{param: name, factory: factory, targets: cloneTargets(targets)})
 	return nil
 }
 
@@ -261,9 +280,10 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 // quantum.Gate value (for example, (*gates.MatrixGate)(nil)) passes the
 // nil check undetected, the same caller-bug gap circuit.AddGate has, and
 // panics when this method calls gate.Name() to name the gate in the
-// no-target error. On a Template copied by value after an accepted
-// declaration the call is refused before any of these checks (see
-// Template).
+// no-target error. The targets are copied, so the slice a caller passed
+// may be reused or mutated after the call without changing what was
+// declared. On a Template copied by value after an accepted declaration
+// the call is refused before any of these checks (see Template).
 func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 	if err := t.checkNotCopied(); err != nil {
 		return err
@@ -278,7 +298,7 @@ func (t *Template) AddGate(gate quantum.Gate, targets ...int) error {
 		return err
 	}
 	t.pin()
-	t.state.steps = append(t.state.steps, step{gate: gate, targets: targets})
+	t.state.steps = append(t.state.steps, step{gate: gate, targets: cloneTargets(targets)})
 	return nil
 }
 

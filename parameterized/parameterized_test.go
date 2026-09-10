@@ -885,3 +885,96 @@ func TestParamAccessorsReturnFreshContainers(t *testing.T) {
 		t.Fatalf("Bind without phi after deleting it from a returned map: err = %v, want MissingParameterError for phi", err)
 	}
 }
+
+// TestDeclaredTargetsAreNotAliasedToCallerSlice pins that a declaration
+// keeps its own copy of the target list (backlog item 22). Before the fix
+// both writers stored the caller's variadic slice by reference, so
+// mutating it after a call that had returned success changed what Bind
+// later built, although the declaration looked complete.
+func TestDeclaredTargetsAreNotAliasedToCallerSlice(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	targets := []int{0}
+	if err := tmpl.AddParamGate("theta", parameterized.Ry, targets...); err != nil {
+		t.Fatal(err)
+	}
+	targets[0] = 1
+	bound, err := tmpl.Bind(parameterized.Params{"theta": 0.2})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// As declared: Ry(0.2) on qubit 0, nothing on qubit 1.
+	manual, _ := circuit.New(2)
+	_ = manual.AddGate(gates.NewRy(0.2), 0)
+	sa, _ := state.New(2)
+	sb, _ := state.New(2)
+	if err := bound.Execute(sa); err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.Execute(sb); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		if sa.Amplitude(i) != sb.Amplitude(i) {
+			t.Fatalf("amplitude %d after mutating the caller's slice: got %v, want %v (Ry on qubit 0 as declared)", i, sa.Amplitude(i), sb.Amplitude(i))
+		}
+	}
+}
+
+// TestAddCopiesTheCallerTargetsSlice pins the contract on both writers and
+// on the pattern the item names: one slice built once and reused across
+// declarations. A mutation after an accepted declaration cannot rewrite,
+// invalidate, or duplicate the targets that declaration recorded, so the
+// range check the writers run at declaration time still describes what
+// Bind builds.
+func TestAddCopiesTheCallerTargetsSlice(t *testing.T) {
+	tmpl := parameterized.NewTemplate(2)
+	targets := []int{0}
+	if err := tmpl.AddParamGate("theta", parameterized.Ry, targets...); err != nil {
+		t.Fatal(err)
+	}
+	// The caller reuses one slice for the next declaration, as a generator
+	// emitting a layer of rotations does.
+	targets[0] = 1
+	if err := tmpl.AddParamGate("phi", parameterized.Rx, targets...); err != nil {
+		t.Fatal(err)
+	}
+	pair := []int{0, 1}
+	if err := tmpl.AddGate(gates.NewCNOT(), pair...); err != nil {
+		t.Fatal(err)
+	}
+	// Mutations that would make a declaration illegal if Bind saw them: a
+	// duplicate target for the CNOT, an out-of-range target for the Rx.
+	pair[1] = 0
+	targets[0] = 7
+
+	bound, err := tmpl.Bind(parameterized.Params{"theta": 0.2, "phi": 0.3})
+	if err != nil {
+		t.Fatalf("Bind after mutating both caller slices: %v, want the circuit as declared", err)
+	}
+	manual, err := circuit.New(2)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.AddGate(gates.NewRy(0.2), 0); err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.AddGate(gates.NewRx(0.3), 1); err != nil {
+		t.Fatal(err)
+	}
+	if err := manual.AddGate(gates.NewCNOT(), 0, 1); err != nil {
+		t.Fatal(err)
+	}
+	sa, _ := state.New(2)
+	sb, _ := state.New(2)
+	if err := bound.Execute(sa); err != nil {
+		t.Fatalf("executing the bound circuit: %v", err)
+	}
+	if err := manual.Execute(sb); err != nil {
+		t.Fatal(err)
+	}
+	for i := 0; i < 4; i++ {
+		if sa.Amplitude(i) != sb.Amplitude(i) {
+			t.Fatalf("amplitude %d after mutating both caller slices: got %v, want %v (Ry on 0, Rx on 1, CNOT 0->1 as declared)", i, sa.Amplitude(i), sb.Amplitude(i))
+		}
+	}
+}
