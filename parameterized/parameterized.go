@@ -54,16 +54,25 @@ type step struct {
 //
 // A Template is used in place or through a pointer, as NewTemplate returns
 // it. Copying a Template by value after a declaration has been accepted is
-// not supported: the copy shares the original's name-tracking map and the
-// backing arrays of its step and name lists but not their slice headers,
-// so declarations on the two would drift apart or overwrite each other.
-// Like strings.Builder, a Template records the receiver of its first
-// accepted declaration, and AddParamGate, AddGate, and Bind on a copy taken
-// after that return an error, before any other check, instead of touching
-// the shared state; NumQubits, ParamNames, and ParamStepCounts on such a
-// copy describe the template as it was when copied. A copy taken before any
+// not supported, whether by assignment, by passing or returning it, or by
+// storing it in a slice, map, or struct field that is later copied: the
+// copy shares the backing arrays of the original's step and name lists but
+// not their slice headers, so a declaration on either could overwrite one
+// the other still lists. Like strings.Builder, a Template records the
+// receiver of its first accepted declaration, and AddParamGate, AddGate,
+// and Bind on a copy taken after that return an error, before any other
+// check, instead of touching the shared arrays. A copy taken before any
 // declaration is accepted shares nothing and is an independent template.
-// A Template is safe for concurrent reads after all Add calls complete.
+// Nothing else is shared: whether a name is declared is read from the name
+// list itself, so every Template value describes itself. In particular, a
+// copy assigned back over the original, which the receiver check cannot
+// tell from the original, restores the lists as they were when the copy
+// was taken, drops the declarations made in between, and goes on
+// consistently from there. NumQubits, ParamNames, and ParamStepCounts on
+// a refused copy describe the template as it was when copied, unless the
+// original has since been rolled back that way and has declared again
+// into slots the copy's lists still cover. A Template is safe for
+// concurrent reads after all Add calls complete.
 type Template struct {
 	// addr is the receiver of the first accepted declaration, set only by
 	// AddParamGate and AddGate, so a by-value copy taken after that can be
@@ -73,9 +82,6 @@ type Template struct {
 	numQubits  int
 	steps      []step
 	paramOrder []string
-	// seen is allocated by AddParamGate on the first declaration, the only
-	// place it is written, so the zero value needs no constructor.
-	seen map[string]bool
 }
 
 // errCopiedTemplate is what AddParamGate, AddGate, and Bind return on a
@@ -84,15 +90,30 @@ var errCopiedTemplate = errors.New("Template copied by value after a declaration
 
 // checkNotCopied returns errCopiedTemplate when t is a by-value copy of a
 // Template that had already accepted a declaration when it was copied.
-// Such a copy shares seen and the slices' backing arrays with the
-// original, so a write through either, or Bind's read of seen on the
-// copy, could desync the two; the three methods that touch seen or append
-// call this first.
+// Such a copy shares the slices' backing arrays with the original, so an
+// append through either could overwrite a step or name the other still
+// lists; the two writers and Bind call this first. A copy assigned back
+// over the original passes (its addr is the receiver again) and is a
+// consistent snapshot, since nothing but the arrays is shared; see
+// Template.
 func (t *Template) checkNotCopied() error {
 	if t.addr != nil && t.addr != t {
 		return errCopiedTemplate
 	}
 	return nil
+}
+
+// declared reports whether name is in paramOrder. The list is the single
+// record of the declared names: a by-value copy of a Template carries its
+// own header over it, so a copy's or a rolled-back original's answer is
+// its own, which a shared map could not give (backlog item 21).
+func (t *Template) declared(name string) bool {
+	for _, n := range t.paramOrder {
+		if n == name {
+			return true
+		}
+	}
+	return false
 }
 
 // NewTemplate returns a template for circuits on numQubits qubits.
@@ -160,11 +181,7 @@ func (t *Template) AddParamGate(name string, factory Factory, targets ...int) er
 		return err
 	}
 	t.addr = t
-	if t.seen == nil {
-		t.seen = make(map[string]bool)
-	}
-	if !t.seen[name] {
-		t.seen[name] = true
+	if !t.declared(name) {
 		t.paramOrder = append(t.paramOrder, name)
 	}
 	t.steps = append(t.steps, step{param: name, factory: factory, targets: targets})
@@ -218,9 +235,14 @@ func (t *Template) Bind(values Params) (*circuit.Circuit, error) {
 			return nil, &InvalidParameterValueError{Name: name, Value: value}
 		}
 	}
-	for name := range values {
-		if !t.seen[name] {
-			return nil, &UnknownParameterError{Name: name}
+	// Every declared name is present and the declared names are distinct,
+	// so values holds an undeclared key exactly when it has more keys than
+	// the template has names; the scan that names one runs only then.
+	if len(values) != len(t.paramOrder) {
+		for name := range values {
+			if !t.declared(name) {
+				return nil, &UnknownParameterError{Name: name}
+			}
 		}
 	}
 

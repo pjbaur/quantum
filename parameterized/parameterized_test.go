@@ -565,3 +565,72 @@ func TestCopyBeforeDeclarationIsIndependent(t *testing.T) {
 		t.Fatalf("AddParamGate on a copy taken after only a rejected declaration: %v, want success", err)
 	}
 }
+
+// TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent pins the
+// copy-back hole round 1's black-box red testing found in the receiver
+// check (backlog item 21): a copy taken after a declaration and assigned
+// back over the original after the original declared once more has the
+// original's own address, so the check passes. While a shared name map
+// existed it still listed the dropped name, so the original's next
+// declaration of it was counted by ParamStepCounts, absent from
+// ParamNames, and never demanded by Bind. Declared names are now read
+// from the name list itself, so the copy-back restores a consistent
+// snapshot and the re-declaration is listed, counted, and demanded.
+func TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent(t *testing.T) {
+	a := *parameterized.NewTemplate(2)
+	if err := a.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	b := a
+	if err := a.AddParamGate("phi", parameterized.Rx, 1); err != nil {
+		t.Fatal(err)
+	}
+	a = b
+	err := a.AddParamGate("phi", parameterized.Rx, 1)
+	if err != nil {
+		// A refusal is consistent with the doc comment; only an accepted
+		// declaration that leaves the template inconsistent is a failure.
+		return
+	}
+	names := a.ParamNames()
+	counts := a.ParamStepCounts()
+	for name := range counts {
+		found := false
+		for _, n := range names {
+			if n == name {
+				found = true
+			}
+		}
+		if !found {
+			t.Errorf("ParamStepCounts lists %q but ParamNames %v omits it (counts %v)", name, names, counts)
+		}
+	}
+	if _, err := a.Bind(parameterized.Params{"theta": 0.1}); err == nil {
+		t.Errorf("Bind with only theta succeeded although a phi step was accepted; want MissingParameterError")
+	}
+}
+
+// TestCopyAssignedBackOverOriginalBindRejectsUnlistedName pins the same
+// copy-back sequence with no further declaration: Bind is given a name
+// that ParamNames does not list and must reject it as unknown, which a
+// shared name map still holding the dropped name did not.
+func TestCopyAssignedBackOverOriginalBindRejectsUnlistedName(t *testing.T) {
+	a := *parameterized.NewTemplate(2)
+	if err := a.AddParamGate("theta", parameterized.Ry, 0); err != nil {
+		t.Fatal(err)
+	}
+	b := a
+	if err := a.AddParamGate("phi", parameterized.Rx, 1); err != nil {
+		t.Fatal(err)
+	}
+	a = b
+	names := a.ParamNames()
+	if len(names) != 1 || names[0] != "theta" {
+		t.Fatalf("ParamNames = %v, want [theta]", names)
+	}
+	_, err := a.Bind(parameterized.Params{"theta": 0.1, "phi": 0.2})
+	var unknown *parameterized.UnknownParameterError
+	if !errors.As(err, &unknown) {
+		t.Fatalf("Bind with phi, which ParamNames does not list: err = %v, want UnknownParameterError", err)
+	}
+}
