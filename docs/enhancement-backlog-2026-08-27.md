@@ -505,7 +505,7 @@ QPE is actually wanted.
   > still reaches `Bind`), and added dated amendment notes to four prior
   > specs. Commits: 4817e29, 6ea900d, 76a5f3e, 9a7fe3e, 9d79e4e, dda9f54,
   > c26c392, 4d53f44, 57647fc, bb8ed87.
-- [ ] 21. **Copying a `Template` by value after a declaration desyncs
+- [x] 21. **Copying a `Template` by value after a declaration desyncs
   `ParamNames` from `ParamStepCounts`** — `Template.seen` is a map and
   `Template.AddParamGate` appends to `Template.paramOrder` and
   `Template.steps`; a value copy taken after at least one declaration
@@ -528,6 +528,27 @@ QPE is actually wanted.
   > **Red tests**: `TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent`
   > in `parameterized/backlog_red_test.go`; reproduce with
   > `go test -tags redtests ./parameterized -run '^TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent'`.
+  > **Done (2026-09-10)**: `Template` is documented and enforced as not safe
+  > to copy by value after a declaration. An unexported `addr *Template`
+  > self-pointer in the style of `strings.Builder` is pinned by `AddParamGate`
+  > and `AddGate` on the first accepted declaration; `AddParamGate`, `AddGate`,
+  > and `Bind` refuse a copy with an unexported `errCopiedTemplate` before any
+  > other check. QA rounds found the guard alone was defeated by assigning a
+  > copy back over the original, so the `seen` map was removed and the
+  > declaration state (`steps` and `paramOrder`) moved behind one lazily
+  > allocated `templateState` pointer that every copy shares, which is what
+  > actually keeps `ParamNames` and `ParamStepCounts` consistent; the guard
+  > remains to enforce the contract, not the invariant. Membership is read from
+  > the name list, and `Bind` scans for unknown names only when the value count
+  > differs from the declared count. Tests in `parameterized/parameterized_test.go`
+  > cover the copy-back sequences (one-step and two-step), refusal by all three
+  > methods with the copy error taking precedence, a copy taken before any
+  > declaration staying independent, and the accessors returning fresh
+  > containers; item 18's zero-value and item 19's empty-target-list contracts
+  > still hold. `algorithm/vqe.go`'s failure inventories name the new path.
+  > Commits: ed7c0e0, 1140e21, 1047b22, 597d84a, 32e13ec, c0ac3cd, f70ece3,
+  > e80e9e0, cf2cf08, 6369cca, 77ba545, 40810ba, 6219788, 206cb4a, c38900d,
+  > b3bc080, c9083d9, 9e52b17, f3a9ee0, 52a9e9e, 588db6a, deb8e66, 19558b7.
 - [ ] 22. **`AddParamGate` and `AddGate` store the caller's variadic
   targets slice by reference** — both methods append
   `step{... targets: targets}` directly, so the `step.targets` slice
