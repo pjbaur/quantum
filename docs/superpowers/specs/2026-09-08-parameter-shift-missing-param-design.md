@@ -254,6 +254,25 @@ Non-finite values are still left to `Bind`: the magnitude check skips
 them, so every sentence above about where a non-finite value is reported
 holds as written.
 
+Amended 2026-09-10 (item 20 round 1 fix): the magnitude check above does
+not distinguish declared names from undeclared ones, since it runs
+ahead of any evaluation and cannot consult `Bind`; it checks every name
+in `names`, in order. So "What is deliberately not checked"'s claim above
+("a name in names that the template never declared is left to Bind ...
+rejects it as UnknownParameterError ... after the names before it have
+cost their evaluations") now holds only when that name's bound value, if
+`params` has one, is within `maxShiftMagnitude`. An undeclared name in
+`names` bound to a value beyond the magnitude bound is caught by the
+magnitude check instead, at 0 evaluations, before `Bind` is ever called.
+Round 1's black-box red testing surfaced this gap
+(`.superpowers/backlog/enhancement-backlog-2026-08-27/item-20-round-1-red.md`,
+survivor 1); `algorithm/vqe.go`'s doc comment states the ordering
+explicitly, and
+`docs/superpowers/specs/2026-09-09-parameter-shift-angle-bound-design.md`
+Rulings, amended the same date, states it for that spec's own text. An
+undeclared name absent from `params`, or present but within the bound,
+is unaffected: both still reach `Bind` as this section describes.
+
 ## Item 17 follows on locally
 
 Item 17 (evaluation undercount on failure): the loop body does
