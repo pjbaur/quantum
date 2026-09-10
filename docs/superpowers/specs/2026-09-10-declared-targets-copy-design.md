@@ -107,7 +107,7 @@ it stores (`bytes.Buffer.Write`, `strings.Builder.Write`,
 `time.Time.AppendFormat` and friends all treat the caller's bytes as
 borrowed). This repository already follows it one layer down, in the
 function these very targets are forwarded to: `circuit.AddGate` stores
-`Targets: append([]int(nil), targets...)` (`circuit/circuit.go:79-82`).
+`Targets: append([]int(nil), targets...)` (`circuit/circuit.go:81-84`).
 The template is the one place in the chain that does not, so this makes
 `parameterized` consistent with `circuit` rather than introducing a new
 rule. The cost is smaller than it looks, because a writer that stops
@@ -207,7 +207,7 @@ and Decision 4 leaves its behavior alone.
 parameter passes the slice, so `circuit.AddGate` receives `s.targets`
 itself, not a copy. It reads it for the range, width, and uniqueness
 checks and then stores `Targets: append([]int(nil), targets...)`
-(`circuit/circuit.go:79-82`): it copies what it retains. The built
+(`circuit/circuit.go:81-84`): it copies what it retains. The built
 circuit therefore never aliases the template's step targets, a later
 declaration on the template cannot change a circuit already bound, and two
 circuits bound from one template share nothing.
