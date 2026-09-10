@@ -591,6 +591,13 @@ func TestCopyBeforeDeclarationIsIndependent(t *testing.T) {
 // behind one pointer every copy shares, so the copy-back writes that
 // pointer over itself and the re-declaration is a second step of a name
 // still listed: listed, counted, and demanded.
+//
+// This is the round 1 survivor with its assertions intact, so it tolerates
+// a refusal of the re-declaration and would go vacuous under a design that
+// refused copy-backs. TestCopyAssignedBackOverOriginalKeepsEveryDeclaration
+// is the test that pins the current semantics; it asserts the same sequence
+// without an escape hatch and fails loudly if a copy-back ever drops a
+// declaration again.
 func TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent(t *testing.T) {
 	a := *parameterized.NewTemplate(2)
 	if err := a.AddParamGate("theta", parameterized.Ry, 0); err != nil {
