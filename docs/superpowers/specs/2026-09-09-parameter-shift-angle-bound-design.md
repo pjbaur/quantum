@@ -172,7 +172,16 @@ wrong, not the `7.45e-9` conclusion or anything downstream of it
 `2^54`). It leaves the wrong-offset regime (`2^51` to `2^54`, shifts of
 `1.5` and `2`) and the frozen-step regime (from `2^48` with default
 options) unaddressed, so `VQE` would still report `Converged` with a
-frozen parameter for `2^50`, against the dispatch's requirement.
+frozen parameter for `2^50`, against the dispatch's requirement. (Amended
+2026-09-10, round 2 fix: strictly, above `2^48`; at exactly `2^48` the
+default step of `0.3` times a gradient of `0.1` still moves the parameter
+by one ulp in the descent direction (`2^48 - 0.03` rounds to
+`2^48 - 0.03125`, verified in a scratch program), because that value and
+`2^48` are both representable in the finer, `[2^47, 2^48)` spacing of
+`0.03125`. Freezing in both directions holds only from the next
+representable float above `2^48` on; the smallest power of two at which
+it holds is `2^49`. `algorithm/vqe.go`'s `maxShiftMagnitude` comment
+carries the same fix.)
 
 **Why not a tighter bound** (`2^10`, where the shift error is comparable
 to the energy's own rounding). A run from an ordinary start with a large

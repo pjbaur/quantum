@@ -34,7 +34,7 @@ func evaluate(h *Hamiltonian, t *parameterized.Template, params parameterized.Pa
 // is at most 2^-26 (1.49e-8), the offset is exact to 7.5e-9 rad, and a
 // gradient component is off by at most that times the largest slope,
 // which the Hamiltonian's coefficient sum bounds. Beyond it the rule
-// degrades until it fails: from 2^48 the default 0.3 step times a
+// degrades until it fails: above 2^48 the default 0.3 step times a
 // gradient of 0.1 rounds to no change, so VQE would freeze the parameter
 // and report Converged; from 2^51 the shift is applied at the wrong
 // offset (a multiple of 0.5 or coarser); above 2^54 the spacing exceeds
