@@ -1,0 +1,346 @@
+# `Template` Copy Guard — Design
+
+Date: 2026-09-10
+Status: Approved (backlog item text plus run-lead dispatch; no brainstorming gate).
+Resolves: backlog item 21 (`.superpowers/backlog/enhancement-backlog-2026-08-27/item-21.md`)
+
+## Context
+
+`parameterized.Template` holds four fields: `numQubits int`, `steps []step`,
+`paramOrder []string`, and `seen map[string]bool`. A Go value copy (`b := a`,
+`a := *NewTemplate(2)`, passing or returning a `Template` by value, storing
+one in a slice that later grows) copies the int, copies the two slice
+headers, and copies the map reference. After at least one declaration the
+copies therefore share one `seen` map and the backing arrays of `steps` and
+`paramOrder`, while each owns its own slice lengths. `AddParamGate`
+(`parameterized/parameterized.go:112-131`) consults `seen` to decide whether
+a name is new and appends to `paramOrder` only when it is; `ParamStepCounts`
+scans `steps`; `Bind` iterates `paramOrder` for completeness and reads
+`seen` for unknown keys.
+
+Observed today (`go test -tags redtests ./parameterized -run '^TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent' -v`),
+with `a := *NewTemplate(2)`, `a.AddParamGate("theta", Ry, 0)`, `b := a`:
+
+| Step | `seen` (shared) | `a.paramOrder` | `a.steps` | `b.paramOrder` | `b.steps` |
+|---|---|---|---|---|---|
+| after `b := a` | `{theta}` | `[theta]` | `[theta]` | `[theta]` | `[theta]` |
+| `b.AddParamGate("phi", Rx, 1)` | `{theta, phi}` | `[theta]` | `[theta]` | `[theta, phi]` | `[theta, phi]` |
+| `a.AddParamGate("phi", Rx, 1)` | `{theta, phi}` | `[theta]` (phi "already seen") | `[theta, phi]` | `[theta, phi]` | `[theta, phi]` |
+
+`a.ParamStepCounts()` is `map[phi:1 theta:1]`, `a.ParamNames()` is
+`[theta]`, and `a.Bind(Params{"theta": 0.1})` returns a circuit: the
+completeness loop runs over `paramOrder` only, so `phi` is never demanded,
+and the `phi` step is built from `values["phi"]`, which is 0 for a missing
+key. A parameter silently bound at angle 0 is exactly the failure `Bind`'s
+`MissingParameterError` exists to prevent.
+
+The slices are hazardous on their own, independent of `seen`. Once
+`append` has left spare capacity (three declarations give `len 3, cap 4`),
+a copy and its original both write their next step into the same backing
+slot: `b.AddGate(H, 0)` then `a.AddGate(X, 1)` leaves `b.steps[3]` holding
+`a`'s `X` gate, because `a`'s append overwrote the shared slot that `b`'s
+header still covers. Nothing in `b` records that the swap happened.
+
+The item offers two contracts: document `Template` as not safe to copy by
+value after any declaration, or make `AddParamGate`, `ParamNames`, and
+`ParamStepCounts` independent per copy. Nothing in the module copies a
+`Template` by value: `algorithm/h2.go`, `algorithm/qaoa.go`,
+`algorithm/vqe.go`, `internal/examples/qaoa.go`, and every test hold a
+`*parameterized.Template` or use a zero-value variable in place. The defect
+is reachable only by a caller outside the module.
+
+## Classification
+
+**Standard.** One new unexported field, one unexported helper, a guard at
+the top of three existing methods, and a one-line pin in two of them; no
+signature, exported type, or cross-package change. Short design doc plus a
+one-task plan.
+
+## Decision 1: a `Template` is not copyable after a declaration, and copies are refused at runtime
+
+**Make copies independent.** Rejected because Go cannot do it. A value
+copy is a shallow copy the language performs without calling any method,
+so the only ways to make `b := a` independent are to have no shared
+reference in the struct at all, or to detect the copy afterwards. Removing
+`seen` (the map) does not remove the sharing: the slice backing arrays are
+shared too, and the slot-overwrite in Context corrupts one copy's step list
+through the other's `append` whether or not a map exists. Copy-on-write
+(each mutator cloning `steps` and `paramOrder` before appending) would make
+every declaration O(n) and still leave `seen`, which cannot be cloned
+without a copy signal. Keeping `seen` as a cache validated against
+`paramOrder` (store the index, trust the entry only if
+`paramOrder[idx] == name`) was traced through and fails: two copies
+interleaving declarations write conflicting indexes into the one map, and
+the third declaration in such a sequence re-appends a name already listed.
+"Independent per copy" is not achievable for a value type holding slices
+or maps; this is why `sync.Mutex`, `bytes.Buffer`, and `strings.Builder`
+all forbid copying after first use rather than supporting it.
+
+**Document only.** Rejected by the dispatch and on its merits: the
+observed failure is a `Bind` that succeeds with a parameter silently at 0,
+the quietest possible wrong answer, and a doc sentence leaves it exactly
+as quiet.
+
+**Static detection through `go vet`'s `copylocks` (a `noCopy` field).**
+Rejected. It fires only when someone runs `vet`, which no caller outside
+the module is obliged to do, so the desync at runtime is unchanged. It
+would also flag the acceptance test's own `a := *NewTemplate(2)` and
+`b := a` lines, which the plan runs `go vet ./...` over, so the test that
+proves the defect fixed could not exist alongside it.
+
+**Document as copy-unsafe and refuse copies at runtime, `strings.Builder`
+style.** Chosen. `strings.Builder` keeps `addr *Builder`, sets it to the
+receiver on first use, and on every later mutator compares it with the
+receiver: a by-value copy carries the original's address and is caught
+(`strings/builder.go`, `copyCheck`). A `Template` gains the same field,
+`addr *Template`, and the same comparison. This is the precedent item 18's
+design already cited for the zero-value contract, so the two rulings on
+`Template` come from the same standard-library type: the zero value is
+usable, and a used value is not copyable. The contract stated on the type:
+a `Template` is used in place or through a pointer, as `NewTemplate`
+returns it; a copy taken after a declaration has been accepted is refused
+by `AddParamGate`, `AddGate`, and `Bind` with an error; a copy taken
+before that shares nothing and is an independent template.
+
+## Decision 2: the refusal is an error, not a panic
+
+`strings.Builder` panics. Here the three guarded methods all already
+return `error`, `AGENTS.md` says to prefer explicit errors over panics,
+item 18's contract on the type says "no method panics on it", and the one
+consumer in the module, `algorithm.VQE`, wraps whatever `Bind` returns
+into `InvalidVQEInputError` through `wrapEvaluationError`
+(`algorithm/vqe.go:308`), so an error reaches a variational caller as the
+same typed failure every other bad template produces, while a panic would
+end the run. Panic rejected.
+
+The error is one package-level unexported value,
+`errCopiedTemplate = errors.New("Template copied by value after a declaration; a declared Template is used in place or through a pointer, never by copy")`,
+returned by all three methods. It is untyped and unexported for the
+reason item 19's Decision 2 gave for the declaration-time argument checks:
+the package's typed errors are `Bind`-time binding errors a variational
+loop may branch on, and a misuse of the type is a caller bug of the same
+family as a nil factory or an empty target list, which are `fmt.Errorf`.
+It is one shared value rather than three `fmt.Errorf` calls because it
+carries no per-call data. No caller in the module needs to branch on it;
+tests match the phrase `copied by value` as item 19's tests match theirs.
+
+## Decision 3: which methods check, and where the pin happens
+
+**Checked: `AddParamGate`, `AddGate`, `Bind`.** These are the three
+methods that read `seen` or append to a slice. On a copy, either write
+would desync the copies (Context), and `Bind`'s unknown-key check reads
+the shared `seen`, so a copy would accept a key its own `paramOrder` never
+lists. Each method calls `checkNotCopied` as its first statement, before
+its argument checks: a copied template is unusable whatever the
+arguments, so `AddParamGate("x", nil, 1)` on a copy reports the copy, not
+the factory, and `Bind` on a copy reports the copy before any missing or
+unknown name.
+
+**Not checked: `NumQubits`, `ParamNames`, `ParamStepCounts`.** They read
+only `numQubits` and the elements inside the copy's own slice lengths.
+After a copy the original can only append beyond those lengths (the copy
+never writes, since its writers are refused), so the copy's accessors keep
+describing the template as it was when copied, consistent with each
+other. They return no error, so a check there could only panic, which
+Decision 2 rules out, or return zero values that lie. They stay as they
+are.
+
+**Pinned by the two writers, on an accepted declaration.** `t.addr = t`
+runs in `AddParamGate` and `AddGate` immediately after `checkTargets`
+succeeds and before the first mutation, so the pin and the first shared
+state come into being in the same call. A rejected declaration (nil
+factory, no targets, out-of-range target) leaves the template untouched,
+pin included, matching items 18 and 19's "nothing declared after a
+rejection". `Bind` checks but never pins: pinning is a write, and `Bind`
+is documented safe for concurrent calls once all `Add` calls complete;
+two goroutines binding a template with no declarations would otherwise
+race on `addr`. The `-race` run in Testing covers this. `NewTemplate`
+does not pin either, so `*NewTemplate(n)` before any declaration is a
+plain independent template, as the acceptance test's first line assumes.
+
+**No `noescape` trick.** `strings.Builder` stores its address through
+`abi.NoEscape` so that a stack-allocated `Builder` stays on the stack. A
+plain `t.addr = t` makes the receiver of `AddParamGate` and `AddGate`
+escape (`go build -gcflags=-m` reports `leaking param: t` for both after
+the change, against `leaking param content: t` before), so a zero-value
+`Template` declared as a local variable moves to the heap on its first
+declaration. Every template built with `NewTemplate` is on the heap
+already, templates are built once per run rather than per iteration, and
+the trick needs `unsafe` and an internal package the module does not
+import. Accepted as is.
+
+## Rulings on edge cases
+
+- **Copy of an undeclared template.** `var t Template; u := t`,
+  `u := *NewTemplate(2)`, or a copy after only rejected declarations:
+  `addr` is nil in both, `seen` is nil, the slices are nil; both go on as
+  independent templates. Pinned by `TestCopyBeforeDeclarationIsIndependent`.
+- **Copy after an accepted `AddGate` only.** `AddGate` pins too, since its
+  `append` is enough to corrupt the other copy's step list. A copy taken
+  after only fixed gates is refused like any other.
+- **A copy that outlives the original.** A function that declares into a
+  local `Template` and returns it by value hands back a copy whose `addr`
+  points at the dead local; every guarded method on it errors. This is
+  the `strings.Builder` rule ("must not be copied after first use") and
+  the reason the doc comment says to use a template in place or through
+  a pointer. Return `*Template`, as `NewTemplate` does.
+- **Refused calls change nothing.** The check runs before any write, so
+  the copy's and the original's `ParamNames`, `ParamStepCounts`, and
+  `steps` are as they were, and the original stays fully usable. Pinned
+  by `TestCopiedTemplateIsRefusedByAddAndBind`.
+- **The original is never affected by a copy.** The copy's writers are
+  refused, so the shared map and arrays are written only through the
+  original; the original's names and counts agree and its `Bind` demands
+  every declared name. This is the acceptance test's assertion.
+- **A copy of a copy** carries the same foreign `addr` and is refused the
+  same way.
+- **Error precedence.** The copy error precedes the nil-factory,
+  nil-gate, no-target, and range errors in the `Add` methods and the
+  missing, non-finite, and unknown errors in `Bind`. Pinned for the
+  nil-factory case.
+- **Concurrency.** The pin is a write inside `AddParamGate` and `AddGate`,
+  which are already writes. `Bind`'s check is a read of `addr`, so "safe
+  for concurrent reads after all `Add` calls complete" is unchanged;
+  `Bind`'s doc comment says so.
+- **Zero value.** Item 18's contract holds: the zero value is the template
+  `NewTemplate(0)` returns (`addr` is nil in both), no method panics on
+  it, and `TestZeroValueTemplateIsAZeroQubitTemplate` runs every call on
+  the same variable.
+
+## Effect on callers
+
+- `algorithm/h2.go` (`H2Ansatz`), `algorithm/qaoa.go` (`QAOATemplate`),
+  `algorithm/vqe.go` (`evaluate`, `parameterShiftGradient`,
+  `validateVQEStructure`, `VQE`), `internal/examples/qaoa.go`, and every
+  test take or return `*parameterized.Template` or use a zero-value
+  variable in place; none copies by value, so none changes behavior. Each
+  `AddParamGate` and `AddGate` call now runs one nil-pointer comparison
+  and one pointer store more; each `Bind` runs one comparison more. The
+  prototype's `go run ./cmd/quantum -demo qaoa` still prints
+  `VQE from the symmetric start: energy = -1.0000, expected cut = 2.0000`
+  followed by `iterations accepted: 29, energy evaluations: 378`.
+- A `Template` that a future caller copies by value after a declaration
+  now fails at its next `AddParamGate`, `AddGate`, or `Bind` with
+  `errCopiedTemplate`; through `VQE` that surfaces as
+  `InvalidVQEInputError` wrapping it.
+- No Go file outside `parameterized/` changes. `CHANGELOG.md` gains an
+  entry.
+
+## Backward compatibility (ADR-style note)
+
+Inputs that were accepted and now error: `AddParamGate`, `AddGate`, or
+`Bind` called on a by-value copy of a `Template` taken after an accepted
+declaration. Nothing used through a pointer or in place behaves
+differently. No signature changes; the new field and helper are
+unexported. Per `docs/compatibility-policy.md` this is a personal project
+with no external consumers; every internal caller is listed above and
+unaffected.
+
+- **CHANGELOG:** following items 15 through 20, an Unreleased entry under
+  the existing `### Fixed` heading, appended after item 20's entry
+  (entries within a section are appended in landing order).
+- **ADR-0010:** no amendment. Its decision (template materialization over
+  symbolic gates) and consequences (validation at `Bind`; QAOA reuses the
+  template) are untouched; how a template detects its own misuse is below
+  the ADR's level.
+- **The 2026-08-30 spec** (`docs/superpowers/specs/2026-08-30-parameter-binding-vqe-design.md`)
+  lists `NewTemplate(numQubits int) *Template` and never mentions value
+  copies; nothing in it becomes false. No amendment.
+- **Item 18's spec:** its "Copying a `Template` by value" ruling says the
+  copies share state and that it is out of scope there; this design is
+  that scope. Its Decision 1 cites `strings.Builder` as the zero-value
+  precedent, and this design follows the same type's copy rule. No
+  amendment.
+- **Item 19's spec:** its "Produces" note for item 21 says the `seen`,
+  `paramOrder`, and `steps` handling is byte for byte what item 18 left
+  it; this design adds a pin line before that handling and a check before
+  the argument checks, and edits none of it. No amendment.
+
+## Red test rulings
+
+`TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent` moves into
+`parameterized/parameterized_test.go` as
+`TestCopyAfterDeclarationKeepsNamesAndCountsConsistent`, the package's
+`Test<Subject><Verb>...` style. Its assertions were checked against the
+contract:
+
+- `a := *parameterized.NewTemplate(2)` then `a.AddParamGate("theta", Ry, 0)`
+  must succeed: the copy precedes any declaration, so `addr` is nil and
+  `a` is an independent template (Decision 3). Consistent; unchanged.
+- `b := a` then `b.AddParamGate("phi", Rx, 1)` must succeed (`t.Fatal(err)`
+  on error): **ruled against the contract and rewritten.** The red test
+  was written to reproduce the desync, so it drives the copy and expects
+  the drive to be accepted. Under Decision 1 that call is the misuse the
+  guard exists to catch, and accepting it is what let the desync happen;
+  the contract says it returns an error. The moved test asserts
+  `err == nil` is a failure, with a message saying the copy shares the
+  original's bookkeeping. This is the one expectation adjusted, and the
+  dispatch authorized exactly this adjustment for a copy-guard ruling.
+- `a.AddParamGate("phi", Rx, 1)` must succeed: `a` is the pinned original.
+  Consistent; unchanged.
+- Every name in `a.ParamStepCounts()` appears in `a.ParamNames()`: the
+  copy never wrote to `seen`, so `a`'s second declaration is new to it
+  and is appended to `paramOrder`. Consistent; unchanged, byte for byte.
+- `a.Bind(Params{"theta": 0.1})` returns `MissingParameterError`: `phi`
+  is in `a.paramOrder`. Consistent; unchanged, byte for byte.
+
+The leading comment is rewritten to describe the contract. The moved test
+says nothing about the error's text, about `AddGate` or `Bind` on a copy,
+about the accessors on a copy, or about copies taken before a
+declaration, so two tests pin those alongside it rather than editing the
+moved test further:
+
+- `TestCopiedTemplateIsRefusedByAddAndBind`: on `c := *orig` after one
+  declaration, `AddParamGate`, `AddParamGate` with a nil factory,
+  `AddGate`, and `Bind` each return an error containing `copied by value`;
+  `c.NumQubits()`, `c.ParamNames()`, `c.ParamStepCounts()` are `2`,
+  `[theta]`, `map[theta:1]`; `orig.ParamNames()` is still `[theta]`, and
+  `orig.AddGate` and `orig.Bind` succeed.
+- `TestCopyBeforeDeclarationIsIndependent`: `fresh := *NewTemplate(2)`,
+  `twin := fresh`, each declares a different name and each lists only its
+  own; `twin.Bind` succeeds; a copy taken after only a rejected
+  declaration (nil factory) accepts a declaration. Passes before and
+  after the change; it pins the half of the contract the code already
+  honors so a later change to the pin site cannot move it silently.
+
+With item 21's test gone, `parameterized/backlog_red_test.go` holds only
+item 22's test, which uses `testing`, `circuit`, `gates`, `parameterized`,
+and `state`; the `errors` import, used only by item 21's test, is removed
+with it. Item 22's test and comment are not edited, and the file's header
+comment is unchanged.
+
+## Testing
+
+All in `parameterized/parameterized_test.go` (package `parameterized_test`):
+
+- `TestCopyAfterDeclarationKeepsNamesAndCountsConsistent`: the moved
+  test. Fails today at the rewritten expectation with
+  `AddParamGate on a by-value copy taken after a declaration succeeded, want an error: the copy shares the original's bookkeeping`.
+- `TestCopiedTemplateIsRefusedByAddAndBind`: fails today at its first
+  assertion with
+  `AddParamGate on a copy: err = <nil>, want an error mentioning "copied by value"`.
+- `TestCopyBeforeDeclarationIsIndependent`: passes before and after.
+- `go test -race ./parameterized ./algorithm` clean: `Bind`'s check is a
+  read.
+- `go test -tags redtests ./parameterized -run '^TestRed'` must list
+  exactly `TestRedDeclaredTargetsAreNotAliasedToCallerSlice` (item 22) as
+  failing; `algorithm` has no tagged tests left (`no tests to run`).
+
+Prototype: every code and test change in the plan was applied to a
+scratch copy of the repository at `d52e18f`; the moved test and the
+refusal test failed as stated against the original methods, all
+seventeen tests in the package passed after the change, and `gofmt -l`,
+`go vet` (plain and `-tags redtests` on `parameterized` and `algorithm`),
+`staticcheck`, `go build`, `go test ./...`,
+`go test -race ./parameterized ./algorithm`, the red-tag run, and the
+QAOA demo were all as stated.
+
+## Out of scope
+
+Item 22 (declared targets alias the caller's slice; its red test stays
+tagged and still fails after this item, since the `append` line that
+stores `targets` is not edited). A `Clone` method for callers who want a
+second template from the first (nobody in the module does; declare
+twice). The `noescape` optimization (Decision 3). Typing or exporting the
+copy error. Any change to `NumQubits`, `ParamNames`, `ParamStepCounts`,
+`checkTargets`, `NewTemplate`, or any exported signature.
