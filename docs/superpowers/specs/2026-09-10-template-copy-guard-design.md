@@ -207,9 +207,9 @@ copy"; two values of a value type quietly writing one declaration list is
 neither. Decision 1 chose the first, so a used `Template` is refused as a
 copy rather than allowed to act as a silent alias, and that is the whole
 of what the guard now enforces. Removing it would be a contract change,
-giving `Template` map-like alias semantics, not a consistency fix; it
-would also reclaim the receiver escape (Decision 3's `noescape` note).
-Neither is proposed here.
+giving `Template` map-like alias semantics, not a consistency fix; with
+`addr` gone it would also give back the receiver escape the `noescape`
+note below records. Neither is proposed here.
 
 As one statement of the contract, for a reader who should not have to
 reconstruct it from three amendments: the state pointer keeps
@@ -449,7 +449,8 @@ Decision 3's round 3 amendment.)
   it restores nothing older than the original's own state. (Amended
   2026-09-10, round 3 fix: unless the original was reset to an undeclared
   template in between; see the round 3 note at the end of this bullet.
-  The round 1 sequence below has no such reset, so its answers stand.) In the round 1
+  The round 1 sequence below has no such reset, so its answers stand.)
+  In the round 1
   sequence (`b := a` after `theta`, `a` declares `phi`, `a = b`), `a`
   still lists `phi`, `a.Bind(Params{"theta": 0.1, "phi": 0.2})` succeeds,
   and `a.Bind(Params{"theta": 0.1})` is `MissingParameterError`. Round
