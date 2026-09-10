@@ -305,9 +305,11 @@ func TestParamStepCounts(t *testing.T) {
 
 // TestZeroValueTemplateAddParamGateDoesNotPanic pins that a Template
 // declared without NewTemplate is safe to call (backlog item 18). Before
-// the fix AddParamGate wrote to the nil seen map unconditionally and
-// panicked with "assignment to entry in nil map"; the map is now allocated
-// on the first declaration, so the call errors or succeeds like any other.
+// the fix AddParamGate wrote to a nil name-tracking map unconditionally and
+// panicked with "assignment to entry in nil map"; the fix allocated the
+// map on the first declaration, and backlog item 21 has since replaced it
+// with a name list held in state that the first accepted declaration
+// allocates, so the call errors or succeeds like any other.
 func TestZeroValueTemplateAddParamGateDoesNotPanic(t *testing.T) {
 	var tmpl parameterized.Template
 	defer func() {

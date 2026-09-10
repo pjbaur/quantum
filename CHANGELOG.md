@@ -117,9 +117,10 @@ stays tagged in `algorithm/backlog_red_numeric_test.go`. Design:
 so a `Template` declared as a plain variable rather than through
 `NewTemplate` panicked with "assignment to entry in nil map" on its first
 parameter declaration, although nothing documented `NewTemplate` as
-required. The map is now allocated on the first declaration, the only
-place it is written, and `NewTemplate` no longer pre-allocates it, so the
-zero value is exactly the template `NewTemplate(0)` returns: it declares
+required. The fix allocated the map on the first declaration, its only
+writer, and stopped `NewTemplate` pre-allocating it (the map has since
+been removed altogether; see the by-value copy entry below), so the zero
+value is exactly the template `NewTemplate(0)` returns: it declares
 nothing, rejects every target as out of range, and, once `Bind`'s own
 parameter checks pass, it fails as `circuit.New` does for a qubit count
 of zero. No method panics on it; templates built with `NewTemplate`
