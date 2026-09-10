@@ -837,11 +837,11 @@ func TestParamAccessorsReturnFreshContainers(t *testing.T) {
 
 	names := tmpl.ParamNames()
 	names[0] = "hacked"
-	// Appending to the returned slice must not reach the template's own
-	// array either; the returned slice has no spare capacity, so this
-	// reallocates rather than writing past the length.
-	if grown := append(names, "extra"); len(grown) != len(names)+1 {
-		t.Fatalf("append to the ParamNames() result: len = %d, want %d", len(grown), len(names)+1)
+	// The returned slice must have no spare capacity, so appending to it
+	// reallocates rather than writing past the length into the
+	// template's own array.
+	if cap(names) != len(names) {
+		t.Fatalf("cap(ParamNames()) = %d, want %d (no spare capacity)", cap(names), len(names))
 	}
 
 	counts := tmpl.ParamStepCounts()
