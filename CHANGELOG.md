@@ -182,8 +182,14 @@ error, before any other check, instead of touching the shared state.
 `NumQubits`, `ParamNames`, and `ParamStepCounts` on such a copy still
 describe the template as it was when copied; a copy taken before any
 declaration is accepted is an independent template; no method panics.
-Nothing in the module copies a `Template` by value, so no caller changes.
-Design: `docs/superpowers/specs/2026-09-10-template-copy-guard-design.md`.
+The name-tracking map is gone as well: whether a name is declared is read
+from the name list itself, so a copy assigned back over the original,
+which the receiver check cannot tell from the original, restores the
+lists as they were when the copy was taken and goes on consistently from
+there (the declarations made in between are dropped), instead of keeping
+a map entry for a name the restored list no longer holds. Nothing in the
+module copies a `Template` by value, so no caller changes. Design:
+`docs/superpowers/specs/2026-09-10-template-copy-guard-design.md`.
 
 ### Breaking
 

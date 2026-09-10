@@ -18,6 +18,12 @@ a name is new and appends to `paramOrder` only when it is; `ParamStepCounts`
 scans `steps`; `Bind` iterates `paramOrder` for completeness and reads
 `seen` for unknown keys.
 
+Amended 2026-09-10 (round 1 fix): the map described here is removed;
+`AddParamGate` and `Bind` now read the name list itself. See Decision 1's
+amendment and the copy-back ruling under "Rulings on edge cases". The
+rest of this section describes the code as it was when the design was
+written.
+
 Observed today (`go test -tags redtests ./parameterized -run '^TestRedCopyAfterDeclarationKeepsNamesAndCountsConsistent' -v`),
 with `a := *NewTemplate(2)`, `a.AddParamGate("theta", Ry, 0)`, `b := a`:
 
@@ -54,7 +60,9 @@ is reachable only by a caller outside the module.
 **Standard.** One new unexported field, one unexported helper, a guard at
 the top of three existing methods, and a one-line pin in two of them; no
 signature, exported type, or cross-package change. Short design doc plus a
-one-task plan.
+one-task plan. (Amended 2026-09-10, round 1 fix: also one field removed,
+`seen`, and a second unexported helper, `declared`; still no signature,
+exported type, or cross-package change.)
 
 ## Decision 1: a `Template` is not copyable after a declaration, and copies are refused at runtime
 
@@ -73,8 +81,26 @@ without a copy signal. Keeping `seen` as a cache validated against
 interleaving declarations write conflicting indexes into the one map, and
 the third declaration in such a sequence re-appends a name already listed.
 "Independent per copy" is not achievable for a value type holding slices
-or maps; this is why `sync.Mutex`, `bytes.Buffer`, and `strings.Builder`
-all forbid copying after first use rather than supporting it.
+or maps; this is why `sync.Mutex` documents, and `strings.Builder`
+enforces, a rule against copying after first use rather than supporting
+it.
+
+Amended 2026-09-10 (round 1 fix): `seen` is now removed, though not to
+make copies independent, which this paragraph still rules out: the
+backing arrays stay shared and the guard stays what refuses a copy. It is
+removed because it was the one field a by-value copy shared as a
+reference rather than as a snapshot, and round 1's black-box red testing
+found a copy the guard cannot see, a copy assigned back over the original
+(ruling under "Rulings on edge cases"), on which the shared map lied about
+which names the restored list holds. `AddParamGate` and `Bind` now ask
+`paramOrder` through the unexported `declared`, a linear scan. Item 18's
+spec rejected that scan for `Bind`'s hot path (O(declared names) per
+key); `Bind` now runs it only when `values` has more keys than the
+template has names, which after the completeness loop is exactly when an
+undeclared key exists (every declared name is present and the names are
+distinct), so the accepted path stays O(names) and the scan is paid only
+on the way to `UnknownParameterError`. The validated-cache variant traced
+above is moot with no map.
 
 **Document only.** Rejected by the dispatch and on its merits: the
 observed failure is a `Bind` that succeeds with a parameter silently at 0,
@@ -130,7 +156,12 @@ tests match the phrase `copied by value` as item 19's tests match theirs.
 methods that read `seen` or append to a slice. On a copy, either write
 would desync the copies (Context), and `Bind`'s unknown-key check reads
 the shared `seen`, so a copy would accept a key its own `paramOrder` never
-lists. Each method calls `checkNotCopied` as its first statement, before
+lists. (Amended 2026-09-10, round 1 fix: `seen` is gone and `Bind` reads
+`paramOrder`, so a copy's `Bind` would now answer from the copy's own
+lists. It stays refused: those lists share backing arrays with the
+original's and, after a copy-back, may no longer hold what they held when
+copied, see the copy-back ruling, and the contract as stated is that a
+copy is unusable as a whole.) Each method calls `checkNotCopied` as its first statement, before
 its argument checks: a copied template is unusable whatever the
 arguments, so `AddParamGate("x", nil, 1)` on a copy reports the copy, not
 the factory, and `Bind` on a copy reports the copy before any missing or
@@ -143,7 +174,10 @@ never writes, since its writers are refused), so the copy's accessors keep
 describing the template as it was when copied, consistent with each
 other. They return no error, so a check there could only panic, which
 Decision 2 rules out, or return zero values that lie. They stay as they
-are.
+are. (Amended 2026-09-10, round 1 fix: "can only append beyond those
+lengths" holds unless the original is rolled back below the copy's length
+by a copy-back and declares again; the copy-back ruling records that
+residual. The accessors still stay as they are, for the reasons given.)
 
 **Pinned by the two writers, on an accepted declaration.** `t.addr = t`
 runs in `AddParamGate` and `AddGate` immediately after `checkTargets`
@@ -167,7 +201,13 @@ the change, against `leaking param content: t` before), so a zero-value
 declaration. Every template built with `NewTemplate` is on the heap
 already, templates are built once per run rather than per iteration, and
 the trick needs `unsafe` and an internal package the module does not
-import. Accepted as is.
+import. Accepted as is. The escape is also what rules out address reuse:
+a `Template` that has pinned itself is on the heap and kept reachable by
+every copy's `addr`, so no later `Template` can come to occupy the pinned
+address while a copy holding it exists, and the comparison in
+`checkNotCopied` cannot pass a copy by coincidence. `strings.Builder`,
+through `abi.NoEscape`, leaves that theoretical hole open; this design
+does not.
 
 ## Rulings on edge cases
 
@@ -180,7 +220,9 @@ import. Accepted as is.
   after only fixed gates is refused like any other.
 - **A copy that outlives the original.** A function that declares into a
   local `Template` and returns it by value hands back a copy whose `addr`
-  points at the dead local; every guarded method on it errors. This is
+  points at the original, which the copy's `addr` keeps alive on the
+  heap (Decision 3: the receiver escapes on its first declaration); every
+  guarded method on the copy errors. This is
   the `strings.Builder` rule ("must not be copied after first use") and
   the reason the doc comment says to use a template in place or through
   a pointer. Return `*Template`, as `NewTemplate` does.
@@ -194,6 +236,52 @@ import. Accepted as is.
   every declared name. This is the acceptance test's assertion.
 - **A copy of a copy** carries the same foreign `addr` and is refused the
   same way.
+- **A copy assigned back over the original.** Amended 2026-09-10 (round 1
+  fix, `.superpowers/backlog/enhancement-backlog-2026-08-27/item-21-round-1-red.md`
+  survivors 1 and 2). `b := a` after a declaration, then
+  `a.AddParamGate("phi", Rx, 1)`, then `a = b` leaves `a` holding the
+  header pair from before `phi` with `addr == &a`, so `checkNotCopied`
+  passes; `strings.Builder`'s `copyCheck` is the same comparison and has
+  the same hole. While `seen` was a shared map it still held `phi`, so
+  `a.AddParamGate("phi", Rx, 1)` appended a step without listing the
+  name, and `a.Bind(Params{"theta": 0.1, "phi": 0.2})` accepted `phi` as
+  known while `ParamNames` omitted it: the item's desync, reached through
+  the guard. The fix removes the map (Decision 1's amendment):
+  `AddParamGate` and `Bind` read membership from `paramOrder`, the list
+  the copy-back restored. A copy-back is therefore a snapshot restore: `a`
+  holds the lists as they were when `b` was taken, every declaration made
+  in between is dropped, parameter and fixed gates alike, and `a` goes on
+  consistently from there. Detecting the copy-back instead was considered
+  and rejected: `len(seen)` against `len(paramOrder)` would miss a
+  copy-back that dropped only fixed gates or repeat declarations, a
+  shared step counter compared with `len(steps)` would catch every drop,
+  but survivor 2 asserts that `Bind` on the written-back `a` rejects
+  `phi` with `UnknownParameterError`, the answer `a`'s own lists give,
+  which any refusal contradicts; and dropping the intervening
+  declarations is what assigning an older value means, not a desync, so
+  it is outside the item's contract and is documented on the type rather
+  than detected. Completeness of the fix: only the pinned original writes
+  (every other copy is refused); it appends a step on every accepted
+  declaration and a name on the first declaration of each, always at the
+  index equal to its own length; so the writer's view is at every moment
+  its own appends in order, every step it holds names a parameter its
+  own list holds, and every listed name has a step below the length of
+  any snapshot taken after that name's declaration. A copy-back restores
+  both headers from one such snapshot, so the pair it restores is
+  consistent, and the writer's later appends keep it so. Hence
+  `ParamStepCounts` never lists a name `ParamNames` omits or vice versa,
+  and `Bind` demands exactly the listed names and rejects any other, on
+  the original and on any written-back value. Pinned by
+  `TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent` and
+  `TestCopyAssignedBackOverOriginalBindRejectsUnlistedName`. Residual:
+  after a copy-back the writer appends into slots that a copy taken
+  between the copy and the copy-back may still cover, when the slice had
+  spare capacity, so that refused copy's `ParamNames` and
+  `ParamStepCounts` can change under it and, if only one of the two
+  slices was reallocated, disagree with each other. The copy's `Bind` is
+  refused, and its accessors stay unguarded (Decision 3), so no binding
+  is ever built from inconsistent lists; the `Template` doc comment
+  states the residual.
 - **Error precedence.** The copy error precedes the nil-factory,
   nil-gate, no-target, and range errors in the `Add` methods and the
   missing, non-finite, and unknown errors in `Bind`. Pinned for the
@@ -215,7 +303,10 @@ import. Accepted as is.
   test take or return `*parameterized.Template` or use a zero-value
   variable in place; none copies by value, so none changes behavior. Each
   `AddParamGate` and `AddGate` call now runs one nil-pointer comparison
-  and one pointer store more; each `Bind` runs one comparison more. The
+  and one pointer store more; each `Bind` runs one comparison more.
+  (Amended 2026-09-10, round 1 fix: each `AddParamGate` also scans the
+  declared names instead of reading a map, and `Bind`'s accepted path
+  replaces one map read per key with one length comparison.) The
   prototype's `go run ./cmd/quantum -demo qaoa` still prints
   `VQE from the symmetric start: energy = -1.0000, expected cut = 2.0000`
   followed by `iterations accepted: 29, energy evaluations: 378`.
@@ -251,10 +342,15 @@ unaffected.
   that scope. Its Decision 1 cites `strings.Builder` as the zero-value
   precedent, and this design follows the same type's copy rule. No
   amendment.
-- **Item 19's spec:** its "Produces" note for item 21 says the `seen`,
+- **Item 19's plan** (`docs/superpowers/plans/2026-09-09-empty-target-list.md`,
+  the task's "Produces" note): says, for item 21, that the `seen`,
   `paramOrder`, and `steps` handling is byte for byte what item 18 left
-  it; this design adds a pin line before that handling and a check before
-  the argument checks, and edits none of it. No amendment.
+  it; item 19's spec says the same in its Decision 1 context without
+  naming item 21. This design adds a pin line before that handling and a
+  check before the argument checks. (Amended 2026-09-10, round 1 fix: the
+  round 1 fix then replaced the `seen` handling with a scan of
+  `paramOrder`; plans are historical records and are not amended, and
+  item 19's spec makes no claim that becomes false.)
 
 ## Red test rulings
 
@@ -309,6 +405,19 @@ and `state`; the `errors` import, used only by item 21's test, is removed
 with it. Item 22's test and comment are not edited, and the file's header
 comment is unchanged.
 
+Amended 2026-09-10 (round 1 fix): round 1's black-box red testing left
+two survivors in `parameterized/backlog_item21_red_test.go`, both on the
+copy-back sequence (ruling above). Both are in scope and both moved into
+`parameterized/parameterized_test.go` with their assertions intact,
+renamed to the package's style by dropping the `Item21` prefix:
+`TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent` (an
+accepted re-declaration after the copy-back must be listed, counted, and
+demanded; a refusal would also satisfy it, but under the fix the
+declaration is accepted and the assertions run) and
+`TestCopyAssignedBackOverOriginalBindRejectsUnlistedName` (`Bind` on the
+written-back value rejects the dropped name as `UnknownParameterError`).
+The survivor file is deleted.
+
 ## Testing
 
 All in `parameterized/parameterized_test.go` (package `parameterized_test`):
@@ -320,6 +429,16 @@ All in `parameterized/parameterized_test.go` (package `parameterized_test`):
   assertion with
   `AddParamGate on a copy: err = <nil>, want an error mentioning "copied by value"`.
 - `TestCopyBeforeDeclarationIsIndependent`: passes before and after.
+- Amended 2026-09-10 (round 1 fix):
+  `TestCopyAssignedBackOverOriginalKeepsNamesAndCountsConsistent` and
+  `TestCopyAssignedBackOverOriginalBindRejectsUnlistedName`, the moved
+  survivors; both failed against the guard alone (the first at the
+  names-versus-counts loop and the `Bind` assertion, the second with
+  `err = <nil>`) and pass with the map removed.
+  `TestCopiedTemplateIsRefusedByAddAndBind` also gained two `Bind` calls
+  on the copy, one with an empty binding and one with an undeclared
+  name, expecting the copy error ahead of `MissingParameterError` and
+  `UnknownParameterError` (round 1 review, minor 4).
 - `go test -race ./parameterized ./algorithm` clean: `Bind`'s check is a
   read.
 - `go test -tags redtests ./parameterized -run '^TestRed'` must list
