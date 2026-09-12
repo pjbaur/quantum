@@ -6,6 +6,32 @@
 
 **Architecture:** `Template` gains an unexported `addr *Template` field in the style of `strings.Builder`: the two writers set it to the receiver on the first accepted declaration, and all three methods that read `seen` or append to a slice compare it with the receiver first, returning one package-level error on a mismatch. The accessors (`NumQubits`, `ParamNames`, `ParamStepCounts`) are untouched, since they read only what a copy holds by value; `NewTemplate` and `Bind` never write `addr`, so a copy taken before any declaration stays an independent template and `Bind` stays a concurrent-safe read. The `Template` doc comment states the contract.
 
+Amended 2026-09-12: the architecture above is what was planned, not what
+shipped. The QA gate defeated the `addr` guard twice, and the design changed
+under it:
+
+- Round 1 found a copy assigned back over the original (`b := a`; `a`
+  declares; `a = b`) passing the guard, because `a.addr` still equals `&a`
+  while the shared `seen` map held names the restored `paramOrder` no longer
+  listed. The map was removed; membership is read from the name list.
+- Round 2 found a two-step copy-back still reproducing the item's own
+  symptom, because the per-copy slice headers could be restored over a
+  rewritten backing array. `steps` and `paramOrder` moved into a
+  heap-allocated `templateState` that the first accepted declaration
+  allocates and every later copy shares by pointer, so a copy-back writes
+  the same pointer over itself.
+- Round 3 recorded the consequence: the `templateState`, not the guard, is
+  what keeps `ParamNames` and `ParamStepCounts` consistent. The guard stays,
+  but only to enforce the contract that a declared `Template` is neither
+  copied into an independent value nor a silent alias.
+
+The shipped contract is in the spec, which carries three dated amendments.
+The task steps below still describe the original approach and were not
+rewritten; read them as the record of what was planned. Normally this
+repository leaves plans untouched for exactly that reason, and this note
+exists because the gap between plan and outcome was large enough to
+mislead.
+
 **Tech Stack:** Go standard library only. No new dependencies.
 
 **Spec:** `docs/superpowers/specs/2026-09-10-template-copy-guard-design.md`
